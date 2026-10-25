@@ -1,0 +1,80 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JJ Movies | Discover Movies</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a href="#" class="logo">JJ <span>Movies</span></a>
+    <div class="brand-divider"></div>
+    <span class="tagline">Your Movie Library</span>
+    <nav>
+      <a href="#home" class="active">⌂ Home</a>
+      <a href="#collection">▦ Categories</a>
+      <a href="#about">ⓘ About</a>
+    </nav>
+  </header>
+
+  <section class="hero" id="home">
+    <div class="hero-content">
+      <h1>Discover <span>Movies</span></h1>
+      <p>Search movies, explore genres and find your preferred version.</p>
+      <div class="search-box">
+        <span class="search-icon">⌕</span>
+        <input id="searchInput" type="search" placeholder="Search movie name...">
+      </div>
+    </div>
+  </section>
+
+  <main class="container" id="collection">
+    <div class="collection-heading">
+      <h2>Movie Collection</h2>
+      <span id="movieCount">0 movies</span>
+    </div>
+
+    <div class="filters">
+      <select id="genreFilter">
+        <option value="all">All Genres</option>
+        <option value="Action">Action</option>
+        <option value="Adventure">Adventure</option>
+        <option value="Comedy">Comedy</option>
+        <option value="Drama">Drama</option>
+        <option value="Sci-Fi">Sci-Fi</option>
+        <option value="Thriller">Thriller</option>
+        <option value="Fantasy">Fantasy</option>
+      </select>
+      <select id="yearFilter">
+        <option value="all">All Years</option>
+      </select>
+    </div>
+
+    <div id="movieGrid" class="movie-grid"></div>
+    <p id="emptyMessage" class="empty-message" hidden>
+      No movies found. Try another search.
+    </p>
+  </main>
+
+  <section class="about-section" id="about">
+    <h2>Welcome to JJ Movies</h2>
+    <p>Explore movie information, languages, quality options and available authorized viewing sources.</p>
+  </section>
+
+  <footer>
+    <a href="#" class="footer-logo">JJ <span>Movies</span></a>
+    <p>Your Movie Library · © 2026 JJ Movies</p>
+  </footer>
+
+  <div id="movieModal" class="modal" hidden>
+    <div class="modal-content">
+      <button id="closeModal" class="close-button" aria-label="Close">&times;</button>
+      <div id="modalDetails"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

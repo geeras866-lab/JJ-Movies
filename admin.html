@@ -1,0 +1,550 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JJ Movies - Admin Panel</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: Arial, sans-serif;
+      background: #090d18; color: #f4f5fa;
+    }
+    header {
+      background: #111827; padding: 18px 5%;
+      display: flex; justify-content: space-between;
+      align-items: center; border-bottom: 1px solid #293044;
+    }
+    header h2 { margin: 0; color: #ff3867; }
+    main { max-width: 1000px; margin: 25px auto; padding: 0 15px; }
+    .panel {
+      background: #111827; border: 1px solid #293044;
+      border-radius: 12px; padding: 22px; margin-bottom: 20px;
+    }
+    h2, h3 { margin-top: 0; }
+    input:not([type="checkbox"]):not([type="file"]), textarea {
+      display: block; width: 100%; margin: 8px 0 14px;
+      padding: 12px; color: white; background: #090d18;
+      border: 1px solid #35405a; border-radius: 7px; font-size: 15px;
+    }
+    input[type="file"] {
+      display: block; width: 100%; margin: 10px 0;
+      padding: 12px; background: #090d18;
+      border: 1px dashed #56617a; border-radius: 7px; color: white;
+    }
+    textarea { min-height: 85px; resize: vertical; }
+    label { font-size: 14px; color: #c5ccdc; }
+    button {
+      border: 0; border-radius: 7px; padding: 11px 15px;
+      margin: 4px 3px 4px 0; background: #ff3867;
+      color: white; font-weight: bold; cursor: pointer;
+    }
+    button.secondary { background: #303a50; }
+    button.danger { background: #b4233d; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .movie-row {
+      border: 1px solid #303a50; border-radius: 9px;
+      padding: 14px; margin: 12px 0; display: flex;
+      gap: 14px; align-items: flex-start;
+    }
+    .movie-row img {
+      width: 70px; min-width: 70px; border-radius: 5px;
+    }
+    .movie-info { flex: 1; min-width: 0; }
+    .movie-info p, .muted { color: #b8c0d2; font-size: 14px; }
+    #message { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .hidden { display: none !important; }
+    #posterPreview {
+      display: block; max-width: 180px; max-height: 260px;
+      object-fit: contain; border-radius: 8px; margin: 12px 0;
+      border: 1px solid #35405a;
+    }
+    .upload-box {
+      background: #090d18; border: 1px solid #35405a;
+      border-radius: 9px; padding: 14px; margin: 8px 0 14px;
+    }
+    @media(max-width: 500px) {
+      .movie-row { flex-direction: column; }
+      header { padding: 15px; }
+      .panel { padding: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>JJ Movies Admin</h2>
+    <button id="logoutBtn" class="secondary hidden">Logout</button>
+  </header>
+
+  <main>
+    <div id="message" class="panel">Ready.</div>
+
+    <section id="loginPanel" class="panel">
+      <h2>Admin Login</h2>
+      <p class="muted">Sign in with your registered admin email.</p>
+      <form id="loginForm">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required>
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <button type="submit">Login</button>
+      </form>
+    </section>
+
+    <section id="adminPanel" class="hidden">
+      <div class="panel">
+        <h2 id="formTitle">Add Movie</h2>
+        <form id="movieForm">
+          <label for="title">Movie Title *</label>
+          <input id="title" required maxlength="200">
+
+          <label for="year">Release Year</label>
+          <input id="year" type="number" min="1888" max="2100">
+
+          <label for="genre">Genre</label>
+          <input id="genre" placeholder="Action, Sci-Fi, Adventure">
+
+          <div class="upload-box">
+            <label for="posterFile"><strong>Choose poster image from your laptop</strong></label>
+            <input id="posterFile" type="file" accept="image/*">
+
+            <img id="posterPreview" class="hidden" alt="Poster preview">
+
+            <p id="fileInfo" class="muted">Select an image to preview it here.</p>
+            <button type="button" id="uploadBtn">Upload Poster Image</button>
+            <button type="button" id="clearImageBtn" class="secondary">Clear Selected Image</button>
+
+            <p class="muted">
+              Images are uploaded to your Supabase movie-posters bucket.
+              Maximum file size: 10 MB.
+            </p>
+          </div>
+
+          <label for="poster">Poster URL (filled automatically after upload)</label>
+          <input id="poster" type="url" placeholder="Choose an image and upload it">
+
+          <label for="description">Description</label>
+          <textarea id="description"></textarea>
+
+          <label>
+            <input id="published" type="checkbox" style="display:inline;width:auto;margin:8px">
+            Publish this movie on the public website
+          </label>
+          <br><br>
+          <button type="submit" id="saveBtn">Save Movie</button>
+          <button type="button" id="cancelBtn" class="secondary hidden">Cancel Edit</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>Manage Movies</h2>
+        <p class="muted">Edit, publish, unpublish, or delete your movie entries.</p>
+        <button id="refreshBtn" class="secondary">Refresh List</button>
+        <div id="movieList">Loading...</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    (function () {
+      var SUPABASE_URL = "https://tswyabgdldbsaopipvug.supabase.co";
+      var SUPABASE_KEY = "sb_publishable_902itkUPAUe272Q4B4jF0w_OEKDNuxr";
+      var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      var currentUser = null;
+      var editingId = null;
+      var selectedFile = null;
+      var previewObjectUrl = null;
+
+      var message = document.getElementById("message");
+      var loginPanel = document.getElementById("loginPanel");
+      var adminPanel = document.getElementById("adminPanel");
+      var movieList = document.getElementById("movieList");
+      var posterFile = document.getElementById("posterFile");
+      var posterPreview = document.getElementById("posterPreview");
+      var uploadBtn = document.getElementById("uploadBtn");
+
+      function showMessage(text) {
+        message.textContent = text;
+      }
+
+      function setPreview(url) {
+        if (url) {
+          posterPreview.src = url;
+          posterPreview.classList.remove("hidden");
+        } else {
+          posterPreview.removeAttribute("src");
+          posterPreview.classList.add("hidden");
+        }
+      }
+
+      function clearSelectedImage() {
+        selectedFile = null;
+        posterFile.value = "";
+        if (previewObjectUrl) {
+          URL.revokeObjectURL(previewObjectUrl);
+          previewObjectUrl = null;
+        }
+        document.getElementById("fileInfo").textContent =
+          "Select an image to preview it here.";
+        setPreview("");
+      }
+
+      function setLoggedIn(user) {
+        currentUser = user;
+        loginPanel.classList.toggle("hidden", !!user);
+        adminPanel.classList.add("hidden");
+        document.getElementById("logoutBtn").classList.toggle("hidden", !user);
+
+        if (!user) {
+          showMessage("Please log in with your admin account.");
+          return;
+        }
+        checkAdmin();
+      }
+
+      async function checkAdmin() {
+        showMessage("Checking admin permissions...");
+        var result = await supabase.rpc("is_jj_admin");
+
+        if (result.error || result.data !== true) {
+          adminPanel.classList.add("hidden");
+          showMessage("Admin check failed or this account is not authorized. " +
+            (result.error ? result.error.message : ""));
+          return;
+        }
+
+        adminPanel.classList.remove("hidden");
+        showMessage("Admin login successful.");
+        await loadMovies();
+      }
+
+      document.getElementById("loginForm").addEventListener("submit", async function (event) {
+        event.preventDefault();
+        showMessage("Signing in...");
+
+        var result = await supabase.auth.signInWithPassword({
+          email: document.getElementById("email").value.trim(),
+          password: document.getElementById("password").value
+        });
+
+        if (result.error) {
+          showMessage("Login failed: " + result.error.message);
+          return;
+        }
+
+        document.getElementById("password").value = "";
+        setLoggedIn(result.data.user);
+      });
+
+      document.getElementById("logoutBtn").addEventListener("click", async function () {
+        await supabase.auth.signOut();
+        currentUser = null;
+        adminPanel.classList.add("hidden");
+        loginPanel.classList.remove("hidden");
+        document.getElementById("logoutBtn").classList.add("hidden");
+        resetForm();
+        showMessage("You have logged out.");
+      });
+
+      function resetForm() {
+        editingId = null;
+        document.getElementById("movieForm").reset();
+        document.getElementById("formTitle").textContent = "Add Movie";
+        document.getElementById("saveBtn").textContent = "Save Movie";
+        document.getElementById("cancelBtn").classList.add("hidden");
+        clearSelectedImage();
+      }
+
+      document.getElementById("cancelBtn").addEventListener("click", resetForm);
+
+      posterFile.addEventListener("change", function () {
+        var file = posterFile.files && posterFile.files[0];
+        selectedFile = null;
+
+        if (previewObjectUrl) {
+          URL.revokeObjectURL(previewObjectUrl);
+          previewObjectUrl = null;
+        }
+
+        if (!file) {
+          setPreview("");
+          document.getElementById("fileInfo").textContent = "No image selected.";
+          return;
+        }
+
+        if (!file.type || file.type.indexOf("image/") !== 0) {
+          posterFile.value = "";
+          setPreview("");
+          showMessage("Please select an image file.");
+          return;
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+          posterFile.value = "";
+          setPreview("");
+          showMessage("Image is larger than 10 MB. Choose a smaller image.");
+          return;
+        }
+
+        selectedFile = file;
+        previewObjectUrl = URL.createObjectURL(file);
+        setPreview(previewObjectUrl);
+        document.getElementById("fileInfo").textContent =
+          file.name + " (" + (file.size / 1024 / 1024).toFixed(2) + " MB)";
+        showMessage("Image selected. Check the preview, then click Upload Poster Image.");
+      });
+
+      document.getElementById("clearImageBtn").addEventListener("click", function () {
+        clearSelectedImage();
+        showMessage("Selected image cleared. An existing poster URL, if any, is unchanged.");
+      });
+
+      uploadBtn.addEventListener("click", async function () {
+        if (!currentUser) {
+          showMessage("Please log in first.");
+          return;
+        }
+
+        if (!selectedFile) {
+          showMessage("First choose an image from your laptop.");
+          return;
+        }
+
+        uploadBtn.disabled = true;
+        showMessage("Uploading poster image... Please wait.");
+
+        try {
+          var safeName = selectedFile.name
+            .replace(/[^a-zA-Z0-9._-]/g, "_")
+            .slice(-100);
+          var filePath = currentUser.id + "/" + Date.now() + "-" + safeName;
+
+          var uploadResult = await supabase.storage
+            .from("movie-posters")
+            .upload(filePath, selectedFile, {
+              cacheControl: "3600",
+              upsert: false,
+              contentType: selectedFile.type
+            });
+
+          if (uploadResult.error) {
+            showMessage("Image upload failed: " + uploadResult.error.message);
+            return;
+          }
+
+          var publicResult = supabase.storage
+            .from("movie-posters")
+            .getPublicUrl(uploadResult.data.path);
+
+          var publicUrl = publicResult.data.publicUrl;
+          document.getElementById("poster").value = publicUrl;
+
+          if (previewObjectUrl) {
+            URL.revokeObjectURL(previewObjectUrl);
+            previewObjectUrl = null;
+          }
+          selectedFile = null;
+          posterFile.value = "";
+          setPreview(publicUrl);
+          document.getElementById("fileInfo").textContent = "Poster uploaded successfully.";
+
+          showMessage("Poster uploaded! Image URL filled automatically. Now click Save Movie.");
+        } catch (error) {
+          showMessage("Upload error: " + error.message);
+        } finally {
+          uploadBtn.disabled = false;
+        }
+      });
+
+      document.getElementById("movieForm").addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        if (!currentUser) {
+          showMessage("Please log in first.");
+          return;
+        }
+
+        if (selectedFile) {
+          showMessage("Please click Upload Poster Image before saving the movie.");
+          return;
+        }
+
+        var title = document.getElementById("title").value.trim();
+        var yearValue = document.getElementById("year").value;
+        var poster = document.getElementById("poster").value.trim();
+
+        if (!title) {
+          showMessage("Movie title is required.");
+          return;
+        }
+
+        if (poster && !/^https?:\/\//i.test(poster)) {
+          showMessage("Poster URL must start with http:// or https://");
+          return;
+        }
+
+        var movie = {
+          title: title,
+          release_year: yearValue ? Number(yearValue) : null,
+          genre: document.getElementById("genre").value.trim() || null,
+          poster_url: poster || null,
+          description: document.getElementById("description").value.trim() || null,
+          is_published: document.getElementById("published").checked
+        };
+
+        var saveBtn = document.getElementById("saveBtn");
+        saveBtn.disabled = true;
+        showMessage("Saving movie...");
+
+        var result;
+        if (editingId !== null) {
+          result = await supabase.from("movies").update(movie).eq("id", editingId);
+        } else {
+          result = await supabase.from("movies").insert(movie);
+        }
+
+        saveBtn.disabled = false;
+
+        if (result.error) {
+          showMessage("Could not save movie: " + result.error.message);
+          return;
+        }
+
+        showMessage(editingId !== null ? "Movie updated." : "Movie added.");
+        resetForm();
+        await loadMovies();
+      });
+
+      async function loadMovies() {
+        movieList.textContent = "Loading movies...";
+
+        var result = await supabase
+          .from("movies")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (result.error) {
+          movieList.textContent = "Could not load movies: " + result.error.message;
+          return;
+        }
+
+        movieList.innerHTML = "";
+
+        if (!result.data.length) {
+          movieList.textContent = "No movies yet. Add your first movie above.";
+          return;
+        }
+
+        result.data.forEach(function (movie) {
+          var row = document.createElement("div");
+          row.className = "movie-row";
+
+          if (movie.poster_url) {
+            var image = document.createElement("img");
+            image.src = movie.poster_url;
+            image.alt = "";
+            image.onerror = function () { image.style.display = "none"; };
+            row.appendChild(image);
+          }
+
+          var info = document.createElement("div");
+          info.className = "movie-info";
+
+          var title = document.createElement("h3");
+          title.textContent = movie.title +
+            (movie.release_year ? " (" + movie.release_year + ")" : "");
+
+          var details = document.createElement("p");
+          details.textContent = (movie.genre || "No genre") + " • " +
+            (movie.is_published ? "Published" : "Unpublished");
+
+          var editBtn = document.createElement("button");
+          editBtn.textContent = "Edit";
+          editBtn.className = "secondary";
+          editBtn.addEventListener("click", function () {
+            editingId = movie.id;
+            document.getElementById("title").value = movie.title || "";
+            document.getElementById("year").value = movie.release_year || "";
+            document.getElementById("genre").value = movie.genre || "";
+            document.getElementById("poster").value = movie.poster_url || "";
+            document.getElementById("description").value = movie.description || "";
+            document.getElementById("published").checked = !!movie.is_published;
+            document.getElementById("formTitle").textContent = "Edit Movie";
+            document.getElementById("saveBtn").textContent = "Update Movie";
+            document.getElementById("cancelBtn").classList.remove("hidden");
+            clearSelectedImage();
+            if (movie.poster_url) setPreview(movie.poster_url);
+            window.scrollTo(0, 0);
+          });
+
+          var publishBtn = document.createElement("button");
+          publishBtn.textContent = movie.is_published ? "Unpublish" : "Publish";
+          publishBtn.className = "secondary";
+          publishBtn.addEventListener("click", async function () {
+            publishBtn.disabled = true;
+            var result = await supabase.from("movies")
+              .update({ is_published: !movie.is_published })
+              .eq("id", movie.id);
+
+            if (result.error) {
+              showMessage("Publish change failed: " + result.error.message);
+            } else {
+              showMessage(movie.is_published ? "Movie unpublished." : "Movie published.");
+              await loadMovies();
+            }
+            publishBtn.disabled = false;
+          });
+
+          var deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "Delete";
+          deleteBtn.className = "danger";
+          deleteBtn.addEventListener("click", async function () {
+            if (!window.confirm("Delete '" + movie.title + "' permanently?")) return;
+
+            deleteBtn.disabled = true;
+            var result = await supabase.from("movies").delete().eq("id", movie.id);
+
+            if (result.error) {
+              showMessage("Delete failed: " + result.error.message);
+            } else {
+              showMessage("Movie deleted.");
+              await loadMovies();
+            }
+            deleteBtn.disabled = false;
+          });
+
+          info.appendChild(title);
+          info.appendChild(details);
+
+          if (movie.description) {
+            var desc = document.createElement("p");
+            desc.textContent = movie.description;
+            info.appendChild(desc);
+          }
+
+          info.appendChild(editBtn);
+          info.appendChild(publishBtn);
+          info.appendChild(deleteBtn);
+          row.appendChild(info);
+          movieList.appendChild(row);
+        });
+      }
+
+      document.getElementById("refreshBtn").addEventListener("click", loadMovies);
+
+      supabase.auth.getSession().then(function (result) {
+        setLoggedIn(result.data.session ? result.data.session.user : null);
+      });
+
+      supabase.auth.onAuthStateChange(function (event, session) {
+        if (event === "SIGNED_OUT") {
+          setLoggedIn(null);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
