@@ -1,6 +1,7 @@
 
 var SUPABASE_URL = "https://tswyabgdldbsaopipvug.supabase.co";
 var SUPABASE_KEY = "sb_publishable_902itkUPAUe272Q4B4jF0w_OEKDNuxr";
+var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 
 var movies = [];
 
@@ -62,8 +63,7 @@ function loadMovies() {
         setupYears();
         renderMovies();
         movieCount.textContent = "0 movies";
-        emptyMessage.textContent =
-          "No published movies yet. Add a movie in Supabase and set is_published to true.";
+        emptyMessage.textContent = "No published movies yet.";
         return;
       }
 
@@ -75,7 +75,7 @@ function loadMovies() {
 
       return fetch(
         SUPABASE_URL +
-          "/rest/v1/movie_versions?select=*&movie_id=in.(" +
+          "/rest/v1/movie_versions?select=id,movie_id,quality,audio_language,source_type,viewing_url&movie_id=in.(" +
           encodeURIComponent(idFilter) +
           ")",
         {
@@ -99,9 +99,10 @@ function loadMovies() {
               })
               .map(function (version) {
                 return {
+                  id: version.id,
                   quality: version.quality || "Standard",
                   audio: version.audio_language || "Not specified",
-                  source: version.source_type || "Not specified",
+                  source: version.source_type || "Telegram",
                   viewingUrl: version.viewing_url || ""
                 };
               });
@@ -116,7 +117,7 @@ function loadMovies() {
       movieCount.textContent = "Unable to load movies";
       emptyMessage.hidden = false;
       emptyMessage.textContent =
-        "Movies load avvaledu. Internet, Supabase URL, API key, and database policies check chey.";
+        "Movies load avvaledu. Internet, Supabase API key, and database policies check chey.";
       movieGrid.innerHTML = "";
     });
 }
@@ -238,36 +239,47 @@ function showMovieDetails(movieId) {
   if (!movie) return;
 
   var versionHTML = movie.versions.map(function (version) {
-    var linkHTML = "";
+    var botURL =
+      "https://t.me/" +
+      TELEGRAM_BOT_USERNAME +
+      "?start=" +
+      encodeURIComponent(String(version.id));
+
+    var sourceHTML = "";
 
     if (version.viewingUrl) {
-      var safeUrl = "";
       try {
         var parsedUrl = new URL(version.viewingUrl);
-        if (parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:") {
-          safeUrl = parsedUrl.href;
+
+        if (
+          parsedUrl.protocol === "https:" &&
+          (parsedUrl.hostname === "t.me" ||
+            parsedUrl.hostname === "telegram.me")
+        ) {
+          sourceHTML =
+            '<p class="version-source">Source: ' +
+            escapeHTML(version.source) +
+            "</p>";
         }
       } catch (e) {}
-
-      if (safeUrl) {
-        linkHTML =
-          '<p><a href="' + escapeHTML(safeUrl) +
-          '" target="_blank" rel="noopener noreferrer">Open authorized source</a></p>';
-      }
     }
 
     return (
       '<div class="version-item">' +
       "<strong>" + escapeHTML(version.quality) + "</strong>" +
       "<p>Audio: " + escapeHTML(version.audio) + "</p>" +
-      "<p>Source: " + escapeHTML(version.source) + "</p>" +
-      linkHTML +
+      sourceHTML +
+      '<p><a class="details-button telegram-download-button" href="' +
+      escapeHTML(botURL) +
+      '" target="_blank" rel="noopener noreferrer">Get with Telegram Bot</a></p>' +
       "</div>"
     );
   }).join("");
 
   modalDetails.innerHTML =
-    "<h2>" + escapeHTML(movie.title) + " (" + escapeHTML(movie.year) + ")</h2>" +
+    "<h2>" + escapeHTML(movie.title) +
+    (movie.year ? " (" + escapeHTML(movie.year) + ")" : "") +
+    "</h2>" +
     "<p><strong>Genre:</strong> " + escapeHTML(movie.genre) + "</p>" +
     "<p>" + escapeHTML(movie.description) + "</p>" +
     "<h3>Available Versions</h3>" +
