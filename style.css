@@ -1,456 +1,511 @@
 
 * {
-    box-sizing: border-box;
-  }
-  
-  html {
-    scroll-behavior: smooth;
-  }
-  
-  body {
-    margin: 0;
-    background: #080d18;
-    color: #f5f6fa;
-    font-family: Arial, Helvetica, sans-serif;
-  }
-  
-  .topbar {
-    min-height: 58px;
-    padding: 10px 3.5%;
-    display: flex;
-    align-items: center;
-    gap: 17px;
-    background: #0b101d;
-    border-bottom: 1px solid #252d3c;
-  }
-  
-  .logo,
-  .footer-logo {
-    font-size: 29px;
-    font-weight: 800;
-    letter-spacing: -1px;
-    color: #f7f7fb;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-  
-  .logo span,
-  .footer-logo span {
-    color: #ff2450;
-  }
-  
-  .brand-divider {
-    width: 1px;
-    height: 28px;
-    background: #343c4b;
-  }
-  
-  .tagline {
-    color: #c3cbdc;
-    font-size: 13px;
-    white-space: nowrap;
-  }
-  
-  .topbar nav {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 25px;
-  }
-  
-  .topbar nav a {
-    color: #c8d0e1;
-    text-decoration: none;
-    font-size: 13px;
-    white-space: nowrap;
-    padding: 9px 0;
-  }
-  
-  .topbar nav a:hover,
-  .topbar nav a.active {
-    color: #ff3158;
-  }
-  
-  .hero {
-    min-height: 205px;
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    padding: 27px 18px 30px;
-    overflow: hidden;
-    background:
-      linear-gradient(90deg, rgba(8, 13, 25, .65), rgba(8, 13, 25, .35)),
-      url("https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1600&q=85")
-      center 48% / cover no-repeat,
-      #12192a;
-    border-bottom: 1px solid #29344a;
-  }
-  
-  .hero-content {
-    width: 100%;
-    max-width: 650px;
-    position: relative;
-    z-index: 1;
-  }
-  
-  .hero h1 {
-    font-size: clamp(30px, 4vw, 43px);
-    margin: 0 0 8px;
-    font-weight: 800;
-    letter-spacing: -1px;
-    text-shadow: 0 2px 12px #000;
-  }
-  
-  .hero h1 span {
-    color: #ff3158;
-  }
-  
-  .hero p {
-    margin: 0 0 19px;
-    color: #d4deef;
-    font-size: 14px;
-    line-height: 1.5;
-  }
-  
-  .search-box {
-    display: flex;
-    align-items: center;
-    gap: 13px;
-    max-width: 590px;
-    margin: auto;
-    padding: 0 17px;
-    height: 52px;
-    border: 1px solid #345173;
-    border-radius: 11px;
-    background: rgba(13, 25, 44, .93);
-    box-shadow: 0 6px 25px rgba(0, 0, 0, .25);
-  }
-  
-  .search-icon {
-    color: #c6d8f2;
-    font-size: 28px;
-    line-height: 1;
-  }
-  
-  .search-box input {
-    width: 100%;
-    border: 0;
-    outline: 0;
-    color: white;
-    background: transparent;
-    font-size: 14px;
-  }
-  
-  .search-box input::placeholder {
-    color: #aab8ce;
-  }
-  
-  .container {
-    padding: 23px 3.5% 30px;
-    max-width: 1600px;
-    margin: auto;
-  }
-  
-  .collection-heading {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 15px;
-  }
-  
-  .collection-heading h2 {
-    font-size: 23px;
-    margin: 0;
-    letter-spacing: -.4px;
-  }
-  
-  #movieCount {
-    color: #aebdd4;
-    font-size: 12px;
-    white-space: nowrap;
-  }
-  
-  .filters {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-  
-  .filters select {
-    width: 172px;
-    max-width: 48%;
-    padding: 12px 13px;
-    color: #edf2fc;
-    background: #111a2b;
-    border: 1px solid #293850;
-    border-radius: 8px;
-    outline: none;
-    font-size: 13px;
-  }
-  
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #080d18;
+  color: #f5f6fa;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.topbar {
+  min-height: 58px;
+  padding: 10px 3.5%;
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  background: #0b101d;
+  border-bottom: 1px solid #252d3c;
+}
+
+.logo,
+.footer-logo {
+  font-size: 29px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: #f7f7fb;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.logo span,
+.footer-logo span {
+  color: #ff2450;
+}
+
+.brand-divider {
+  width: 1px;
+  height: 28px;
+  background: #343c4b;
+}
+
+.tagline {
+  color: #c3cbdc;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.topbar nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 25px;
+}
+
+.topbar nav a {
+  color: #c8d0e1;
+  text-decoration: none;
+  font-size: 13px;
+  white-space: nowrap;
+  padding: 9px 0;
+}
+
+.topbar nav a:hover,
+.topbar nav a.active {
+  color: #ff3158;
+}
+
+.hero {
+  min-height: 205px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 27px 18px 30px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(8, 13, 25, .65), rgba(8, 13, 25, .35)),
+    url("https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1600&q=85")
+    center 48% / cover no-repeat,
+    #12192a;
+  border-bottom: 1px solid #29344a;
+}
+
+.hero-content {
+  width: 100%;
+  max-width: 650px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero h1 {
+  font-size: clamp(30px, 4vw, 43px);
+  margin: 0 0 8px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  text-shadow: 0 2px 12px #000;
+}
+
+.hero h1 span {
+  color: #ff3158;
+}
+
+.hero p {
+  margin: 0 0 19px;
+  color: #d4deef;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  max-width: 590px;
+  margin: auto;
+  padding: 0 17px;
+  height: 52px;
+  border: 1px solid #345173;
+  border-radius: 11px;
+  background: rgba(13, 25, 44, .93);
+  box-shadow: 0 6px 25px rgba(0, 0, 0, .25);
+}
+
+.search-icon {
+  color: #c6d8f2;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.search-box input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: white;
+  background: transparent;
+  font-size: 14px;
+}
+
+.search-box input::placeholder {
+  color: #aab8ce;
+}
+
+/* Android App Download Button */
+.app-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+  padding: 14px 24px;
+  background: #ff2450;
+  color: #ffffff;
+  text-decoration: none;
+  border: 1px solid #ff5274;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(255, 36, 80, 0.22);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.app-download-btn:hover {
+  background: #e91441;
+  transform: translateY(-2px);
+}
+
+.app-download-note {
+  margin-top: 10px !important;
+  margin-bottom: 0 !important;
+  color: #d4deef;
+  font-size: 12px !important;
+}
+
+.container {
+  padding: 23px 3.5% 30px;
+  max-width: 1600px;
+  margin: auto;
+}
+
+.collection-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.collection-heading h2 {
+  font-size: 23px;
+  margin: 0;
+  letter-spacing: -.4px;
+}
+
+#movieCount {
+  color: #aebdd4;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.filters select {
+  width: 172px;
+  max-width: 48%;
+  padding: 12px 13px;
+  color: #edf2fc;
+  background: #111a2b;
+  border: 1px solid #293850;
+  border-radius: 8px;
+  outline: none;
+  font-size: 13px;
+}
+
+.movie-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.movie-card {
+  min-width: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, #101725, #0b111e);
+  border: 1px solid #27364c;
+  border-radius: 7px;
+  transition: transform .2s, border-color .2s, box-shadow .2s;
+}
+
+.movie-card:hover {
+  transform: translateY(-4px);
+  border-color: #ff3158;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+}
+
+.poster {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  display: block;
+  object-fit: cover;
+  background: #192338;
+}
+
+.poster-placeholder {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 12px;
+  color: #ff5674;
+  font-size: 19px;
+  font-weight: bold;
+  background: linear-gradient(145deg, #1a2a42, #111521);
+}
+
+.movie-info {
+  padding: 11px 10px 10px;
+}
+
+.movie-info h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.movie-meta {
+  margin-bottom: 10px;
+  color: #a9bad4;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.details-button {
+  display: block;
+  width: 100%;
+  padding: 9px 5px;
+  color: white;
+  background: #ff2450;
+  border: 0;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.details-button:hover {
+  background: #e91441;
+}
+
+.empty-message {
+  text-align: center;
+  color: #b6c4d9;
+  padding: 35px 10px;
+}
+
+.about-section {
+  padding: 35px 20px;
+  text-align: center;
+  background: #0d1422;
+  border-top: 1px solid #263146;
+}
+
+.about-section h2 {
+  margin-top: 0;
+}
+
+.about-section p {
+  max-width: 600px;
+  margin: auto;
+  color: #aebbd0;
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+footer {
+  padding: 25px 15px;
+  text-align: center;
+  background: #090e18;
+  border-top: 1px solid #242f43;
+}
+
+.footer-logo {
+  font-size: 23px;
+}
+
+footer p {
+  color: #8d9bb1;
+  font-size: 12px;
+}
+
+/* Footer App Download Link */
+.footer-app-link {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 10px 16px;
+  color: #ffffff;
+  background: #ff2450;
+  text-decoration: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 0.2s ease;
+}
+
+.footer-app-link:hover {
+  background: #e91441;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  padding: 20px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, .84);
+}
+
+.modal-content {
+  position: relative;
+  max-width: 700px;
+  margin: 35px auto;
+  padding: 25px;
+  border: 1px solid #2b3e59;
+  border-radius: 10px;
+  background: #0e1727;
+  box-shadow: 0 20px 70px #0009;
+}
+
+.close-button {
+  position: absolute;
+  top: 8px;
+  right: 13px;
+  color: white;
+  background: transparent;
+  border: 0;
+  font-size: 30px;
+  cursor: pointer;
+}
+
+.modal-content h2 {
+  padding-right: 25px;
+  font-size: 25px;
+}
+
+.modal-content p {
+  color: #bfcee3;
+  line-height: 1.65;
+  font-size: 14px;
+}
+
+.version-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.version-item {
+  padding: 14px;
+  border: 1px solid #2d405a;
+  border-radius: 7px;
+  background: #142238;
+}
+
+.version-item strong {
+  display: block;
+  margin-bottom: 7px;
+}
+
+.version-item span {
+  color: #bdcbe0;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@media (min-width: 1200px) {
   .movie-grid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
   }
-  
-  .movie-card {
-    min-width: 0;
-    overflow: hidden;
-    background: linear-gradient(180deg, #101725, #0b111e);
-    border: 1px solid #27364c;
-    border-radius: 7px;
-    transition: transform .2s, border-color .2s, box-shadow .2s;
+}
+
+@media (max-width: 900px) {
+  .topbar nav {
+    gap: 12px;
   }
-  
-  .movie-card:hover {
-    transform: translateY(-4px);
-    border-color: #ff3158;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+
+  .tagline,
+  .brand-divider {
+    display: none;
   }
-  
-  .poster {
-    width: 100%;
-    aspect-ratio: 2 / 3;
-    display: block;
-    object-fit: cover;
-    background: #192338;
+
+  .movie-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
-  
-  .poster-placeholder {
-    width: 100%;
-    aspect-ratio: 2 / 3;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 12px;
-    color: #ff5674;
-    font-size: 19px;
-    font-weight: bold;
-    background: linear-gradient(145deg, #1a2a42, #111521);
+}
+
+@media (max-width: 600px) {
+  .topbar {
+    padding: 12px 4%;
+    flex-wrap: wrap;
   }
-  
-  .movie-info {
-    padding: 11px 10px 10px;
-  }
-  
-  .movie-info h3 {
-    margin: 0 0 8px;
-    font-size: 13px;
-    line-height: 1.4;
-    overflow-wrap: anywhere;
-  }
-  
-  .movie-meta {
-    margin-bottom: 10px;
-    color: #a9bad4;
-    font-size: 11px;
-    line-height: 1.4;
-  }
-  
-  .details-button {
-    display: block;
-    width: 100%;
-    padding: 9px 5px;
-    color: white;
-    background: #ff2450;
-    border: 0;
-    border-radius: 5px;
-    font-size: 11px;
-    font-weight: bold;
-    cursor: pointer;
-  }
-  
-  .details-button:hover {
-    background: #e91441;
-  }
-  
-  .empty-message {
-    text-align: center;
-    color: #b6c4d9;
-    padding: 35px 10px;
-  }
-  
-  .about-section {
-    padding: 35px 20px;
-    text-align: center;
-    background: #0d1422;
-    border-top: 1px solid #263146;
-  }
-  
-  .about-section h2 {
-    margin-top: 0;
-  }
-  
-  .about-section p {
-    max-width: 600px;
-    margin: auto;
-    color: #aebbd0;
-    line-height: 1.7;
-    font-size: 14px;
-  }
-  
-  footer {
-    padding: 25px 15px;
-    text-align: center;
-    background: #090e18;
-    border-top: 1px solid #242f43;
-  }
-  
-  .footer-logo {
-    font-size: 23px;
-  }
-  
-  footer p {
-    color: #8d9bb1;
-    font-size: 12px;
-  }
-  
-  .modal {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    padding: 20px;
-    overflow-y: auto;
-    background: rgba(0, 0, 0, .84);
-  }
-  
-  .modal-content {
-    position: relative;
-    max-width: 700px;
-    margin: 35px auto;
-    padding: 25px;
-    border: 1px solid #2b3e59;
-    border-radius: 10px;
-    background: #0e1727;
-    box-shadow: 0 20px 70px #0009;
-  }
-  
-  .close-button {
-    position: absolute;
-    top: 8px;
-    right: 13px;
-    color: white;
-    background: transparent;
-    border: 0;
-    font-size: 30px;
-    cursor: pointer;
-  }
-  
-  .modal-content h2 {
-    padding-right: 25px;
+
+  .logo {
     font-size: 25px;
   }
-  
-  .modal-content p {
-    color: #bfcee3;
-    line-height: 1.65;
+
+  .topbar nav {
+    gap: 14px;
+  }
+
+  .topbar nav a {
+    font-size: 11px;
+  }
+
+  .hero {
+    min-height: 205px;
+  }
+
+  .hero p {
+    font-size: 12px;
+  }
+
+  .app-download-btn {
+    width: 100%;
+    max-width: 320px;
+    padding: 14px 18px;
     font-size: 14px;
   }
-  
-  .version-list {
-    display: grid;
-    gap: 10px;
-    margin-top: 15px;
+
+  .container {
+    padding: 22px 12px 30px;
   }
-  
-  .version-item {
-    padding: 14px;
-    border: 1px solid #2d405a;
-    border-radius: 7px;
-    background: #142238;
+
+  .collection-heading h2 {
+    font-size: 19px;
   }
-  
-  .version-item strong {
-    display: block;
-    margin-bottom: 7px;
+
+  .movie-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
-  
-  .version-item span {
-    color: #bdcbe0;
+
+  .movie-info {
+    padding: 10px 8px;
+  }
+
+  .movie-info h3 {
     font-size: 13px;
-    line-height: 1.8;
   }
-  
-  [hidden] {
-    display: none !important;
+
+  .modal-content {
+    padding: 20px 15px;
+    margin: 20px auto;
   }
-  
-  @media (min-width: 1200px) {
-    .movie-grid {
-      grid-template-columns: repeat(8, minmax(0, 1fr));
-    }
-  }
-  
-  @media (max-width: 900px) {
-    .topbar nav {
-      gap: 12px;
-    }
-  
-    .tagline,
-    .brand-divider {
-      display: none;
-    }
-  
-    .movie-grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-  }
-  
-  @media (max-width: 600px) {
-    .topbar {
-      padding: 12px 4%;
-      flex-wrap: wrap;
-    }
-  
-    .logo {
-      font-size: 25px;
-    }
-  
-    .topbar nav {
-      gap: 14px;
-    }
-  
-    .topbar nav a {
-      font-size: 11px;
-    }
-  
-    .hero {
-      min-height: 205px;
-    }
-  
-    .hero p {
-      font-size: 12px;
-    }
-  
-    .container {
-      padding: 22px 12px 30px;
-    }
-  
-    .collection-heading h2 {
-      font-size: 19px;
-    }
-  
-    .movie-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-    }
-  
-    .movie-info {
-      padding: 10px 8px;
-    }
-  
-    .movie-info h3 {
-      font-size: 13px;
-    }
-  
-    .modal-content {
-      padding: 20px 15px;
-      margin: 20px auto;
-    }
-  }
-  
+}
