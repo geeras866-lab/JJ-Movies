@@ -110,7 +110,7 @@ function createExtraSections() {
     pinned.id = "jjPinnedSection";
     pinned.className = "jj-feature-section";
     pinned.innerHTML =
-      '<h2 id="jjPinnedHeading">📌 Featured Movies</h2>' +
+      '<h2 id="jjPinnedHeading">📌 Movies</h2>' +
       '<div id="jjPinnedGrid" class="movie-grid"></div>';
 
     collection.parentNode.insertBefore(pinned, collection);
