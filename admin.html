@@ -1,4 +1,4 @@
-
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -36,6 +36,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .section-note{color:#b8c0d2;font-size:13px;line-height:1.6}
 .checkline{display:flex;gap:9px;align-items:center;margin:14px 0}
 .checkline input{width:auto!important;margin:0!important}
+.pin-label-box{background:#090d18;border:1px solid #35405a;border-radius:9px;padding:14px;margin:10px 0 16px}
 hr{border-color:#303a50;margin:24px 0}
 @media(max-width:500px){.movie-row{flex-direction:column}header{padding:15px}.panel{padding:15px}}
 </style>
@@ -99,6 +100,12 @@ hr{border-color:#303a50;margin:24px 0}
           <input id="pinned" type="checkbox">
           Pin this movie to the homepage
         </label>
+
+        <div class="pin-label-box">
+          <label for="pinLabel"><strong>Custom Pin Label (optional)</strong></label>
+          <input id="pinLabel" type="text" maxlength="60" placeholder="Example: 🔥 NEW MOVIE">
+          <p class="section-note">Enter the exact text you want to show on the pinned movie. Examples: 🔥 NEW MOVIE, 🎬 NEW TRAILER, ⭐ TRENDING. The label is saved with the movie and displayed when it is pinned.</p>
+        </div>
 
         <label class="checkline">
           <input id="published" type="checkbox">
@@ -463,6 +470,7 @@ hr{border-color:#303a50;margin:24px 0}
       description: document.getElementById("description").value.trim() || null,
       trailer_url: trailer || null,
       is_pinned: document.getElementById("pinned").checked,
+      pin_label: document.getElementById("pinLabel").value.trim() || null,
       is_published: document.getElementById("published").checked
     };
 
@@ -549,7 +557,8 @@ hr{border-color:#303a50;margin:24px 0}
         var title = makeElement("h3", "", movie.title + (movie.release_year ? " (" + movie.release_year + ")" : ""));
         var details = makeElement("p", "", (movie.genre || "No genre") + " • " +
           (movie.is_published ? "Published" : "Unpublished") + " • " +
-          (movie.is_pinned ? "📌 Pinned" : "Not pinned"));
+          (movie.is_pinned ? "📌 Pinned" : "Not pinned") +
+          (movie.is_pinned && movie.pin_label ? " • Label: " + movie.pin_label : ""));
 
         var editBtn = makeElement("button", "secondary", "Edit");
         editBtn.addEventListener("click", function () {
@@ -561,6 +570,7 @@ hr{border-color:#303a50;margin:24px 0}
           document.getElementById("trailerUrl").value = movie.trailer_url || "";
           document.getElementById("description").value = movie.description || "";
           document.getElementById("pinned").checked = !!movie.is_pinned;
+          document.getElementById("pinLabel").value = movie.pin_label || "";
           document.getElementById("published").checked = !!movie.is_published;
           document.getElementById("formTitle").textContent = "Edit Movie";
           document.getElementById("saveBtn").textContent = "Update Movie";
@@ -572,13 +582,34 @@ hr{border-color:#303a50;margin:24px 0}
 
         var pinBtn = makeElement("button", "secondary", movie.is_pinned ? "Unpin" : "📌 Pin to Homepage");
         pinBtn.addEventListener("click", async function () {
+          var updateData;
+
+          if (!movie.is_pinned) {
+            var customLabel = window.prompt(
+              "Enter a custom pin label for this movie (example: 🔥 NEW MOVIE):",
+              movie.pin_label || ""
+            );
+
+            if (customLabel === null) {
+              showMessage("Pin cancelled. No changes were made.");
+              return;
+            }
+
+            updateData = {
+              is_pinned: true,
+              pin_label: customLabel.trim() || null
+            };
+          } else {
+            updateData = { is_pinned: false };
+          }
+
           pinBtn.disabled = true;
           try {
-            var r = await supabase.from("movies").update({ is_pinned: !movie.is_pinned }).eq("id", movie.id);
+            var r = await supabase.from("movies").update(updateData).eq("id", movie.id);
             if (r.error) {
               showMessage("Pin change failed: " + r.error.message);
             } else {
-              showMessage(movie.is_pinned ? "Movie unpinned." : "Movie pinned to homepage.");
+              showMessage(movie.is_pinned ? "Movie unpinned. Its custom label has been saved." : "Movie pinned with your custom label.");
               await loadMovies();
             }
           } catch (error) {
@@ -946,3 +977,4 @@ hr{border-color:#303a50;margin:24px 0}
 </script>
 </body>
 </html>
+```
