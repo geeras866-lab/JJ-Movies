@@ -30,48 +30,39 @@ function escapeHTML(value) {
 function safeURL(value) {
   try {
     var url = new URL(value);
-
     if (url.protocol === "https:" || url.protocol === "http:") {
       return url.href;
     }
   } catch (e) {}
-
   return "";
 }
 
 function getMoviePinLabel(movie) {
-  if (!movie || !movie.pinned) {
-    return "";
-  }
-
-  return String(movie.pinLabel || "").trim() || "📌 PINNED";
+  if (!movie || movie.pinned !== true) return "";
+  return String(movie.pinLabel || "").trim();
 }
 
-/* Add extra sections without changing index.html */
+/* Extra sections and styles */
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
     var style = document.createElement("style");
     style.id = "jjExtraStyles";
-
     style.textContent = `
       .jj-feature-section {
         max-width:1200px;
         margin:28px auto;
         padding:0 20px;
       }
-
       .jj-feature-section h2 {
         color:#f4f5fa;
         margin-bottom:18px;
       }
-
       .jj-pinned-label {
         color:#ff3867;
         font-size:13px;
         font-weight:bold;
         margin-bottom:8px;
       }
-
       .jj-update-card {
         background:#111827;
         border:1px solid #293044;
@@ -80,17 +71,14 @@ function createExtraSections() {
         margin:12px 0;
         overflow-wrap:anywhere;
       }
-
       .jj-update-card h3 {
         margin:0 0 8px;
         color:#ff7293;
       }
-
       .jj-update-card p {
         color:#c5ccdc;
         line-height:1.6;
       }
-
       .jj-trailer-button {
         display:inline-block;
         padding:10px 14px;
@@ -101,19 +89,16 @@ function createExtraSections() {
         margin:8px 0;
         font-weight:bold;
       }
-
       .jj-pin-badge {
         color:#ff7293;
         font-size:12px;
         font-weight:bold;
         overflow-wrap:anywhere;
       }
-
       .jj-feature-section .movie-grid {
         margin-bottom:20px;
       }
     `;
-
     document.head.appendChild(style);
   }
 
@@ -124,7 +109,6 @@ function createExtraSections() {
     var pinned = document.createElement("section");
     pinned.id = "jjPinnedSection";
     pinned.className = "jj-feature-section";
-
     pinned.innerHTML =
       '<h2 id="jjPinnedHeading">📌 Featured Movies</h2>' +
       '<div id="jjPinnedGrid" class="movie-grid"></div>';
@@ -136,7 +120,6 @@ function createExtraSections() {
     var updates = document.createElement("section");
     updates.id = "jjUpdatesSection";
     updates.className = "jj-feature-section";
-
     updates.innerHTML =
       '<h2>📝 JJ Movies — Latest Updates</h2>' +
       '<div id="jjUpdatesList"><p class="muted">Loading updates...</p></div>';
@@ -164,7 +147,6 @@ function loadMovies() {
       if (!response.ok) {
         throw new Error("Movies request failed: " + response.status);
       }
-
       return response.json();
     })
     .then(function (data) {
@@ -177,7 +159,7 @@ function loadMovies() {
           poster: item.poster_url || "",
           description: item.description || "",
           pinned: item.is_pinned === true,
-          pinLabel: item.pin_label || "",
+          pinLabel: String(item.pin_label || "").trim(),
           trailer: safeURL(item.trailer_url || ""),
           versions: []
         };
@@ -204,11 +186,8 @@ function loadMovies() {
       )
         .then(function (response) {
           if (!response.ok) {
-            throw new Error(
-              "Movie versions request failed: " + response.status
-            );
+            throw new Error("Movie versions request failed: " + response.status);
           }
-
           return response.json();
         })
         .then(function (versions) {
@@ -234,12 +213,10 @@ function loadMovies() {
     })
     .catch(function (error) {
       console.error("JJ Movies error:", error);
-
       movieCount.textContent = "Unable to load movies";
       emptyMessage.hidden = false;
       emptyMessage.textContent =
         "Movies load avvaledu. Internet, Supabase API key and database policies check cheyyi.";
-
       movieGrid.innerHTML = "";
       loadMessages();
     });
@@ -247,14 +224,10 @@ function loadMovies() {
 
 function setupYears() {
   yearFilter.innerHTML = '<option value="all">All Years</option>';
-
   var years = [];
 
   movies.forEach(function (movie) {
-    if (
-      movie.year &&
-      years.indexOf(String(movie.year)) === -1
-    ) {
+    if (movie.year && years.indexOf(String(movie.year)) === -1) {
       years.push(String(movie.year));
     }
   });
@@ -312,12 +285,11 @@ function createMovieCard(movie) {
   var info = document.createElement("div");
   info.className = "movie-info";
 
-  var label = getMoviePinLabel(movie);
-
-  if (label) {
+  var pinLabel = getMoviePinLabel(movie);
+  if (pinLabel) {
     var badge = document.createElement("div");
     badge.className = "jj-pin-badge";
-    badge.textContent = label;
+    badge.textContent = pinLabel;
     info.appendChild(badge);
   }
 
@@ -326,14 +298,12 @@ function createMovieCard(movie) {
 
   var meta = document.createElement("div");
   meta.className = "movie-meta";
-  meta.textContent =
-    (movie.year || "Year unknown") + " • " + movie.genre;
+  meta.textContent = (movie.year || "Year unknown") + " • " + movie.genre;
 
   var button = document.createElement("button");
   button.className = "details-button";
   button.type = "button";
   button.textContent = "View Details";
-
   button.addEventListener("click", function () {
     showMovieDetails(movie.id);
   });
@@ -341,7 +311,6 @@ function createMovieCard(movie) {
   info.appendChild(title);
   info.appendChild(meta);
   info.appendChild(button);
-
   card.appendChild(info);
 
   return card;
@@ -358,14 +327,13 @@ function renderMovies() {
     movieGrid.appendChild(createMovieCard(movie));
   });
 
-  // Use a custom heading when a pinned movie has a custom label
   if (pinnedHeading) {
-    var firstPinnedWithLabel = movies.find(function (movie) {
-      return movie.pinned && String(movie.pinLabel || "").trim() !== "";
+    var pinnedMoviesWithLabel = movies.filter(function (movie) {
+      return movie.pinned && getMoviePinLabel(movie) !== "";
     });
 
-    pinnedHeading.textContent = firstPinnedWithLabel
-      ? firstPinnedWithLabel.pinLabel.trim()
+    pinnedHeading.textContent = pinnedMoviesWithLabel.length
+      ? "📌 " + getMoviePinLabel(pinnedMoviesWithLabel[0])
       : "📌 Featured Movies";
   }
 
@@ -383,20 +351,17 @@ function renderMovies() {
     if (!pinnedMovies.length) {
       var note = document.createElement("p");
       note.className = "muted";
-
       note.textContent = movies.some(function (movie) {
         return movie.pinned;
       })
         ? "No pinned movies match your current filters."
         : "No featured movies right now.";
-
       pinnedGrid.appendChild(note);
     }
   }
 
   movieCount.textContent =
-    filtered.length +
-    (filtered.length === 1 ? " movie" : " movies");
+    filtered.length + (filtered.length === 1 ? " movie" : " movies");
 
   emptyMessage.hidden = filtered.length !== 0;
 
@@ -433,7 +398,6 @@ function showMovieDetails(movieId) {
     if (telegramURL) {
       try {
         var parsedUrl = new URL(telegramURL);
-
         if (
           parsedUrl.hostname === "t.me" ||
           parsedUrl.hostname === "telegram.me"
@@ -448,12 +412,8 @@ function showMovieDetails(movieId) {
 
     return (
       '<div class="version-item">' +
-      "<strong>" +
-      escapeHTML(version.quality) +
-      "</strong>" +
-      "<p>Audio: " +
-      escapeHTML(version.audio) +
-      "</p>" +
+      "<strong>" + escapeHTML(version.quality) + "</strong>" +
+      "<p>Audio: " + escapeHTML(version.audio) + "</p>" +
       sourceHTML +
       '<p><a class="details-button telegram-download-button" href="' +
       escapeHTML(botURL) +
@@ -462,13 +422,10 @@ function showMovieDetails(movieId) {
     );
   }).join("");
 
-  // IMPORTANT: show the database's custom label, not "Featured Movie"
+  /* Custom label only: no hard-coded "Featured Movie" badge */
   var pinLabel = getMoviePinLabel(movie);
-
   var pinBadgeHTML = pinLabel
-    ? '<p class="jj-pin-badge">' +
-      escapeHTML(pinLabel) +
-      "</p>"
+    ? '<p class="jj-pin-badge">' + escapeHTML(pinLabel) + "</p>"
     : "";
 
   modalDetails.innerHTML =
@@ -494,7 +451,6 @@ function showMovieDetails(movieId) {
 
 function loadMessages() {
   var updatesList = document.getElementById("jjUpdatesList");
-
   if (!updatesList) return;
 
   fetch(
@@ -506,7 +462,6 @@ function loadMessages() {
       if (!response.ok) {
         throw new Error("Updates request failed: " + response.status);
       }
-
       return response.json();
     })
     .then(function (data) {
@@ -532,7 +487,6 @@ function loadMessages() {
         card.appendChild(paragraph);
 
         var linkURL = safeURL(item.link_url || "");
-
         if (linkURL) {
           var link = document.createElement("a");
           link.className = "jj-trailer-button";
@@ -540,7 +494,6 @@ function loadMessages() {
           link.target = "_blank";
           link.rel = "noopener noreferrer";
           link.textContent = "Open Link";
-
           card.appendChild(link);
         }
 
@@ -549,7 +502,6 @@ function loadMessages() {
     })
     .catch(function (error) {
       console.error("JJ Movies updates:", error);
-
       updatesList.textContent =
         "Updates load avvaledu. Supabase jj_messages table and public read policy check cheyyi.";
     });
