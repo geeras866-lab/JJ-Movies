@@ -39,7 +39,7 @@ function safeURL(value) {
   return "";
 }
 
-/* Add extra sections without changing index.html */
+/* Create extra sections without changing index.html */
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
     var style = document.createElement("style");
@@ -118,7 +118,7 @@ function createExtraSections() {
     pinned.className = "jj-feature-section";
 
     pinned.innerHTML =
-      '<h2>📌 Featured Movies</h2>' +
+      '<h2 id="jjPinnedHeading">📌 Featured Movies</h2>' +
       '<div id="jjPinnedGrid" class="movie-grid"></div>';
 
     collection.parentNode.insertBefore(pinned, collection);
@@ -170,7 +170,7 @@ function loadMovies() {
           description: item.description || "",
           pinned: item.is_pinned === true,
 
-          // NEW: Custom label saved in Supabase
+          // Custom pin label from Supabase
           pinLabel: item.pin_label || "",
 
           trailer: safeURL(item.trailer_url || ""),
@@ -307,7 +307,7 @@ function createMovieCard(movie) {
   var info = document.createElement("div");
   info.className = "movie-info";
 
-  // NEW: Display the custom label for pinned movies
+  // Show the movie's custom label on its card
   if (movie.pinned) {
     var badge = document.createElement("div");
     badge.className = "jj-pin-badge";
@@ -344,12 +344,24 @@ function createMovieCard(movie) {
 function renderMovies() {
   var filtered = movies.filter(matchesFilters);
   var pinnedGrid = document.getElementById("jjPinnedGrid");
+  var pinnedHeading = document.getElementById("jjPinnedHeading");
 
   movieGrid.innerHTML = "";
 
   filtered.forEach(function (movie) {
     movieGrid.appendChild(createMovieCard(movie));
   });
+
+  // Dynamically update the Featured Movies section heading
+  if (pinnedHeading) {
+    var firstPinnedWithLabel = movies.find(function (movie) {
+      return movie.pinned && movie.pinLabel.trim() !== "";
+    });
+
+    pinnedHeading.textContent = firstPinnedWithLabel
+      ? firstPinnedWithLabel.pinLabel
+      : "📌 Featured Movies";
+  }
 
   if (pinnedGrid) {
     pinnedGrid.innerHTML = "";
@@ -444,7 +456,6 @@ function showMovieDetails(movieId) {
     );
   }).join("");
 
-  // NEW: Custom label is also shown in movie details
   var pinBadgeHTML = movie.pinned
     ? '<p class="jj-pin-badge">' +
       escapeHTML(movie.pinLabel || "📌 PINNED") +
