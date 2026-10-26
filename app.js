@@ -39,7 +39,15 @@ function safeURL(value) {
   return "";
 }
 
-/* Create extra sections without changing index.html */
+function getMoviePinLabel(movie) {
+  if (!movie || !movie.pinned) {
+    return "";
+  }
+
+  return String(movie.pinLabel || "").trim() || "📌 PINNED";
+}
+
+/* Add extra sections without changing index.html */
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
     var style = document.createElement("style");
@@ -169,10 +177,7 @@ function loadMovies() {
           poster: item.poster_url || "",
           description: item.description || "",
           pinned: item.is_pinned === true,
-
-          // Custom pin label from Supabase
           pinLabel: item.pin_label || "",
-
           trailer: safeURL(item.trailer_url || ""),
           versions: []
         };
@@ -307,11 +312,12 @@ function createMovieCard(movie) {
   var info = document.createElement("div");
   info.className = "movie-info";
 
-  // Show the movie's custom label on its card
-  if (movie.pinned) {
+  var label = getMoviePinLabel(movie);
+
+  if (label) {
     var badge = document.createElement("div");
     badge.className = "jj-pin-badge";
-    badge.textContent = movie.pinLabel || "📌 PINNED";
+    badge.textContent = label;
     info.appendChild(badge);
   }
 
@@ -352,14 +358,14 @@ function renderMovies() {
     movieGrid.appendChild(createMovieCard(movie));
   });
 
-  // Dynamically update the Featured Movies section heading
+  // Use a custom heading when a pinned movie has a custom label
   if (pinnedHeading) {
     var firstPinnedWithLabel = movies.find(function (movie) {
-      return movie.pinned && movie.pinLabel.trim() !== "";
+      return movie.pinned && String(movie.pinLabel || "").trim() !== "";
     });
 
     pinnedHeading.textContent = firstPinnedWithLabel
-      ? firstPinnedWithLabel.pinLabel
+      ? firstPinnedWithLabel.pinLabel.trim()
       : "📌 Featured Movies";
   }
 
@@ -456,9 +462,12 @@ function showMovieDetails(movieId) {
     );
   }).join("");
 
-  var pinBadgeHTML = movie.pinned
+  // IMPORTANT: show the database's custom label, not "Featured Movie"
+  var pinLabel = getMoviePinLabel(movie);
+
+  var pinBadgeHTML = pinLabel
     ? '<p class="jj-pin-badge">' +
-      escapeHTML(movie.pinLabel || "📌 PINNED") +
+      escapeHTML(pinLabel) +
       "</p>"
     : "";
 
