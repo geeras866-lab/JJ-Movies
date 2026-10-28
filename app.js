@@ -1,4 +1,3 @@
-
 var SUPABASE_URL = "https://tswyabgdldbsaopipvug.supabase.co";
 var SUPABASE_KEY = "sb_publishable_902itkUPAUe272Q4B4jF0w_OEKDNuxr";
 var TELEGRAM_BOT_USERNAME = "jj_files_bot";
@@ -155,6 +154,7 @@ function loadMovies() {
           id: item.id,
           title: item.title || "Untitled",
           year: item.release_year || "",
+          runtime: item.runtime || "",
           genre: item.genre || "Other",
           poster: item.poster_url || "",
           description: item.description || "",
@@ -296,9 +296,14 @@ function createMovieCard(movie) {
   var title = document.createElement("h3");
   title.textContent = movie.title;
 
+  var metaParts = [];
+  metaParts.push(movie.year || "Year unknown");
+  if (movie.genre) metaParts.push(movie.genre);
+  if (movie.runtime) metaParts.push(movie.runtime);
+
   var meta = document.createElement("div");
   meta.className = "movie-meta";
-  meta.textContent = (movie.year || "Year unknown") + " • " + movie.genre;
+  meta.textContent = metaParts.join(" • ");
 
   var button = document.createElement("button");
   button.className = "details-button";
@@ -428,6 +433,10 @@ function showMovieDetails(movieId) {
     ? '<p class="jj-pin-badge">' + escapeHTML(pinLabel) + "</p>"
     : "";
 
+  var runtimeHTML = movie.runtime
+    ? "<p><strong>Runtime:</strong> " + escapeHTML(movie.runtime) + "</p>"
+    : "";
+
   modalDetails.innerHTML =
     pinBadgeHTML +
     "<h2>" +
@@ -437,6 +446,7 @@ function showMovieDetails(movieId) {
     "<p><strong>Genre:</strong> " +
     escapeHTML(movie.genre) +
     "</p>" +
+    runtimeHTML +
     "<p>" +
     escapeHTML(movie.description) +
     "</p>" +
