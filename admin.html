@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -72,6 +71,9 @@ hr{border-color:#303a50;margin:24px 0}
 
         <label for="year">Release Year</label>
         <input id="year" type="number" min="1888" max="2100">
+
+        <label for="runtime">Runtime (Duration)</label>
+        <input id="runtime" type="text" maxlength="50" placeholder="Example: 2h 15m or 135 min">
 
         <label for="genre">Genre</label>
         <input id="genre" placeholder="Action, Sci-Fi, Adventure">
@@ -336,6 +338,7 @@ hr{border-color:#303a50;margin:24px 0}
   function resetMovieForm() {
     editingId = null;
     document.getElementById("movieForm").reset();
+    document.getElementById("runtime").value = "";
     document.getElementById("formTitle").textContent = "Add Movie";
     document.getElementById("saveBtn").textContent = "Save Movie";
     document.getElementById("cancelBtn").classList.add("hidden");
@@ -444,6 +447,7 @@ hr{border-color:#303a50;margin:24px 0}
 
     var title = document.getElementById("title").value.trim();
     var yearValue = document.getElementById("year").value;
+    var runtimeValue = document.getElementById("runtime").value.trim();
     var posterInput = document.getElementById("poster").value.trim();
     var trailerInput = document.getElementById("trailerUrl").value.trim();
     var poster = posterInput ? safeHttpUrl(posterInput) : "";
@@ -465,6 +469,7 @@ hr{border-color:#303a50;margin:24px 0}
     var movie = {
       title: title,
       release_year: yearValue ? Number(yearValue) : null,
+      runtime: runtimeValue || null,
       genre: document.getElementById("genre").value.trim() || null,
       poster_url: poster || null,
       description: document.getElementById("description").value.trim() || null,
@@ -555,16 +560,22 @@ hr{border-color:#303a50;margin:24px 0}
 
         var info = makeElement("div", "movie-info");
         var title = makeElement("h3", "", movie.title + (movie.release_year ? " (" + movie.release_year + ")" : ""));
-        var details = makeElement("p", "", (movie.genre || "No genre") + " • " +
-          (movie.is_published ? "Published" : "Unpublished") + " • " +
-          (movie.is_pinned ? "📌 Pinned" : "Not pinned") +
-          (movie.is_pinned && movie.pin_label ? " • Label: " + movie.pin_label : ""));
+        
+        var metaItems = [];
+        if (movie.runtime) metaItems.push("⏱ " + movie.runtime);
+        metaItems.push(movie.genre || "No genre");
+        metaItems.push(movie.is_published ? "Published" : "Unpublished");
+        metaItems.push(movie.is_pinned ? "📌 Pinned" : "Not pinned");
+        if (movie.is_pinned && movie.pin_label) metaItems.push("Label: " + movie.pin_label);
+
+        var details = makeElement("p", "", metaItems.join(" • "));
 
         var editBtn = makeElement("button", "secondary", "Edit");
         editBtn.addEventListener("click", function () {
           editingId = movie.id;
           document.getElementById("title").value = movie.title || "";
           document.getElementById("year").value = movie.release_year || "";
+          document.getElementById("runtime").value = movie.runtime || "";
           document.getElementById("genre").value = movie.genre || "";
           document.getElementById("poster").value = movie.poster_url || "";
           document.getElementById("trailerUrl").value = movie.trailer_url || "";
@@ -977,4 +988,3 @@ hr{border-color:#303a50;margin:24px 0}
 </script>
 </body>
 </html>
-```
