@@ -7,7 +7,7 @@ var messages = [];
 
 var movieGrid = document.getElementById("movieGrid");
 var searchInput = document.getElementById("searchInput");
-var genreFilter = document.getElementById("genreFilter"); // Category select dropdown in HTML
+var genreFilter = document.getElementById("genreFilter");
 var yearFilter = document.getElementById("yearFilter");
 var movieCount = document.getElementById("movieCount");
 var emptyMessage = document.getElementById("emptyMessage");
@@ -102,8 +102,8 @@ function loadMovies() {
           title: item.title || "Untitled",
           year: item.release_year || "",
           runtime: item.runtime || "",
-          category: item.category || "", // Reading directly from new category column
-          genre: item.genre || "", // Genre is safe and untouched
+          category: item.category || "",
+          genre: item.genre || "",
           poster: item.poster_url || "",
           description: item.description || "",
           pinned: item.is_pinned === true,
