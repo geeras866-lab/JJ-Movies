@@ -29,10 +29,6 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .hidden{display:none!important}
 #posterPreview{display:block;max-width:180px;max-height:260px;object-fit:contain;border-radius:8px;margin:12px 0;border:1px solid #35405a}
 .upload-box{background:#090d18;border:1px solid #35405a;border-radius:9px;padding:14px;margin:8px 0 14px}
-.version-row,.announcement-row{border:1px solid #35405a;border-radius:9px;padding:14px;margin:12px 0;overflow-wrap:anywhere}
-.version-row p,.announcement-row p{color:#c5ccdc;font-size:14px;line-height:1.5}
-.version-row a,.announcement-row a{color:#ff7293}
-.section-note{color:#b8c0d2;font-size:13px;line-height:1.6}
 .checkline{display:flex;gap:9px;align-items:center;margin:14px 0}
 .checkline input{width:auto!important;margin:0!important}
 hr{border-color:#303a50;margin:24px 0}
@@ -72,8 +68,9 @@ hr{border-color:#303a50;margin:24px 0}
         <label for="runtime">Runtime</label>
         <input id="runtime" type="text" maxlength="50" placeholder="2h 15m">
 
-        <label for="genre">Category Name *</label>
-        <input id="genre" type="text" placeholder="Type category (e.g. Marvel, DC, Dubbed)" required>
+        <!-- Independent Category Field -->
+        <label for="categoryInput">Category Folder Name *</label>
+        <input id="categoryInput" type="text" placeholder="Type category folder (e.g. Marvel, DC, Dubbed)" required>
 
         <div class="upload-box">
           <label for="posterFile"><strong>Choose poster image</strong></label>
@@ -156,7 +153,7 @@ hr{border-color:#303a50;margin:24px 0}
   async function checkAdmin() {
     var res = await supabase.rpc("is_jj_admin");
     if (res.error || res.data !== true) {
-      showMessage("Admin check failed: " + (res.error ? res.error.message : "Unauthorized"));
+      showMessage("Admin check failed.");
       return;
     }
     adminPanel.classList.remove("hidden");
@@ -165,7 +162,6 @@ hr{border-color:#303a50;margin:24px 0}
 
   document.getElementById("loginForm").addEventListener("submit", async function (e) {
     e.preventDefault();
-    showMessage("Logging in...");
     var res = await supabase.auth.signInWithPassword({
       email: document.getElementById("email").value.trim(),
       password: document.getElementById("password").value
@@ -177,7 +173,6 @@ hr{border-color:#303a50;margin:24px 0}
   document.getElementById("logoutBtn").addEventListener("click", async function () {
     await supabase.auth.signOut();
     setLoggedIn(null);
-    showMessage("Logged out.");
   });
 
   posterFile.addEventListener("change", function () {
@@ -197,32 +192,25 @@ hr{border-color:#303a50;margin:24px 0}
   });
 
   uploadBtn.addEventListener("click", async function () {
-    if (!selectedFile) { showMessage("Please select an image file first."); return; }
+    if (!selectedFile) { showMessage("Select an image first."); return; }
     uploadBtn.disabled = true;
-    showMessage("Uploading poster...");
     var path = currentUser.id + "/" + Date.now() + "-" + selectedFile.name;
     var upRes = await supabase.storage.from("movie-posters").upload(path, selectedFile);
-    if (upRes.error) { 
-      showMessage("Upload error: " + upRes.error.message); 
-      uploadBtn.disabled = false; 
-      return; 
-    }
+    if (upRes.error) { showMessage("Upload error"); uploadBtn.disabled = false; return; }
     var pubUrl = supabase.storage.from("movie-posters").getPublicUrl(upRes.data.path).data.publicUrl;
     document.getElementById("poster").value = pubUrl;
     posterPreview.src = pubUrl;
     uploadBtn.disabled = false;
-    showMessage("Poster uploaded successfully!");
+    showMessage("Poster uploaded!");
   });
 
   document.getElementById("movieForm").addEventListener("submit", async function (e) {
     e.preventDefault();
-    showMessage("Saving movie...");
-    
     var movie = {
       title: document.getElementById("title").value.trim(),
       release_year: document.getElementById("year").value ? Number(document.getElementById("year").value) : null,
       runtime: document.getElementById("runtime").value.trim() || null,
-      genre: document.getElementById("genre").value.trim() || null,
+      category: document.getElementById("categoryInput").value.trim() || null, // Saving directly to category column
       poster_url: safeHttpUrl(document.getElementById("poster").value.trim()) || null,
       description: document.getElementById("description").value.trim() || null,
       trailer_url: safeHttpUrl(document.getElementById("trailerUrl").value.trim()) || null,
@@ -237,12 +225,7 @@ hr{border-color:#303a50;margin:24px 0}
     } else {
       res = await supabase.from("movies").insert([movie]);
     }
-
-    if (res.error) { 
-      showMessage("Database Error: " + res.error.message); 
-      return; 
-    }
-    
+    if (res.error) { showMessage("Error: " + res.error.message); return; }
     showMessage("Movie saved successfully!");
     document.getElementById("movieForm").reset();
     posterPreview.classList.add("hidden");
@@ -254,7 +237,7 @@ hr{border-color:#303a50;margin:24px 0}
     var res = await supabase.from("movies").select("*").order("created_at", { ascending: false });
     movieList.innerHTML = "";
     var movies = res.data || [];
-    if (!movies.length) { movieList.textContent = "No movies found."; return; }
+    if (!movies.length) { movieList.textContent = "No movies."; return; }
 
     movies.forEach(function (movie) {
       var row = makeElement("div", "movie-row");
@@ -267,18 +250,18 @@ hr{border-color:#303a50;margin:24px 0}
       var info = makeElement("div", "movie-info");
       info.appendChild(makeElement("h3", "", movie.title));
 
-      var catLabel = makeElement("label", "", "Category Name:");
+      var catLabel = makeElement("label", "", "Category Folder Name:");
       var catInput = document.createElement("input");
       catInput.type = "text";
-      catInput.value = movie.genre || "";
+      catInput.value = movie.category || "";
 
       var saveCatBtn = makeElement("button", "secondary", "Save Category");
       saveCatBtn.addEventListener("click", async function() {
-        var uRes = await supabase.from("movies").update({ genre: catInput.value.trim() }).eq("id", movie.id);
+        var uRes = await supabase.from("movies").update({ category: catInput.value.trim() }).eq("id", movie.id);
         if (uRes.error) {
-          showMessage("Category update failed: " + uRes.error.message);
+          showMessage("Failed: " + uRes.error.message);
         } else {
-          showMessage("Category updated to: " + catInput.value.trim());
+          showMessage("Category folder updated to: " + catInput.value.trim());
           loadMovies();
         }
       });
@@ -290,13 +273,8 @@ hr{border-color:#303a50;margin:24px 0}
       var delBtn = makeElement("button", "danger", "Delete");
       delBtn.addEventListener("click", async function() {
         if (confirm("Delete movie?")) {
-          var dRes = await supabase.from("movies").delete().eq("id", movie.id);
-          if (dRes.error) {
-            showMessage("Delete error: " + dRes.error.message);
-          } else {
-            showMessage("Movie deleted.");
-            loadMovies();
-          }
+          await supabase.from("movies").delete().eq("id", movie.id);
+          loadMovies();
         }
       });
       info.appendChild(delBtn);
