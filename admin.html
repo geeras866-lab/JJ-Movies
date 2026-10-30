@@ -75,21 +75,8 @@ hr{border-color:#303a50;margin:24px 0}
         <label for="runtime">Runtime (Duration)</label>
         <input id="runtime" type="text" maxlength="50" placeholder="Example: 2h 15m or 135 min">
 
-        <label for="genre">Category / Genre *</label>
-        <select id="genre" required>
-          <option value="Marvel">Marvel</option>
-          <option value="DC">DC</option>
-          <option value="Dubbed">Dubbed Audio</option>
-          <option value="Hollywood">Hollywood</option>
-          <option value="Action">Action</option>
-          <option value="Adventure">Adventure</option>
-          <option value="Comedy">Comedy</option>
-          <option value="Drama">Drama</option>
-          <option value="Sci-Fi">Sci-Fi</option>
-          <option value="Thriller">Thriller</option>
-          <option value="Telugu">Telugu</option>
-          <option value="Tamil">Tamil</option>
-        </select>
+        <label for="genre">Category Name *</label>
+        <input id="genre" type="text" placeholder="Type category name (e.g. Marvel, DC, Dubbed, etc.)" required>
 
         <div class="upload-box">
           <label for="posterFile"><strong>Choose poster image from your laptop</strong></label>
@@ -98,7 +85,6 @@ hr{border-color:#303a50;margin:24px 0}
           <p id="fileInfo" class="muted">Select an image to preview it here.</p>
           <button type="button" id="uploadBtn">Upload Poster Image</button>
           <button type="button" id="clearImageBtn" class="secondary">Clear Selected Image</button>
-          <p class="muted">Images are uploaded to your Supabase movie-posters bucket. Maximum file size: 10 MB.</p>
         </div>
 
         <label for="poster">Poster URL</label>
@@ -174,8 +160,8 @@ hr{border-color:#303a50;margin:24px 0}
     </div>
 
     <div class="panel">
-      <h2>Manage Movies (Direct Category Assignment)</h2>
-      <p class="muted">Already unna movies ki ikkade direct ga category change chesi update chesukovachu!</p>
+      <h2>Manage Movies & Categories</h2>
+      <p class="muted">Meeku nachina category name direct ga type chesi update cheyochu, leda remove/clear cheyochu.</p>
       <button id="refreshBtn" class="secondary">Refresh List</button>
       <div id="movieList">Loading...</div>
     </div>
@@ -221,7 +207,6 @@ hr{border-color:#303a50;margin:24px 0}
 
   var currentUser = null;
   var editingId = null;
-  var editingAnnouncementId = null;
   var selectedFile = null;
   var previewObjectUrl = null;
 
@@ -284,7 +269,6 @@ hr{border-color:#303a50;margin:24px 0}
     loginPanel.classList.toggle("hidden", !!user);
     adminPanel.classList.add("hidden");
     document.getElementById("logoutBtn").classList.toggle("hidden", !user);
-
     if (!user) {
       showMessage("Please log in with your admin account.");
       return;
@@ -342,7 +326,7 @@ hr{border-color:#303a50;margin:24px 0}
     editingId = null;
     document.getElementById("movieForm").reset();
     document.getElementById("runtime").value = "";
-    document.getElementById("genre").value = "Marvel";
+    document.getElementById("genre").value = "";
     document.getElementById("formTitle").textContent = "Add Movie";
     document.getElementById("saveBtn").textContent = "Save Movie";
     document.getElementById("cancelBtn").classList.add("hidden");
@@ -368,9 +352,7 @@ hr{border-color:#303a50;margin:24px 0}
     document.getElementById("fileInfo").textContent = file.name;
   });
 
-  document.getElementById("clearImageBtn").addEventListener("click", function () {
-    clearSelectedImage();
-  });
+  document.getElementById("clearImageBtn").addEventListener("click", clearSelectedImage);
 
   uploadBtn.addEventListener("click", async function () {
     if (!currentUser || !selectedFile) {
@@ -406,12 +388,11 @@ hr{border-color:#303a50;margin:24px 0}
       return;
     }
 
-    var title = document.getElementById("title").value.trim();
     var movie = {
-      title: title,
+      title: document.getElementById("title").value.trim(),
       release_year: document.getElementById("year").value ? Number(document.getElementById("year").value) : null,
       runtime: document.getElementById("runtime").value.trim() || null,
-      genre: document.getElementById("genre").value,
+      genre: document.getElementById("genre").value.trim() || null,
       poster_url: safeHttpUrl(document.getElementById("poster").value.trim()) || null,
       description: document.getElementById("description").value.trim() || null,
       trailer_url: safeHttpUrl(document.getElementById("trailerUrl").value.trim()) || null,
@@ -484,31 +465,50 @@ hr{border-color:#303a50;margin:24px 0}
         var info = makeElement("div", "movie-info");
         info.appendChild(makeElement("h3", "", movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "")));
 
-        // Direct Category Changer Dropdown inside movie list row
-        var catLabel = makeElement("label", "", "Change Category:");
-        var catSelect = document.createElement("select");
-        var categories = ["Marvel", "DC", "Dubbed", "Hollywood", "Action", "Adventure", "Comedy", "Drama", "Sci-Fi", "Thriller", "Telugu", "Tamil"];
-        categories.forEach(function(cat) {
-          var opt = document.createElement("option");
-          opt.value = cat;
-          opt.textContent = cat;
-          if (movie.genre === cat) opt.selected = true;
-          catSelect.appendChild(opt);
-        });
+        // Direct Category Text Input & Buttons to Add/Remove/Update Category
+        var catLabel = makeElement("label", "", "Category Name:");
+        var catInput = document.createElement("input");
+        catInput.type = "text";
+        catInput.value = movie.genre || "";
+        catInput.placeholder = "Enter category name (e.g. Marvel)";
 
-        // Instant update when category is changed from dropdown
-        catSelect.addEventListener("change", async function() {
-          var newCat = catSelect.value;
+        var btnGroup = document.createElement("div");
+        btnGroup.style.display = "flex";
+        btnGroup.style.gap = "6px";
+        btnGroup.style.margin = "6px 0 10px 0";
+
+        var updateCatBtn = makeElement("button", "secondary", "Save Category");
+        updateCatBtn.style.margin = "0";
+        updateCatBtn.addEventListener("click", async function() {
+          var newCat = catInput.value.trim();
           var updateRes = await supabase.from("movies").update({ genre: newCat }).eq("id", movie.id);
           if (updateRes.error) {
             showMessage("Category update failed: " + updateRes.error.message);
           } else {
             showMessage("Category updated to '" + newCat + "' for " + movie.title);
+            await loadMovies();
           }
         });
 
+        var removeCatBtn = makeElement("button", "danger", "Remove Category");
+        removeCatBtn.style.margin = "0";
+        removeCatBtn.addEventListener("click", async function() {
+          var updateRes = await supabase.from("movies").update({ genre: null }).eq("id", movie.id);
+          if (updateRes.error) {
+            showMessage("Remove failed: " + updateRes.error.message);
+          } else {
+            showMessage("Category removed for " + movie.title);
+            catInput.value = "";
+            await loadMovies();
+          }
+        });
+
+        btnGroup.appendChild(updateCatBtn);
+        btnGroup.appendChild(removeCatBtn);
+
         info.appendChild(catLabel);
-        info.appendChild(catSelect);
+        info.appendChild(catInput);
+        info.appendChild(btnGroup);
 
         var editBtn = makeElement("button", "secondary", "Full Edit");
         editBtn.addEventListener("click", function () {
@@ -516,7 +516,7 @@ hr{border-color:#303a50;margin:24px 0}
           document.getElementById("title").value = movie.title || "";
           document.getElementById("year").value = movie.release_year || "";
           document.getElementById("runtime").value = movie.runtime || "";
-          document.getElementById("genre").value = movie.genre || "Marvel";
+          document.getElementById("genre").value = movie.genre || "";
           document.getElementById("poster").value = movie.poster_url || "";
           document.getElementById("trailerUrl").value = movie.trailer_url || "";
           document.getElementById("description").value = movie.description || "";
@@ -530,7 +530,7 @@ hr{border-color:#303a50;margin:24px 0}
           window.scrollTo(0, 0);
         });
 
-        var deleteBtn = makeElement("button", "danger", "Delete");
+        var deleteBtn = makeElement("button", "danger", "Delete Movie");
         deleteBtn.addEventListener("click", async function () {
           if (!window.confirm("Delete '" + movie.title + "' permanently?")) return;
           await supabase.from("movies").delete().eq("id", movie.id);
