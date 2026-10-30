@@ -465,12 +465,11 @@ hr{border-color:#303a50;margin:24px 0}
         var info = makeElement("div", "movie-info");
         info.appendChild(makeElement("h3", "", movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "")));
 
-        // Direct Category Text Input & Buttons to Add/Remove/Update Category
         var catLabel = makeElement("label", "", "Category Name:");
         var catInput = document.createElement("input");
         catInput.type = "text";
         catInput.value = movie.genre || "";
-        catInput.placeholder = "Enter category name (e.g. Marvel)";
+        catInput.placeholder = "Enter category name";
 
         var btnGroup = document.createElement("div");
         btnGroup.style.display = "flex";
@@ -544,6 +543,28 @@ hr{border-color:#303a50;margin:24px 0}
       });
     } catch (error) {
       movieList.textContent = "Load error: " + error.message;
+    }
+  }
+
+  async function loadAnnouncements() {
+    if (!announcementList) return;
+    announcementList.textContent = "Loading messages...";
+    try {
+      var result = await supabase.from("jj_messages").select("*").order("created_at", { ascending: false });
+      announcementList.innerHTML = "";
+      var messages = result.data || [];
+      if (!messages.length) {
+        announcementList.textContent = "No messages yet.";
+        return;
+      }
+      messages.forEach(function (msg) {
+        var row = makeElement("div", "announcement-row");
+        row.appendChild(makeElement("h3", "", msg.title));
+        row.appendChild(makeElement("p", "", msg.message));
+        announcementList.appendChild(row);
+      });
+    } catch (error) {
+      announcementList.textContent = "Load error: " + error.message;
     }
   }
 
