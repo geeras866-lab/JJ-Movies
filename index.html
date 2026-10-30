@@ -7,7 +7,6 @@
   <title>JJ Movies | Discover Movies</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    /* MovieRulz Style Category Menu Bar */
     .menu-bar {
       display: flex;
       overflow-x: auto;
@@ -51,21 +50,18 @@
     </nav>
   </header>
 
-  <!-- Ekkada meeru istam ochina categories buttons petkovachu -->
   <div class="menu-bar" id="categoryMenu">
     <button class="menu-btn active" onclick="filterByCustomCategory('all', this)">HOME</button>
     <button class="menu-btn" onclick="filterByCustomCategory('Marvel', this)">MARVEL</button>
     <button class="menu-btn" onclick="filterByCustomCategory('DC', this)">DC</button>
     <button class="menu-btn" onclick="filterByCustomCategory('Dubbed', this)">DUBBED AUDIO</button>
     <button class="menu-btn" onclick="filterByCustomCategory('Hollywood', this)">HOLLYWOOD</button>
-    <!-- Meeru kothhaga inka categories add cheyyalanukunte ikkada inko button tag add cheyyandi -->
-    <!-- <button class="menu-btn" onclick="filterByCustomCategory('Meeru Petkunna Name', this)">DISPLAY NAME</button> -->
   </div>
 
   <section class="hero" id="home">
     <div class="hero-content">
       <h1>Discover <span>Movies</span></h1>
-      <p>Search movies, explore genres and find your preferred version.</p>
+      <p>Search movies, explore categories and find your preferred version.</p>
 
       <div class="search-box">
         <span class="search-icon">⌕</span>
@@ -77,7 +73,6 @@
         >
       </div>
 
-      <!-- Download Android App -->
       <a
         href="./jj-movies.apk"
         class="app-download-btn"
@@ -99,10 +94,9 @@
       <span id="movieCount">0 movies</span>
     </div>
 
-    <!-- Hidden dropdowns so app.js runs smoothly without breaking -->
     <div class="filters" style="display:none;">
-      <select id="genreFilter" aria-label="Filter by genre">
-        <option value="all">All Genres</option>
+      <select id="genreFilter" aria-label="Filter by category">
+        <option value="all">All Categories</option>
       </select>
       <select id="yearFilter" aria-label="Filter by year">
         <option value="all">All Years</option>
@@ -145,13 +139,21 @@
 
   <script src="app.js"></script>
   <script>
-    // Custom category filtering logic
     function filterByCustomCategory(category, btnElement) {
-      document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
-      btnElement.classList.add('active');
+      document.querySelectorAll('.menu-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+      });
+      if (btnElement) btnElement.classList.add('active');
 
-      const genreSelect = document.getElementById('genreFilter');
+      var genreSelect = document.getElementById('genreFilter');
       if (genreSelect) {
+        var option = genreSelect.querySelector('option[value="' + category + '"]');
+        if (!option && category !== 'all') {
+          option = document.createElement('option');
+          option.value = category;
+          option.textContent = category;
+          genreSelect.appendChild(option);
+        }
         genreSelect.value = category;
         genreSelect.dispatchEvent(new Event('change'));
       }
