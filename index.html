@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,6 +6,37 @@
   <meta name="theme-color" content="#090d18">
   <title>JJ Movies | Discover Movies</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* MovieRulz Style Category Menu Bar */
+    .menu-bar {
+      display: flex;
+      overflow-x: auto;
+      gap: 8px;
+      background-color: #121826;
+      padding: 12px 15px;
+      border-bottom: 2px solid #1e293b;
+      white-space: nowrap;
+      scrollbar-width: none;
+    }
+    .menu-bar::-webkit-scrollbar {
+      display: none;
+    }
+    .menu-btn {
+      background-color: #1e293b;
+      color: #94a3b8;
+      border: none;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .menu-btn.active, .menu-btn:hover {
+      background-color: #e50914;
+      color: #ffffff;
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -20,6 +50,17 @@
       <a href="#about">ⓘ About</a>
     </nav>
   </header>
+
+  <!-- Ekkada meeru istam ochina categories buttons petkovachu -->
+  <div class="menu-bar" id="categoryMenu">
+    <button class="menu-btn active" onclick="filterByCustomCategory('all', this)">HOME</button>
+    <button class="menu-btn" onclick="filterByCustomCategory('Marvel', this)">MARVEL</button>
+    <button class="menu-btn" onclick="filterByCustomCategory('DC', this)">DC</button>
+    <button class="menu-btn" onclick="filterByCustomCategory('Dubbed', this)">DUBBED AUDIO</button>
+    <button class="menu-btn" onclick="filterByCustomCategory('Hollywood', this)">HOLLYWOOD</button>
+    <!-- Meeru kothhaga inka categories add cheyyalanukunte ikkada inko button tag add cheyyandi -->
+    <!-- <button class="menu-btn" onclick="filterByCustomCategory('Meeru Petkunna Name', this)">DISPLAY NAME</button> -->
+  </div>
 
   <section class="hero" id="home">
     <div class="hero-content">
@@ -58,18 +99,11 @@
       <span id="movieCount">0 movies</span>
     </div>
 
-    <div class="filters">
+    <!-- Hidden dropdowns so app.js runs smoothly without breaking -->
+    <div class="filters" style="display:none;">
       <select id="genreFilter" aria-label="Filter by genre">
         <option value="all">All Genres</option>
-        <option value="Action">Action</option>
-        <option value="Adventure">Adventure</option>
-        <option value="Comedy">Comedy</option>
-        <option value="Drama">Drama</option>
-        <option value="Sci-Fi">Sci-Fi</option>
-        <option value="Thriller">Thriller</option>
-        <option value="Fantasy">Fantasy</option>
       </select>
-
       <select id="yearFilter" aria-label="Filter by year">
         <option value="all">All Years</option>
       </select>
@@ -82,7 +116,7 @@
     </p>
   </main>
 
-  <section class="about-section" id="about">
+  <section class="section-about" id="about">
     <h2>Welcome to JJ Movies</h2>
     <p>
       Explore movie information, languages, quality options
@@ -110,5 +144,18 @@
   </div>
 
   <script src="app.js"></script>
+  <script>
+    // Custom category filtering logic
+    function filterByCustomCategory(category, btnElement) {
+      document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
+      btnElement.classList.add('active');
+
+      const genreSelect = document.getElementById('genreFilter');
+      if (genreSelect) {
+        genreSelect.value = category;
+        genreSelect.dispatchEvent(new Event('change'));
+      }
+    }
+  </script>
 </body>
 </html>
