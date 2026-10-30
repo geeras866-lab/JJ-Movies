@@ -106,7 +106,6 @@ hr{border-color:#303a50;margin:24px 0}
 
         <label for="trailerUrl">Trailer URL (optional)</label>
         <input id="trailerUrl" type="url" placeholder="https://www.youtube.com/watch?v=...">
-        <p class="section-note">Add a trailer link. It will appear as a trailer button on the movie details.</p>
 
         <label for="description">Description</label>
         <textarea id="description"></textarea>
@@ -119,7 +118,6 @@ hr{border-color:#303a50;margin:24px 0}
         <div class="pin-label-box">
           <label for="pinLabel"><strong>Custom Pin Label (optional)</strong></label>
           <input id="pinLabel" type="text" maxlength="60" placeholder="Example: 🔥 NEW MOVIE">
-          <p class="section-note">Enter the exact text you want to show on the pinned movie. Examples: 🔥 NEW MOVIE, 🎬 NEW TRAILER, ⭐ TRENDING.</p>
         </div>
 
         <label class="checkline">
@@ -134,8 +132,6 @@ hr{border-color:#303a50;margin:24px 0}
 
     <div class="panel">
       <h2>Manage Movie Quality Links</h2>
-      <p class="section-note">Upload the movie file to your private Telegram channel first. Copy the exact message link and add it below.</p>
-
       <form id="versionForm">
         <label for="versionMovie">Select Movie *</label>
         <select id="versionMovie" required><option value="">Loading movies...</option></select>
@@ -178,7 +174,8 @@ hr{border-color:#303a50;margin:24px 0}
     </div>
 
     <div class="panel">
-      <h2>Manage Movies</h2>
+      <h2>Manage Movies (Direct Category Assignment)</h2>
+      <p class="muted">Already unna movies ki ikkade direct ga category change chesi update chesukovachu!</p>
       <button id="refreshBtn" class="secondary">Refresh List</button>
       <div id="movieList">Loading...</div>
     </div>
@@ -301,7 +298,7 @@ hr{border-color:#303a50;margin:24px 0}
       var result = await supabase.rpc("is_jj_admin");
       if (result.error || result.data !== true) {
         adminPanel.classList.add("hidden");
-        showMessage("Admin check failed or this account is not authorized.");
+        showMessage("Admin check failed.");
         return;
       }
       adminPanel.classList.remove("hidden");
@@ -315,7 +312,6 @@ hr{border-color:#303a50;margin:24px 0}
 
   document.getElementById("loginForm").addEventListener("submit", async function (event) {
     event.preventDefault();
-    showMessage("Signing in...");
     try {
       var result = await supabase.auth.signInWithPassword({
         email: document.getElementById("email").value.trim(),
@@ -339,7 +335,6 @@ hr{border-color:#303a50;margin:24px 0}
     loginPanel.classList.remove("hidden");
     document.getElementById("logoutBtn").classList.add("hidden");
     resetMovieForm();
-    resetAnnouncementForm();
     showMessage("You have logged out.");
   });
 
@@ -359,82 +354,44 @@ hr{border-color:#303a50;margin:24px 0}
   posterFile.addEventListener("change", function () {
     var file = posterFile.files && posterFile.files[0];
     selectedFile = null;
-
     if (previewObjectUrl) {
       URL.revokeObjectURL(previewObjectUrl);
       previewObjectUrl = null;
     }
     if (!file) {
       setPreview("");
-      document.getElementById("fileInfo").textContent = "No image selected.";
       return;
     }
-    if (!file.type || file.type.indexOf("image/") !== 0) {
-      posterFile.value = "";
-      setPreview("");
-      showMessage("Please select an image file.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      posterFile.value = "";
-      setPreview("");
-      showMessage("Image is larger than 10 MB.");
-      return;
-    }
-
     selectedFile = file;
     previewObjectUrl = URL.createObjectURL(file);
     setPreview(previewObjectUrl);
     document.getElementById("fileInfo").textContent = file.name;
-    showMessage("Image selected. Click Upload Poster Image.");
   });
 
   document.getElementById("clearImageBtn").addEventListener("click", function () {
     clearSelectedImage();
-    showMessage("Selected image cleared.");
   });
 
   uploadBtn.addEventListener("click", async function () {
-    if (!currentUser) {
-      showMessage("Please log in first.");
+    if (!currentUser || !selectedFile) {
+      showMessage("Choose an image first.");
       return;
     }
-    if (!selectedFile) {
-      showMessage("First choose an image from your laptop.");
-      return;
-    }
-
     uploadBtn.disabled = true;
-    showMessage("Uploading poster image... Please wait.");
     try {
       var safeName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
       var filePath = currentUser.id + "/" + Date.now() + "-" + safeName;
-      var uploadResult = await supabase.storage.from("movie-posters").upload(
-        filePath, selectedFile, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: selectedFile.type
-        }
-      );
-
+      var uploadResult = await supabase.storage.from("movie-posters").upload(filePath, selectedFile, { upsert: false });
       if (uploadResult.error) {
-        showMessage("Image upload failed: " + uploadResult.error.message);
+        showMessage("Upload failed: " + uploadResult.error.message);
         return;
       }
-
-      var publicResult = supabase.storage.from("movie-posters").getPublicUrl(uploadResult.data.path);
-      var publicUrl = publicResult.data.publicUrl;
+      var publicUrl = supabase.storage.from("movie-posters").getPublicUrl(uploadResult.data.path).data.publicUrl;
       document.getElementById("poster").value = publicUrl;
-
-      if (previewObjectUrl) {
-        URL.revokeObjectURL(previewObjectUrl);
-        previewObjectUrl = null;
-      }
+      setPreview(publicUrl);
       selectedFile = null;
       posterFile.value = "";
-      setPreview(publicUrl);
-      document.getElementById("fileInfo").textContent = "Poster uploaded successfully.";
-      showMessage("Poster uploaded! Now click Save Movie.");
+      showMessage("Poster uploaded successfully.");
     } catch (error) {
       showMessage("Upload error: " + error.message);
     } finally {
@@ -444,44 +401,25 @@ hr{border-color:#303a50;margin:24px 0}
 
   document.getElementById("movieForm").addEventListener("submit", async function (event) {
     event.preventDefault();
-    if (!currentUser) {
-      showMessage("Please log in first.");
-      return;
-    }
-    if (selectedFile) {
-      showMessage("Please click Upload Poster Image before saving.");
+    if (!currentUser || selectedFile) {
+      showMessage("Please upload poster first.");
       return;
     }
 
     var title = document.getElementById("title").value.trim();
-    var yearValue = document.getElementById("year").value;
-    var runtimeValue = document.getElementById("runtime").value.trim();
-    var posterInput = document.getElementById("poster").value.trim();
-    var trailerInput = document.getElementById("trailerUrl").value.trim();
-    var poster = posterInput ? safeHttpUrl(posterInput) : "";
-    var trailer = trailerInput ? safeHttpUrl(trailerInput) : "";
-
-    if (!title) {
-      showMessage("Movie title is required.");
-      return;
-    }
-
     var movie = {
       title: title,
-      release_year: yearValue ? Number(yearValue) : null,
-      runtime: runtimeValue || null,
+      release_year: document.getElementById("year").value ? Number(document.getElementById("year").value) : null,
+      runtime: document.getElementById("runtime").value.trim() || null,
       genre: document.getElementById("genre").value,
-      poster_url: poster || null,
+      poster_url: safeHttpUrl(document.getElementById("poster").value.trim()) || null,
       description: document.getElementById("description").value.trim() || null,
-      trailer_url: trailer || null,
+      trailer_url: safeHttpUrl(document.getElementById("trailerUrl").value.trim()) || null,
       is_pinned: document.getElementById("pinned").checked,
       pin_label: document.getElementById("pinLabel").value.trim() || null,
       is_published: document.getElementById("published").checked
     };
 
-    var saveBtn = document.getElementById("saveBtn");
-    saveBtn.disabled = true;
-    showMessage("Saving movie...");
     try {
       var result;
       if (editingId !== null) {
@@ -489,44 +427,31 @@ hr{border-color:#303a50;margin:24px 0}
       } else {
         result = await supabase.from("movies").insert(movie);
       }
-
       if (result.error) {
-        showMessage("Could not save movie: " + result.error.message);
+        showMessage("Error: " + result.error.message);
         return;
       }
-
-      showMessage(editingId !== null ? "Movie updated." : "Movie added.");
+      showMessage(editingId !== null ? "Movie updated successfully." : "Movie added successfully.");
       resetMovieForm();
       await loadMovies();
     } catch (error) {
       showMessage("Save error: " + error.message);
-    } finally {
-      saveBtn.disabled = false;
     }
   });
 
   function populateVersionMovies(movies) {
-    var previousId = versionMovie.value;
     versionMovie.innerHTML = "";
     var first = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
     first.value = "";
     versionMovie.appendChild(first);
-
     movies.forEach(function (movie) {
       var option = document.createElement("option");
       option.value = String(movie.id);
       option.textContent = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
       versionMovie.appendChild(option);
     });
-
-    if (previousId && movies.some(function (movie) { return String(movie.id) === previousId; })) {
-      versionMovie.value = previousId;
-    } else if (movies.length) {
-      versionMovie.value = String(movies[0].id);
-    }
-
+    if (movies.length) versionMovie.value = String(movies[0].id);
     if (versionMovie.value) loadVersions();
-    else versionList.textContent = "Add a movie first.";
   }
 
   async function loadMovies() {
@@ -534,10 +459,9 @@ hr{border-color:#303a50;margin:24px 0}
     try {
       var result = await supabase.from("movies").select("*").order("created_at", { ascending: false });
       if (result.error) {
-        movieList.textContent = "Could not load movies: " + result.error.message;
+        movieList.textContent = "Error: " + result.error.message;
         return;
       }
-
       var movies = result.data || [];
       populateVersionMovies(movies);
       movieList.innerHTML = "";
@@ -553,23 +477,40 @@ hr{border-color:#303a50;margin:24px 0}
         if (movie.poster_url && safeHttpUrl(movie.poster_url)) {
           var image = document.createElement("img");
           image.src = safeHttpUrl(movie.poster_url);
-          image.alt = "";
           image.onerror = function () { image.style.display = "none"; };
           row.appendChild(image);
         }
 
         var info = makeElement("div", "movie-info");
-        var title = makeElement("h3", "", movie.title + (movie.release_year ? " (" + movie.release_year + ")" : ""));
-        
-        var metaItems = [];
-        if (movie.runtime) metaItems.push("⏱ " + movie.runtime);
-        metaItems.push("Category: " + (movie.genre || "None"));
-        metaItems.push(movie.is_published ? "Published" : "Unpublished");
-        metaItems.push(movie.is_pinned ? "📌 Pinned" : "Not pinned");
+        info.appendChild(makeElement("h3", "", movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "")));
 
-        var details = makeElement("p", "", metaItems.join(" • "));
+        // Direct Category Changer Dropdown inside movie list row
+        var catLabel = makeElement("label", "", "Change Category:");
+        var catSelect = document.createElement("select");
+        var categories = ["Marvel", "DC", "Dubbed", "Hollywood", "Action", "Adventure", "Comedy", "Drama", "Sci-Fi", "Thriller", "Telugu", "Tamil"];
+        categories.forEach(function(cat) {
+          var opt = document.createElement("option");
+          opt.value = cat;
+          opt.textContent = cat;
+          if (movie.genre === cat) opt.selected = true;
+          catSelect.appendChild(opt);
+        });
 
-        var editBtn = makeElement("button", "secondary", "Edit");
+        // Instant update when category is changed from dropdown
+        catSelect.addEventListener("change", async function() {
+          var newCat = catSelect.value;
+          var updateRes = await supabase.from("movies").update({ genre: newCat }).eq("id", movie.id);
+          if (updateRes.error) {
+            showMessage("Category update failed: " + updateRes.error.message);
+          } else {
+            showMessage("Category updated to '" + newCat + "' for " + movie.title);
+          }
+        });
+
+        info.appendChild(catLabel);
+        info.appendChild(catSelect);
+
+        var editBtn = makeElement("button", "secondary", "Full Edit");
         editBtn.addEventListener("click", function () {
           editingId = movie.id;
           document.getElementById("title").value = movie.title || "";
@@ -585,56 +526,18 @@ hr{border-color:#303a50;margin:24px 0}
           document.getElementById("formTitle").textContent = "Edit Movie";
           document.getElementById("saveBtn").textContent = "Update Movie";
           document.getElementById("cancelBtn").classList.remove("hidden");
-          clearSelectedImage();
           if (movie.poster_url) setPreview(movie.poster_url);
           window.scrollTo(0, 0);
-        });
-
-        var pinBtn = makeElement("button", "secondary", movie.is_pinned ? "Unpin" : "📌 Pin");
-        pinBtn.addEventListener("click", async function () {
-          var updateData;
-          if (!movie.is_pinned) {
-            var customLabel = window.prompt("Enter a custom pin label (example: 🔥 NEW MOVIE):", movie.pin_label || "");
-            if (customLabel === null) return;
-            updateData = { is_pinned: true, pin_label: customLabel.trim() || null };
-          } else {
-            updateData = { is_pinned: false };
-          }
-
-          try {
-            var r = await supabase.from("movies").update(updateData).eq("id", movie.id);
-            if (!r.error) await loadMovies();
-          } catch (error) {
-            showMessage("Pin error: " + error.message);
-          }
-        });
-
-        var publishBtn = makeElement("button", "secondary", movie.is_published ? "Unpublish" : "Publish");
-        publishBtn.addEventListener("click", async function () {
-          try {
-            await supabase.from("movies").update({ is_published: !movie.is_published }).eq("id", movie.id);
-            await loadMovies();
-          } catch (error) {
-            showMessage("Publish error: " + error.message);
-          }
         });
 
         var deleteBtn = makeElement("button", "danger", "Delete");
         deleteBtn.addEventListener("click", async function () {
           if (!window.confirm("Delete '" + movie.title + "' permanently?")) return;
-          try {
-            await supabase.from("movies").delete().eq("id", movie.id);
-            await loadMovies();
-          } catch (error) {
-            showMessage("Delete error: " + error.message);
-          }
+          await supabase.from("movies").delete().eq("id", movie.id);
+          await loadMovies();
         });
 
-        info.appendChild(title);
-        info.appendChild(details);
         info.appendChild(editBtn);
-        info.appendChild(pinBtn);
-        info.appendChild(publishBtn);
         info.appendChild(deleteBtn);
         row.appendChild(info);
         movieList.appendChild(row);
@@ -644,82 +547,42 @@ hr{border-color:#303a50;margin:24px 0}
     }
   }
 
-  function isValidTelegramMessageLink(value) {
-    var link = value.trim();
-    return /^https:\/\/t\.me\/(c\/[0-9]+\/[0-9]+|[a-zA-Z0-9_]{5,}\/[0-9]+)\/?$/i.test(link);
-  }
-
   document.getElementById("versionForm").addEventListener("submit", async function (event) {
     event.preventDefault();
-    if (!currentUser) return;
-
     var movieId = versionMovie.value;
-    var quality = document.getElementById("versionQuality").value;
-    var language = document.getElementById("versionLanguage").value;
-    var telegramLink = document.getElementById("telegramLink").value.trim();
-
-    if (!movieId) {
-      showMessage("Please select a movie.");
-      return;
-    }
-    if (!isValidTelegramMessageLink(telegramLink)) {
-      showMessage("Invalid Telegram message link.");
-      return;
-    }
-
+    if (!movieId) return;
     try {
       await supabase.from("movie_versions").insert({
         movie_id: Number(movieId),
-        quality: quality,
-        audio_language: language,
+        quality: document.getElementById("versionQuality").value,
+        audio_language: document.getElementById("versionLanguage").value,
         source_type: "Telegram",
-        viewing_url: telegramLink
+        viewing_url: document.getElementById("telegramLink").value.trim()
       });
       showMessage("Quality link saved successfully.");
       document.getElementById("telegramLink").value = "";
-      await loadVersions();
+      loadVersions();
     } catch (error) {
-      showMessage("Quality link error: " + error.message);
+      showMessage("Error: " + error.message);
     }
   });
 
   async function loadVersions() {
     var movieId = versionMovie.value;
-    if (!movieId) {
-      versionList.textContent = "Select a movie first.";
-      return;
-    }
-
-    try {
-      var result = await supabase.from("movie_versions").select("*").eq("movie_id", Number(movieId)).order("created_at", { ascending: false });
-      versionList.innerHTML = "";
-      var versions = result.data || [];
-      if (!versions.length) {
-        versionList.textContent = "No quality links saved yet.";
-        return;
-      }
-
-      versions.forEach(function (version) {
-        var row = makeElement("div", "version-row");
-        row.appendChild(makeElement("h3", "", version.quality + " • " + version.audio_language));
-        var a = document.createElement("a");
-        a.href = version.viewing_url;
-        a.textContent = version.viewing_url;
-        a.target = "_blank";
-        row.appendChild(a);
-
-        var del = makeElement("button", "danger", "Delete");
-        del.addEventListener("click", async function () {
-          await supabase.from("movie_versions").delete().eq("id", version.id);
-          await loadVersions();
-        });
-        row.appendChild(document.createElement("br"));
-        row.appendChild(del);
-        versionList.appendChild(row);
+    if (!movieId) return;
+    var result = await supabase.from("movie_versions").select("*").eq("movie_id", Number(movieId)).order("created_at", { ascending: false });
+    versionList.innerHTML = "";
+    (result.data || []).forEach(function (v) {
+      var row = makeElement("div", "version-row");
+      row.appendChild(makeElement("h3", "", v.quality + " • " + v.audio_language));
+      var del = makeElement("button", "danger", "Delete Link");
+      del.addEventListener("click", async function () {
+        await supabase.from("movie_versions").delete().eq("id", v.id);
+        loadVersions();
       });
-    } catch (error) {
-      versionList.textContent = "Load error: " + error.message;
-    }
+      row.appendChild(del);
+      versionList.appendChild(row);
+    });
   }
 
   document.getElementById("refreshBtn").addEventListener("click", loadMovies);
