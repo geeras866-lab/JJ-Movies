@@ -7,7 +7,7 @@ var messages = [];
 
 var movieGrid = document.getElementById("movieGrid");
 var searchInput = document.getElementById("searchInput");
-var genreFilter = document.getElementById("genreFilter"); // Category select element in HTML
+var genreFilter = document.getElementById("genreFilter"); // Category select dropdown in HTML
 var yearFilter = document.getElementById("yearFilter");
 var movieCount = document.getElementById("movieCount");
 var emptyMessage = document.getElementById("emptyMessage");
@@ -102,7 +102,8 @@ function loadMovies() {
           title: item.title || "Untitled",
           year: item.release_year || "",
           runtime: item.runtime || "",
-          category: item.genre || "Other", // Database column genre ni category ga map chestunnam
+          category: item.category || "", // Reading directly from new category column
+          genre: item.genre || "", // Genre is safe and untouched
           poster: item.poster_url || "",
           description: item.description || "",
           pinned: item.is_pinned === true,
@@ -179,7 +180,7 @@ function setupYears() {
 
 function matchesFilters(movie) {
   var search = searchInput.value.toLowerCase().trim();
-  var selectedCategory = genreFilter.value.toLowerCase().trim();
+  var selectedCategory = genreFilter ? genreFilter.value.toLowerCase().trim() : "all";
   var year = yearFilter.value;
 
   var movieCategory = String(movie.category || "").toLowerCase().trim();
@@ -317,7 +318,7 @@ function showMovieDetails(movieId) {
   modalDetails.innerHTML =
     pinBadgeHTML +
     "<h2>" + escapeHTML(movie.title) + (movie.year ? " (" + escapeHTML(movie.year) + ")" : "") + "</h2>" +
-    "<p><strong>Category:</strong> " + escapeHTML(movie.category) + "</p>" +
+    (movie.category ? "<p><strong>Category:</strong> " + escapeHTML(movie.category) + "</p>" : "") +
     "<p>" + escapeHTML(movie.description) + "</p>" +
     trailerHTML +
     "<h3>Available Versions</h3>" +
@@ -356,7 +357,7 @@ function closeMovieModal() {
 }
 
 searchInput.addEventListener("input", renderMovies);
-genreFilter.addEventListener("change", renderMovies);
+if (genreFilter) genreFilter.addEventListener("change", renderMovies);
 yearFilter.addEventListener("change", renderMovies);
 
 document.getElementById("closeModal").addEventListener("click", closeMovieModal);
