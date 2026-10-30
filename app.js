@@ -244,14 +244,17 @@ function setupYears() {
   });
 }
 
+/* Updated matchesFilters to support case-insensitive matching */
 function matchesFilters(movie) {
   var search = searchInput.value.toLowerCase().trim();
-  var genre = genreFilter.value;
+  var genre = genreFilter.value.toLowerCase().trim();
   var year = yearFilter.value;
+
+  var movieGenre = String(movie.genre || "").toLowerCase().trim();
 
   return (
     movie.title.toLowerCase().indexOf(search) !== -1 &&
-    (genre === "all" || movie.genre === genre) &&
+    (genre === "all" || movieGenre === genre) &&
     (year === "all" || String(movie.year) === year)
   );
 }
@@ -427,7 +430,6 @@ function showMovieDetails(movieId) {
     );
   }).join("");
 
-  /* Custom label only: no hard-coded "Featured Movie" badge */
   var pinLabel = getMoviePinLabel(movie);
   var pinBadgeHTML = pinLabel
     ? '<p class="jj-pin-badge">' + escapeHTML(pinLabel) + "</p>"
