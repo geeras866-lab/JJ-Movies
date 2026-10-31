@@ -167,7 +167,7 @@ hr{border-color:#303a50;margin:24px 0}
       <div id="movieList">Loading...</div>
     </div>
 
-    <!-- CREATE JJ MESSAGE -->
+    <!-- CREATE / EDIT JJ MESSAGE -->
     <div class="panel">
       <h2 id="messageFormTitle">Create JJ Message / Update</h2>
       <form id="announcementForm">
@@ -185,6 +185,7 @@ hr{border-color:#303a50;margin:24px 0}
         </label>
 
         <button type="submit" id="saveAnnouncementBtn">Save Message</button>
+        <button type="button" id="cancelAnnouncementBtn" class="secondary hidden">Cancel Edit</button>
       </form>
 
       <hr>
@@ -205,6 +206,7 @@ hr{border-color:#303a50;margin:24px 0}
 
   var currentUser = null;
   var editingId = null;
+  var editingAnnouncementId = null;
   var selectedFile = null;
   var previewObjectUrl = null;
 
@@ -353,13 +355,11 @@ hr{border-color:#303a50;margin:24px 0}
   });
 
   function populateMovieSelects(movies) {
-    // Version dropdown
     versionMovie.innerHTML = "";
     var vFirst = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
     vFirst.value = "";
     versionMovie.appendChild(vFirst);
 
-    // Category dropdown
     categoryMovieSelect.innerHTML = "";
     var cFirst = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
     cFirst.value = "";
@@ -380,14 +380,8 @@ hr{border-color:#303a50;margin:24px 0}
     if (movies.length) {
       versionMovie.value = String(movies[0].id);
       categoryMovieSelect.value = String(movies[0].id);
-      updateQuickCategoryInput();
       loadVersions();
     }
-  }
-
-  function updateQuickCategoryInput() {
-    var selectedId = categoryMovieSelect.value;
-    // We can fetch or find the movie category from loaded elements
   }
 
   categoryMovieSelect.addEventListener("change", async function() {
@@ -468,7 +462,6 @@ hr{border-color:#303a50;margin:24px 0}
       movieList.appendChild(row);
     });
 
-    // Trigger category input fill for current selected dropdown
     if (categoryMovieSelect.value) {
       var activeMovie = movies.find(function(m) { return String(m.id) === String(categoryMovieSelect.value); });
       if (activeMovie) quickCategoryInput.value = activeMovie.category || "";
@@ -516,7 +509,7 @@ hr{border-color:#303a50;margin:24px 0}
   versionMovie.addEventListener("change", loadVersions);
   document.getElementById("refreshVersionsBtn").addEventListener("click", loadVersions);
 
-  // JJ Messages Form Logic
+  // JJ Messages Form Logic with Edit Support
   document.getElementById("announcementForm").addEventListener("submit", async function(e) {
     e.preventDefault();
     var msgData = {
@@ -526,11 +519,28 @@ hr{border-color:#303a50;margin:24px 0}
       is_published: document.getElementById("announcementPublished").checked
     };
 
-    var res = await supabase.from("jj_messages").insert([msgData]);
+    var res;
+    if (editingAnnouncementId !== null) {
+      res = await supabase.from("jj_messages").update(msgData).eq("id", editingAnnouncementId);
+    } else {
+      res = await supabase.from("jj_messages").insert([msgData]);
+    }
     if (res.error) { showMessage("Error: " + res.error.message); return; }
     showMessage("JJ Message saved successfully!");
     document.getElementById("announcementForm").reset();
+    editingAnnouncementId = null;
+    document.getElementById("messageFormTitle").textContent = "Create JJ Message / Update";
+    document.getElementById("saveAnnouncementBtn").textContent = "Save Message";
+    document.getElementById("cancelAnnouncementBtn").classList.add("hidden");
     loadAnnouncements();
+  });
+
+  document.getElementById("cancelAnnouncementBtn").addEventListener("click", function() {
+    editingAnnouncementId = null;
+    document.getElementById("announcementForm").reset();
+    document.getElementById("messageFormTitle").textContent = "Create JJ Message / Update";
+    document.getElementById("saveAnnouncementBtn").textContent = "Save Message";
+    document.getElementById("cancelAnnouncementBtn").classList.add("hidden");
   });
 
   async function loadAnnouncements() {
@@ -543,15 +553,47 @@ hr{border-color:#303a50;margin:24px 0}
       var row = makeElement("div", "announcement-row");
       row.appendChild(makeElement("h3", "", m.title));
       row.appendChild(makeElement("p", "", m.message));
-      
+      if (m.link_url) {
+        var a = makeElement("a", "", m.link_url);
+        a.href = m.link_url;
+        a.target = "_blank";
+        a.style.display = "block";
+        a.style.margin = "6px 0";
+        a.style.color = "#ff3867";
+        row.appendChild(a);
+      }
+
+      var btnGrp = document.createElement("div");
+      btnGrp.style.display = "flex";
+      btnGrp.style.gap = "6px";
+      btnGrp.style.marginTop = "10px";
+
+      var editBtn = makeElement("button", "secondary", "Edit Message");
+      editBtn.style.margin = "0";
+      editBtn.addEventListener("click", function() {
+        editingAnnouncementId = m.id;
+        document.getElementById("announcementTitle").value = m.title || "";
+        document.getElementById("announcementText").value = m.message || "";
+        document.getElementById("announcementLink").value = m.link_url || "";
+        document.getElementById("announcementPublished").checked = !!m.is_published;
+        document.getElementById("messageFormTitle").textContent = "Edit JJ Message";
+        document.getElementById("saveAnnouncementBtn").textContent = "Update Message";
+        document.getElementById("cancelAnnouncementBtn").classList.remove("hidden");
+        window.scrollTo(0, document.getElementById("announcementForm").offsetTop);
+      });
+
       var del = makeElement("button", "danger", "Delete Message");
+      del.style.margin = "0";
       del.addEventListener("click", async function() {
         if (confirm("Delete this update message?")) {
           await supabase.from("jj_messages").delete().eq("id", m.id);
           loadAnnouncements();
         }
       });
-      row.appendChild(del);
+
+      btnGrp.appendChild(editBtn);
+      btnGrp.appendChild(del);
+      row.appendChild(btnGrp);
       announcementList.appendChild(row);
     });
   }
