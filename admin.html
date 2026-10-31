@@ -422,10 +422,16 @@ hr{border-color:#303a50;margin:24px 0}
   });
 
   managerSearchInput.addEventListener("input", function() {
-    var val = managerSearchInput.value.trim();
+    var val = managerSearchInput.value.trim().toLowerCase();
+    if (!val) {
+      selectedMovieCardContainer.classList.add("hidden");
+      managerMovieRow.innerHTML = "";
+      return;
+    }
+
     var matchedMovie = allMoviesCache.find(function(m) {
-      var label = m.title + (m.release_year ? " (" + m.release_year + ")" : "");
-      return label.toLowerCase() === val.toLowerCase() || String(m.id) === val;
+      var label = (m.title + (m.release_year ? " (" + m.release_year + ")" : "")).toLowerCase();
+      return label === val || label.indexOf(val) !== -1;
     });
 
     if (!matchedMovie) {
