@@ -163,14 +163,21 @@ hr{border-color:#303a50;margin:24px 0}
       <div id="versionList">Select a movie above.</div>
     </div>
 
-    <!-- CUSTOM SEARCHABLE MOVIE MANAGER -->
+    <!-- SEARCH & SELECT MOVIE MANAGER -->
     <div class="panel">
-      <h2>Quick Movie Manager (Search, Edit & Delete)</h2>
-      <p class="muted">Movie peru sagam type chesina chalu, kindha options vasthayi.</p>
+      <h2>Quick Movie Manager (Search, Select, Edit & Delete)</h2>
+      <p class="muted">Search cheyandi leda kinda select dropdown nundi movie choose cheskondi.</p>
       
-      <label for="managerSearchInput">Search Movie *</label>
+      <!-- Search option -->
+      <label for="managerSearchInput">Search Movie</label>
       <input id="managerSearchInput" placeholder="Type movie name (e.g. Jurassic)..." autocomplete="off">
       <div id="suggestionsBox"></div>
+
+      <!-- Separate Select Dropdown option -->
+      <label for="managerDropdownSelect" style="margin-top:12px;">Or Select Movie from List</label>
+      <select id="managerDropdownSelect">
+        <option value="">Choose a movie...</option>
+      </select>
 
       <div id="selectedMovieCardContainer" class="hidden" style="margin-top:15px;">
         <div class="movie-row" id="managerMovieRow">
@@ -235,6 +242,7 @@ hr{border-color:#303a50;margin:24px 0}
   var quickCategoryInput = document.getElementById("quickCategoryInput");
   var managerSearchInput = document.getElementById("managerSearchInput");
   var suggestionsBox = document.getElementById("suggestionsBox");
+  var managerDropdownSelect = document.getElementById("managerDropdownSelect");
   var managerMovieRow = document.getElementById("managerMovieRow");
   var selectedMovieCardContainer = document.getElementById("selectedMovieCardContainer");
   var announcementList = document.getElementById("announcementList");
@@ -383,6 +391,11 @@ hr{border-color:#303a50;margin:24px 0}
     cFirst.value = "";
     categoryMovieSelect.appendChild(cFirst);
 
+    managerDropdownSelect.innerHTML = "";
+    var mFirst = makeElement("option", "", movies.length ? "Choose a movie from list..." : "Add a movie first");
+    mFirst.value = "";
+    managerDropdownSelect.appendChild(mFirst);
+
     movies.forEach(function (movie) {
       var label = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
       
@@ -395,6 +408,11 @@ hr{border-color:#303a50;margin:24px 0}
       opt2.value = String(movie.id);
       opt2.textContent = label;
       categoryMovieSelect.appendChild(opt2);
+
+      var opt3 = document.createElement("option");
+      opt3.value = String(movie.id);
+      opt3.textContent = label;
+      managerDropdownSelect.appendChild(opt3);
     });
 
     if (movies.length) {
@@ -451,6 +469,7 @@ hr{border-color:#303a50;margin:24px 0}
         await supabase.from("movies").delete().eq("id", movie.id);
         selectedMovieCardContainer.classList.add("hidden");
         managerSearchInput.value = "";
+        managerDropdownSelect.value = "";
         loadMovies();
       }
     });
@@ -466,7 +485,6 @@ hr{border-color:#303a50;margin:24px 0}
     suggestionsBox.innerHTML = "";
     if (!val) {
       suggestionsBox.style.display = "none";
-      selectedMovieCardContainer.classList.add("hidden");
       return;
     }
 
@@ -477,7 +495,6 @@ hr{border-color:#303a50;margin:24px 0}
 
     if (!matches.length) {
       suggestionsBox.style.display = "none";
-      selectedMovieCardContainer.classList.add("hidden");
       return;
     }
 
@@ -487,11 +504,26 @@ hr{border-color:#303a50;margin:24px 0}
       div.addEventListener("click", function() {
         managerSearchInput.value = label;
         suggestionsBox.style.display = "none";
+        managerDropdownSelect.value = String(movie.id);
         displaySelectedMovie(movie);
       });
       suggestionsBox.appendChild(div);
     });
     suggestionsBox.style.display = "block";
+  });
+
+  managerDropdownSelect.addEventListener("change", function() {
+    var movieId = managerDropdownSelect.value;
+    if (!movieId) {
+      selectedMovieCardContainer.classList.add("hidden");
+      return;
+    }
+    var movie = allMoviesCache.find(function(m) { return String(m.id) === String(movieId); });
+    if (movie) {
+      managerSearchInput.value = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
+      suggestionsBox.style.display = "none";
+      displaySelectedMovie(movie);
+    }
   });
 
   document.getElementById("quickCategoryForm").addEventListener("submit", async function(e) {
