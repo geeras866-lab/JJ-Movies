@@ -160,13 +160,16 @@ hr{border-color:#303a50;margin:24px 0}
       <div id="versionList">Select a movie above.</div>
     </div>
 
-    <!-- SEARCH & SELECT MOVIE MANAGER (REPLACES LONG SCROLL LIST) -->
+    <!-- SEARCHABLE MOVIE MANAGER -->
     <div class="panel">
       <h2>Quick Movie Manager (Search, Edit & Delete)</h2>
-      <p class="muted">List lo scroll chese pani lekunda, movie search chesi direct ga edit or delete cheyandi.</p>
+      <p class="muted">Movie peru type chesi search cheyandi, automatic ga select avtundi.</p>
       
-      <label for="managerMovieSelect">Search / Select Movie *</label>
-      <select id="managerMovieSelect"><option value="">Loading movies...</option></select>
+      <label for="managerSearchInput">Search Movie *</label>
+      <input id="managerSearchInput" list="moviesDataList" placeholder="Type movie name to search..." autocomplete="off">
+      <datalist id="moviesDataList">
+        <!-- Dynamic options -->
+      </datalist>
 
       <div id="selectedMovieCardContainer" class="hidden" style="margin-top:15px;">
         <div class="movie-row" id="managerMovieRow">
@@ -229,7 +232,8 @@ hr{border-color:#303a50;margin:24px 0}
   var versionList = document.getElementById("versionList");
   var categoryMovieSelect = document.getElementById("categoryMovieSelect");
   var quickCategoryInput = document.getElementById("quickCategoryInput");
-  var managerMovieSelect = document.getElementById("managerMovieSelect");
+  var managerSearchInput = document.getElementById("managerSearchInput");
+  var moviesDataList = document.getElementById("moviesDataList");
   var managerMovieRow = document.getElementById("managerMovieRow");
   var selectedMovieCardContainer = document.getElementById("selectedMovieCardContainer");
   var announcementList = document.getElementById("announcementList");
@@ -380,11 +384,8 @@ hr{border-color:#303a50;margin:24px 0}
     cFirst.value = "";
     categoryMovieSelect.appendChild(cFirst);
 
-    // Manager select
-    managerMovieSelect.innerHTML = "";
-    var mFirst = makeElement("option", "", movies.length ? "Search or select a movie..." : "Add a movie first");
-    mFirst.value = "";
-    managerMovieSelect.appendChild(mFirst);
+    // Datalist options for search
+    moviesDataList.innerHTML = "";
 
     movies.forEach(function (movie) {
       var label = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
@@ -399,10 +400,9 @@ hr{border-color:#303a50;margin:24px 0}
       opt2.textContent = label;
       categoryMovieSelect.appendChild(opt2);
 
-      var opt3 = document.createElement("option");
-      opt3.value = String(movie.id);
-      opt3.textContent = label;
-      managerMovieSelect.appendChild(opt3);
+      var dOpt = document.createElement("option");
+      dOpt.value = label;
+      moviesDataList.appendChild(dOpt);
     });
 
     if (movies.length) {
@@ -421,16 +421,20 @@ hr{border-color:#303a50;margin:24px 0}
     }
   });
 
-  managerMovieSelect.addEventListener("change", function() {
-    var movieId = managerMovieSelect.value;
-    if (!movieId) {
+  managerSearchInput.addEventListener("input", function() {
+    var val = managerSearchInput.value.trim();
+    var matchedMovie = allMoviesCache.find(function(m) {
+      var label = m.title + (m.release_year ? " (" + m.release_year + ")" : "");
+      return label.toLowerCase() === val.toLowerCase() || String(m.id) === val;
+    });
+
+    if (!matchedMovie) {
       selectedMovieCardContainer.classList.add("hidden");
       managerMovieRow.innerHTML = "";
       return;
     }
-    var movie = allMoviesCache.find(function(m) { return String(m.id) === String(movieId); });
-    if (!movie) return;
 
+    var movie = matchedMovie;
     managerMovieRow.innerHTML = "";
     if (movie.poster_url && safeHttpUrl(movie.poster_url)) {
       var img = document.createElement("img");
@@ -467,6 +471,7 @@ hr{border-color:#303a50;margin:24px 0}
       if (confirm("Delete '" + movie.title + "' permanently?")) {
         await supabase.from("movies").delete().eq("id", movie.id);
         selectedMovieCardContainer.classList.add("hidden");
+        managerSearchInput.value = "";
         loadMovies();
       }
     });
@@ -500,14 +505,6 @@ hr{border-color:#303a50;margin:24px 0}
     if (categoryMovieSelect.value) {
       var activeMovie = movies.find(function(m) { return String(m.id) === String(categoryMovieSelect.value); });
       if (activeMovie) quickCategoryInput.value = activeMovie.category || "";
-    }
-
-    if (managerMovieSelect.value) {
-      var mCard = movies.find(function(m) { return String(m.id) === String(managerMovieSelect.value); });
-      if (!mCard) {
-        selectedMovieCardContainer.classList.add("hidden");
-        managerMovieSelect.value = "";
-      }
     }
   }
 
