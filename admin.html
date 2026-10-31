@@ -33,6 +33,9 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .pin-label-box{background:#090d18;border:1px solid #35405a;border-radius:9px;padding:14px;margin:10px 0 16px}
 .checkline{display:flex;gap:9px;align-items:center;margin:14px 0}
 .checkline input{width:auto!important;margin:0!important}
+#suggestionsBox{background:#090d18;border:1px solid #35405a;border-radius:7px;max-height:180px;overflow-y:auto;margin-top:-8px;margin-bottom:14px;display:none}
+#suggestionsBox div{padding:10px 12px;cursor:pointer;border-bottom:1px solid #293044;color:#f4f5fa}
+#suggestionsBox div:hover{background:#1e293b}
 hr{border-color:#303a50;margin:24px 0}
 @media(max-width:500px){.movie-row{flex-direction:column}header{padding:15px}.panel{padding:15px}}
 </style>
@@ -160,20 +163,18 @@ hr{border-color:#303a50;margin:24px 0}
       <div id="versionList">Select a movie above.</div>
     </div>
 
-    <!-- SEARCHABLE MOVIE MANAGER -->
+    <!-- CUSTOM SEARCHABLE MOVIE MANAGER -->
     <div class="panel">
       <h2>Quick Movie Manager (Search, Edit & Delete)</h2>
-      <p class="muted">Movie peru type chesi search cheyandi, automatic ga select avtundi.</p>
+      <p class="muted">Movie peru type cheyandi, kindha vache suggestions lo click cheyandi.</p>
       
       <label for="managerSearchInput">Search Movie *</label>
-      <input id="managerSearchInput" list="moviesDataList" placeholder="Type movie name to search..." autocomplete="off">
-      <datalist id="moviesDataList">
-        <!-- Dynamic options -->
-      </datalist>
+      <input id="managerSearchInput" placeholder="Type movie name (e.g. Jurassic)..." autocomplete="off">
+      <div id="suggestionsBox"></div>
 
       <div id="selectedMovieCardContainer" class="hidden" style="margin-top:15px;">
         <div class="movie-row" id="managerMovieRow">
-          <!-- Dynamically populated selected movie details -->
+          <!-- Selected movie details -->
         </div>
       </div>
     </div>
@@ -233,7 +234,7 @@ hr{border-color:#303a50;margin:24px 0}
   var categoryMovieSelect = document.getElementById("categoryMovieSelect");
   var quickCategoryInput = document.getElementById("quickCategoryInput");
   var managerSearchInput = document.getElementById("managerSearchInput");
-  var moviesDataList = document.getElementById("moviesDataList");
+  var suggestionsBox = document.getElementById("suggestionsBox");
   var managerMovieRow = document.getElementById("managerMovieRow");
   var selectedMovieCardContainer = document.getElementById("selectedMovieCardContainer");
   var announcementList = document.getElementById("announcementList");
@@ -372,20 +373,15 @@ hr{border-color:#303a50;margin:24px 0}
   function populateMovieSelects(movies) {
     allMoviesCache = movies;
 
-    // Version select
     versionMovie.innerHTML = "";
     var vFirst = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
     vFirst.value = "";
     versionMovie.appendChild(vFirst);
 
-    // Category select
     categoryMovieSelect.innerHTML = "";
     var cFirst = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
     cFirst.value = "";
     categoryMovieSelect.appendChild(cFirst);
-
-    // Datalist options for search
-    moviesDataList.innerHTML = "";
 
     movies.forEach(function (movie) {
       var label = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
@@ -399,10 +395,6 @@ hr{border-color:#303a50;margin:24px 0}
       opt2.value = String(movie.id);
       opt2.textContent = label;
       categoryMovieSelect.appendChild(opt2);
-
-      var dOpt = document.createElement("option");
-      dOpt.value = label;
-      moviesDataList.appendChild(dOpt);
     });
 
     if (movies.length) {
@@ -421,26 +413,7 @@ hr{border-color:#303a50;margin:24px 0}
     }
   });
 
-  managerSearchInput.addEventListener("input", function() {
-    var val = managerSearchInput.value.trim().toLowerCase();
-    if (!val) {
-      selectedMovieCardContainer.classList.add("hidden");
-      managerMovieRow.innerHTML = "";
-      return;
-    }
-
-    var matchedMovie = allMoviesCache.find(function(m) {
-      var label = (m.title + (m.release_year ? " (" + m.release_year + ")" : "")).toLowerCase();
-      return label === val || label.indexOf(val) !== -1;
-    });
-
-    if (!matchedMovie) {
-      selectedMovieCardContainer.classList.add("hidden");
-      managerMovieRow.innerHTML = "";
-      return;
-    }
-
-    var movie = matchedMovie;
+  function displaySelectedMovie(movie) {
     managerMovieRow.innerHTML = "";
     if (movie.poster_url && safeHttpUrl(movie.poster_url)) {
       var img = document.createElement("img");
@@ -486,6 +459,39 @@ hr{border-color:#303a50;margin:24px 0}
     info.appendChild(delBtn);
     managerMovieRow.appendChild(info);
     selectedMovieCardContainer.classList.remove("hidden");
+  }
+
+  managerSearchInput.addEventListener("input", function() {
+    var val = managerSearchInput.value.trim().toLowerCase();
+    suggestionsBox.innerHTML = "";
+    if (!val) {
+      suggestionsBox.style.display = "none";
+      selectedMovieCardContainer.classList.add("hidden");
+      return;
+    }
+
+    var matches = allMoviesCache.filter(function(m) {
+      var label = (m.title + (m.release_year ? " (" + m.release_year + ")" : "")).toLowerCase();
+      return label.indexOf(val) !== -1;
+    });
+
+    if (!matches.length) {
+      suggestionsBox.style.display = "none";
+      selectedMovieCardContainer.classList.add("hidden");
+      return;
+    }
+
+    matches.forEach(function(movie) {
+      var label = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
+      var div = makeElement("div", "", label);
+      div.addEventListener("click", function() {
+        managerSearchInput.value = label;
+        suggestionsBox.style.display = "none";
+        displaySelectedMovie(movie);
+      });
+      suggestionsBox.appendChild(div);
+    });
+    suggestionsBox.style.display = "block";
   });
 
   document.getElementById("quickCategoryForm").addEventListener("submit", async function(e) {
@@ -514,7 +520,6 @@ hr{border-color:#303a50;margin:24px 0}
     }
   }
 
-  // Version form logic
   document.getElementById("versionForm").addEventListener("submit", async function(e) {
     e.preventDefault();
     var movieId = versionMovie.value;
@@ -555,7 +560,6 @@ hr{border-color:#303a50;margin:24px 0}
   versionMovie.addEventListener("change", loadVersions);
   document.getElementById("refreshVersionsBtn").addEventListener("click", loadVersions);
 
-  // JJ Messages Form Logic
   document.getElementById("announcementForm").addEventListener("submit", async function(e) {
     e.preventDefault();
     var msgData = {
