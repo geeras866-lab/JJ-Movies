@@ -50,7 +50,7 @@ function createExtraSections() {
       .jj-feature-section h2 { color:#f4f5fa; margin-bottom:18px; }
       .jj-update-card { background:#111827; border:1px solid #ff3867; border-radius:12px; padding:17px; margin:12px 0; overflow-wrap:anywhere; box-shadow: 0 4px 15px rgba(255, 56, 103, 0.15); }
       .jj-update-card h3 { margin:0 0 8px; color:#ff7293; }
-      .jj-update-card p { color:#c5ccdc; line-height:1.6; }
+      .jj-update-card p { color:#c5ccdc; line-height:1.6; margin-bottom:12px; }
       .jj-trailer-button { display:inline-block; padding:10px 14px; background:#ff3867; color:white; text-decoration:none; border-radius:7px; margin:8px 0; font-weight:bold; }
       .jj-pin-badge { color:#ff7293; font-size:12px; font-weight:bold; overflow-wrap:anywhere; }
     `;
@@ -345,7 +345,12 @@ function loadMessages() {
       messages.forEach(function (item) {
         var card = document.createElement("article");
         card.className = "jj-update-card";
-        card.innerHTML = "<h3>" + escapeHTML(item.title) + "</h3><p>" + escapeHTML(item.message) + "</p>";
+
+        var linkHTML = item.link_url 
+          ? '<p><a class="jj-trailer-button" href="' + safeURL(item.link_url) + '" target="_blank" rel="noopener noreferrer">🔗 Open Link</a></p>' 
+          : '';
+
+        card.innerHTML = "<h3>" + escapeHTML(item.title) + "</h3><p>" + escapeHTML(item.message) + "</p>" + linkHTML;
         updatesList.appendChild(card);
       });
     });
