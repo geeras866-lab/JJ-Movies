@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JJ Movies - Admin Panel</title>
+<title>JJ Movies - Pro Admin Dashboard</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,sans-serif;background:#090d18;color:#f4f5fa}
@@ -39,7 +39,7 @@ hr{border-color:#303a50;margin:24px 0}
 </head>
 <body>
 <header>
-  <h2>JJ Movies Admin</h2>
+  <h2>JJ Movies Pro Admin</h2>
   <button id="logoutBtn" class="secondary hidden">Logout</button>
 </header>
 
@@ -160,11 +160,19 @@ hr{border-color:#303a50;margin:24px 0}
       <div id="versionList">Select a movie above.</div>
     </div>
 
-    <!-- MANAGE MOVIES LIST -->
+    <!-- SEARCH & SELECT MOVIE MANAGER (REPLACES LONG SCROLL LIST) -->
     <div class="panel">
-      <h2>Movies List (Full Edit / Delete)</h2>
-      <button id="refreshBtn" class="secondary">Refresh List</button>
-      <div id="movieList">Loading...</div>
+      <h2>Quick Movie Manager (Search, Edit & Delete)</h2>
+      <p class="muted">List lo scroll chese pani lekunda, movie search chesi direct ga edit or delete cheyandi.</p>
+      
+      <label for="managerMovieSelect">Search / Select Movie *</label>
+      <select id="managerMovieSelect"><option value="">Loading movies...</option></select>
+
+      <div id="selectedMovieCardContainer" class="hidden" style="margin-top:15px;">
+        <div class="movie-row" id="managerMovieRow">
+          <!-- Dynamically populated selected movie details -->
+        </div>
+      </div>
     </div>
 
     <!-- CREATE / EDIT JJ MESSAGE -->
@@ -209,11 +217,11 @@ hr{border-color:#303a50;margin:24px 0}
   var editingAnnouncementId = null;
   var selectedFile = null;
   var previewObjectUrl = null;
+  var allMoviesCache = [];
 
   var message = document.getElementById("message");
   var loginPanel = document.getElementById("loginPanel");
   var adminPanel = document.getElementById("adminPanel");
-  var movieList = document.getElementById("movieList");
   var posterFile = document.getElementById("posterFile");
   var posterPreview = document.getElementById("posterPreview");
   var uploadBtn = document.getElementById("uploadBtn");
@@ -221,6 +229,9 @@ hr{border-color:#303a50;margin:24px 0}
   var versionList = document.getElementById("versionList");
   var categoryMovieSelect = document.getElementById("categoryMovieSelect");
   var quickCategoryInput = document.getElementById("quickCategoryInput");
+  var managerMovieSelect = document.getElementById("managerMovieSelect");
+  var managerMovieRow = document.getElementById("managerMovieRow");
+  var selectedMovieCardContainer = document.getElementById("selectedMovieCardContainer");
   var announcementList = document.getElementById("announcementList");
 
   function showMessage(text) { message.textContent = text; }
@@ -355,26 +366,43 @@ hr{border-color:#303a50;margin:24px 0}
   });
 
   function populateMovieSelects(movies) {
+    allMoviesCache = movies;
+
+    // Version select
     versionMovie.innerHTML = "";
     var vFirst = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
     vFirst.value = "";
     versionMovie.appendChild(vFirst);
 
+    // Category select
     categoryMovieSelect.innerHTML = "";
     var cFirst = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
     cFirst.value = "";
     categoryMovieSelect.appendChild(cFirst);
 
+    // Manager select
+    managerMovieSelect.innerHTML = "";
+    var mFirst = makeElement("option", "", movies.length ? "Search or select a movie..." : "Add a movie first");
+    mFirst.value = "";
+    managerMovieSelect.appendChild(mFirst);
+
     movies.forEach(function (movie) {
+      var label = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
+      
       var opt1 = document.createElement("option");
       opt1.value = String(movie.id);
-      opt1.textContent = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
+      opt1.textContent = label;
       versionMovie.appendChild(opt1);
 
       var opt2 = document.createElement("option");
       opt2.value = String(movie.id);
-      opt2.textContent = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
+      opt2.textContent = label;
       categoryMovieSelect.appendChild(opt2);
+
+      var opt3 = document.createElement("option");
+      opt3.value = String(movie.id);
+      opt3.textContent = label;
+      managerMovieSelect.appendChild(opt3);
     });
 
     if (movies.length) {
@@ -391,6 +419,62 @@ hr{border-color:#303a50;margin:24px 0}
     if (res.data) {
       quickCategoryInput.value = res.data.category || "";
     }
+  });
+
+  managerMovieSelect.addEventListener("change", function() {
+    var movieId = managerMovieSelect.value;
+    if (!movieId) {
+      selectedMovieCardContainer.classList.add("hidden");
+      managerMovieRow.innerHTML = "";
+      return;
+    }
+    var movie = allMoviesCache.find(function(m) { return String(m.id) === String(movieId); });
+    if (!movie) return;
+
+    managerMovieRow.innerHTML = "";
+    if (movie.poster_url && safeHttpUrl(movie.poster_url)) {
+      var img = document.createElement("img");
+      img.src = safeHttpUrl(movie.poster_url);
+      img.onerror = function() { img.style.display = 'none'; };
+      managerMovieRow.appendChild(img);
+    }
+    var info = makeElement("div", "movie-info");
+    info.appendChild(makeElement("h3", "", movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "")));
+    info.appendChild(makeElement("p", "muted", "Category: " + (movie.category || "None")));
+
+    var editBtn = makeElement("button", "secondary", "Full Edit");
+    editBtn.addEventListener("click", function() {
+      editingId = movie.id;
+      document.getElementById("title").value = movie.title || "";
+      document.getElementById("year").value = movie.release_year || "";
+      document.getElementById("runtime").value = movie.runtime || "";
+      document.getElementById("categoryInput").value = movie.category || "";
+      document.getElementById("poster").value = movie.poster_url || "";
+      document.getElementById("trailerUrl").value = movie.trailer_url || "";
+      document.getElementById("description").value = movie.description || "";
+      document.getElementById("pinned").checked = !!movie.is_pinned;
+      document.getElementById("pinLabel").value = movie.pin_label || "";
+      document.getElementById("published").checked = !!movie.is_published;
+      document.getElementById("formTitle").textContent = "Edit Movie";
+      document.getElementById("saveBtn").textContent = "Update Movie";
+      document.getElementById("cancelBtn").classList.remove("hidden");
+      if (movie.poster_url) setPreview(movie.poster_url);
+      window.scrollTo(0,0);
+    });
+
+    var delBtn = makeElement("button", "danger", "Delete Movie");
+    delBtn.addEventListener("click", async function() {
+      if (confirm("Delete '" + movie.title + "' permanently?")) {
+        await supabase.from("movies").delete().eq("id", movie.id);
+        selectedMovieCardContainer.classList.add("hidden");
+        loadMovies();
+      }
+    });
+
+    info.appendChild(editBtn);
+    info.appendChild(delBtn);
+    managerMovieRow.appendChild(info);
+    selectedMovieCardContainer.classList.remove("hidden");
   });
 
   document.getElementById("quickCategoryForm").addEventListener("submit", async function(e) {
@@ -412,59 +496,18 @@ hr{border-color:#303a50;margin:24px 0}
     var res = await supabase.from("movies").select("*").order("created_at", { ascending: false });
     var movies = res.data || [];
     populateMovieSelects(movies);
-    movieList.innerHTML = "";
-
-    if (!movies.length) { movieList.textContent = "No movies."; return; }
-
-    movies.forEach(function (movie) {
-      var row = makeElement("div", "movie-row");
-      if (movie.poster_url && safeHttpUrl(movie.poster_url)) {
-        var img = document.createElement("img");
-        img.src = safeHttpUrl(movie.poster_url);
-        img.onerror = function() { img.style.display = 'none'; };
-        row.appendChild(img);
-      }
-      var info = makeElement("div", "movie-info");
-      info.appendChild(makeElement("h3", "", movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "")));
-      info.appendChild(makeElement("p", "muted", "Category: " + (movie.category || "None")));
-
-      var editBtn = makeElement("button", "secondary", "Full Edit");
-      editBtn.addEventListener("click", function() {
-        editingId = movie.id;
-        document.getElementById("title").value = movie.title || "";
-        document.getElementById("year").value = movie.release_year || "";
-        document.getElementById("runtime").value = movie.runtime || "";
-        document.getElementById("categoryInput").value = movie.category || "";
-        document.getElementById("poster").value = movie.poster_url || "";
-        document.getElementById("trailerUrl").value = movie.trailer_url || "";
-        document.getElementById("description").value = movie.description || "";
-        document.getElementById("pinned").checked = !!movie.is_pinned;
-        document.getElementById("pinLabel").value = movie.pin_label || "";
-        document.getElementById("published").checked = !!movie.is_published;
-        document.getElementById("formTitle").textContent = "Edit Movie";
-        document.getElementById("saveBtn").textContent = "Update Movie";
-        document.getElementById("cancelBtn").classList.remove("hidden");
-        if (movie.poster_url) setPreview(movie.poster_url);
-        window.scrollTo(0,0);
-      });
-
-      var delBtn = makeElement("button", "danger", "Delete Movie");
-      delBtn.addEventListener("click", async function() {
-        if (confirm("Delete '" + movie.title + "' permanently?")) {
-          await supabase.from("movies").delete().eq("id", movie.id);
-          loadMovies();
-        }
-      });
-
-      info.appendChild(editBtn);
-      info.appendChild(delBtn);
-      row.appendChild(info);
-      movieList.appendChild(row);
-    });
 
     if (categoryMovieSelect.value) {
       var activeMovie = movies.find(function(m) { return String(m.id) === String(categoryMovieSelect.value); });
       if (activeMovie) quickCategoryInput.value = activeMovie.category || "";
+    }
+
+    if (managerMovieSelect.value) {
+      var mCard = movies.find(function(m) { return String(m.id) === String(managerMovieSelect.value); });
+      if (!mCard) {
+        selectedMovieCardContainer.classList.add("hidden");
+        managerMovieSelect.value = "";
+      }
     }
   }
 
@@ -509,7 +552,7 @@ hr{border-color:#303a50;margin:24px 0}
   versionMovie.addEventListener("change", loadVersions);
   document.getElementById("refreshVersionsBtn").addEventListener("click", loadVersions);
 
-  // JJ Messages Form Logic with Edit Support
+  // JJ Messages Form Logic
   document.getElementById("announcementForm").addEventListener("submit", async function(e) {
     e.preventDefault();
     var msgData = {
@@ -598,7 +641,6 @@ hr{border-color:#303a50;margin:24px 0}
     });
   }
 
-  document.getElementById("refreshBtn").addEventListener("click", loadMovies);
   document.getElementById("refreshAnnouncementsBtn").addEventListener("click", loadAnnouncements);
 
   supabase.auth.getSession().then(function (res) {
