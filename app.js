@@ -48,7 +48,7 @@ function createExtraSections() {
     style.textContent = `
       .jj-feature-section { max-width:1200px; margin:28px auto; padding:0 20px; }
       .jj-feature-section h2 { color:#f4f5fa; margin-bottom:18px; }
-      .jj-update-card { background:#111827; border:1px solid #293044; border-radius:12px; padding:17px; margin:12px 0; overflow-wrap:anywhere; }
+      .jj-update-card { background:#111827; border:1px solid #ff3867; border-radius:12px; padding:17px; margin:12px 0; overflow-wrap:anywhere; box-shadow: 0 4px 15px rgba(255, 56, 103, 0.15); }
       .jj-update-card h3 { margin:0 0 8px; color:#ff7293; }
       .jj-update-card p { color:#c5ccdc; line-height:1.6; }
       .jj-trailer-button { display:inline-block; padding:10px 14px; background:#ff3867; color:white; text-decoration:none; border-radius:7px; margin:8px 0; font-weight:bold; }
@@ -58,7 +58,6 @@ function createExtraSections() {
   }
 
   var collection = document.getElementById("collection");
-  var about = document.getElementById("about");
 
   if (collection && !document.getElementById("jjPinnedSection")) {
     var pinned = document.createElement("section");
@@ -68,12 +67,12 @@ function createExtraSections() {
     collection.parentNode.insertBefore(pinned, collection);
   }
 
-  if (about && !document.getElementById("jjUpdatesSection")) {
+  if (collection && !document.getElementById("jjUpdatesSection")) {
     var updates = document.createElement("section");
     updates.id = "jjUpdatesSection";
     updates.className = "jj-feature-section";
-    updates.innerHTML = '<h2>📝 JJ Movies — Latest Updates</h2><div id="jjUpdatesList"><p class="muted">Loading updates...</p></div>';
-    about.parentNode.insertBefore(updates, about);
+    updates.innerHTML = '<h2>📝 JJ Movies — Important Updates</h2><div id="jjUpdatesList"><p class="muted">Loading updates...</p></div>';
+    collection.parentNode.insertBefore(updates, collection);
   }
 }
 
