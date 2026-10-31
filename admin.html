@@ -110,6 +110,21 @@ hr{border-color:#303a50;margin:24px 0}
       </form>
     </div>
 
+    <!-- SIMPLE CATEGORY MANAGEMENT PANEL -->
+    <div class="panel">
+      <h2>Manage Movie Category</h2>
+      <p class="muted">Movie ni select chesi, direct ga category assign cheyochu.</p>
+      <form id="quickCategoryForm">
+        <label for="categoryMovieSelect">Select Movie *</label>
+        <select id="categoryMovieSelect" required><option value="">Loading movies...</option></select>
+
+        <label for="quickCategoryInput">Category Name *</label>
+        <input id="quickCategoryInput" type="text" placeholder="Type category (e.g. Marvel, DC, Jurassic)" required>
+
+        <button type="submit" id="saveQuickCatBtn">Save Movie Category</button>
+      </form>
+    </div>
+
     <!-- MANAGE QUALITY LINKS -->
     <div class="panel">
       <h2>Manage Movie Quality Links</h2>
@@ -145,9 +160,9 @@ hr{border-color:#303a50;margin:24px 0}
       <div id="versionList">Select a movie above.</div>
     </div>
 
-    <!-- MANAGE MOVIES & CATEGORIES -->
+    <!-- MANAGE MOVIES LIST -->
     <div class="panel">
-      <h2>Manage Movies & Categories</h2>
+      <h2>Movies List (Full Edit / Delete)</h2>
       <button id="refreshBtn" class="secondary">Refresh List</button>
       <div id="movieList">Loading...</div>
     </div>
@@ -170,7 +185,6 @@ hr{border-color:#303a50;margin:24px 0}
         </label>
 
         <button type="submit" id="saveAnnouncementBtn">Save Message</button>
-        <button type="button" id="cancelAnnouncementBtn" class="secondary hidden">Cancel Edit</button>
       </form>
 
       <hr>
@@ -191,7 +205,6 @@ hr{border-color:#303a50;margin:24px 0}
 
   var currentUser = null;
   var editingId = null;
-  var editingAnnouncementId = null;
   var selectedFile = null;
   var previewObjectUrl = null;
 
@@ -204,6 +217,8 @@ hr{border-color:#303a50;margin:24px 0}
   var uploadBtn = document.getElementById("uploadBtn");
   var versionMovie = document.getElementById("versionMovie");
   var versionList = document.getElementById("versionList");
+  var categoryMovieSelect = document.getElementById("categoryMovieSelect");
+  var quickCategoryInput = document.getElementById("quickCategoryInput");
   var announcementList = document.getElementById("announcementList");
 
   function showMessage(text) { message.textContent = text; }
@@ -337,25 +352,72 @@ hr{border-color:#303a50;margin:24px 0}
     loadMovies();
   });
 
-  function populateVersionMovies(movies) {
+  function populateMovieSelects(movies) {
+    // Version dropdown
     versionMovie.innerHTML = "";
-    var first = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
-    first.value = "";
-    versionMovie.appendChild(first);
+    var vFirst = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
+    vFirst.value = "";
+    versionMovie.appendChild(vFirst);
+
+    // Category dropdown
+    categoryMovieSelect.innerHTML = "";
+    var cFirst = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
+    cFirst.value = "";
+    categoryMovieSelect.appendChild(cFirst);
+
     movies.forEach(function (movie) {
-      var opt = document.createElement("option");
-      opt.value = String(movie.id);
-      opt.textContent = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
-      versionMovie.appendChild(opt);
+      var opt1 = document.createElement("option");
+      opt1.value = String(movie.id);
+      opt1.textContent = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
+      versionMovie.appendChild(opt1);
+
+      var opt2 = document.createElement("option");
+      opt2.value = String(movie.id);
+      opt2.textContent = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
+      categoryMovieSelect.appendChild(opt2);
     });
-    if (movies.length) versionMovie.value = String(movies[0].id);
-    if (versionMovie.value) loadVersions();
+
+    if (movies.length) {
+      versionMovie.value = String(movies[0].id);
+      categoryMovieSelect.value = String(movies[0].id);
+      updateQuickCategoryInput();
+      loadVersions();
+    }
   }
+
+  function updateQuickCategoryInput() {
+    var selectedId = categoryMovieSelect.value;
+    // We can fetch or find the movie category from loaded elements
+  }
+
+  categoryMovieSelect.addEventListener("change", async function() {
+    var movieId = categoryMovieSelect.value;
+    if (!movieId) { quickCategoryInput.value = ""; return; }
+    var res = await supabase.from("movies").select("category").eq("id", Number(movieId)).single();
+    if (res.data) {
+      quickCategoryInput.value = res.data.category || "";
+    }
+  });
+
+  document.getElementById("quickCategoryForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    var movieId = categoryMovieSelect.value;
+    var newCat = quickCategoryInput.value.trim();
+    if (!movieId) { showMessage("Please select a movie."); return; }
+
+    var res = await supabase.from("movies").update({ category: newCat }).eq("id", Number(movieId));
+    if (res.error) {
+      showMessage("Failed to update category: " + res.error.message);
+    } else {
+      showMessage("Category updated successfully to '" + newCat + "'!");
+      loadMovies();
+    }
+  });
 
   async function loadMovies() {
     var res = await supabase.from("movies").select("*").order("created_at", { ascending: false });
     var movies = res.data || [];
-    populateVersionMovies(movies);
+    populateMovieSelects(movies);
     movieList.innerHTML = "";
 
     if (!movies.length) { movieList.textContent = "No movies."; return; }
@@ -370,32 +432,7 @@ hr{border-color:#303a50;margin:24px 0}
       }
       var info = makeElement("div", "movie-info");
       info.appendChild(makeElement("h3", "", movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "")));
-
-      var catLabel = makeElement("label", "", "Category Name:");
-      var catInput = document.createElement("input");
-      catInput.type = "text";
-      catInput.value = movie.category || "";
-
-      var btnGrp = document.createElement("div");
-      btnGrp.style.display = "flex";
-      btnGrp.style.gap = "6px";
-      btnGrp.style.margin = "6px 0 10px 0";
-
-      var saveCatBtn = makeElement("button", "secondary", "Save Category");
-      saveCatBtn.style.margin = "0";
-      saveCatBtn.addEventListener("click", async function() {
-        var uRes = await supabase.from("movies").update({ category: catInput.value.trim() }).eq("id", movie.id);
-        if (uRes.error) {
-          showMessage("Failed: " + uRes.error.message);
-        } else {
-          showMessage("Category updated to: " + catInput.value.trim());
-          loadMovies();
-        }
-      });
-      btnGrp.appendChild(saveCatBtn);
-      info.appendChild(catLabel);
-      info.appendChild(catInput);
-      info.appendChild(btnGrp);
+      info.appendChild(makeElement("p", "muted", "Category: " + (movie.category || "None")));
 
       var editBtn = makeElement("button", "secondary", "Full Edit");
       editBtn.addEventListener("click", function() {
@@ -430,6 +467,12 @@ hr{border-color:#303a50;margin:24px 0}
       row.appendChild(info);
       movieList.appendChild(row);
     });
+
+    // Trigger category input fill for current selected dropdown
+    if (categoryMovieSelect.value) {
+      var activeMovie = movies.find(function(m) { return String(m.id) === String(categoryMovieSelect.value); });
+      if (activeMovie) quickCategoryInput.value = activeMovie.category || "";
+    }
   }
 
   // Version form logic
@@ -483,16 +526,10 @@ hr{border-color:#303a50;margin:24px 0}
       is_published: document.getElementById("announcementPublished").checked
     };
 
-    var res;
-    if (editingAnnouncementId !== null) {
-      res = await supabase.from("jj_messages").update(msgData).eq("id", editingAnnouncementId);
-    } else {
-      res = await supabase.from("jj_messages").insert([msgData]);
-    }
+    var res = await supabase.from("jj_messages").insert([msgData]);
     if (res.error) { showMessage("Error: " + res.error.message); return; }
     showMessage("JJ Message saved successfully!");
     document.getElementById("announcementForm").reset();
-    editingAnnouncementId = null;
     loadAnnouncements();
   });
 
