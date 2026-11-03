@@ -1,0 +1,27 @@
+name: Migrate Posters to Telegram
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-migration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install @supabase/supabase-js
+
+      - name: Run Migration Script
+        env:
+          SUPABASE_URL: "https://tswyabgdldbsaopipvug.supabase.co"
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHANNEL_ID: "-1004420066872"
+        run: node scripts/migrate.js
