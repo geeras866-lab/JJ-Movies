@@ -86,14 +86,6 @@ function createExtraSections() {
 
   var collection = document.getElementById("collection");
 
-  if (collection && !document.getElementById("jjPinnedSection")) {
-    var pinned = document.createElement("section");
-    pinned.id = "jjPinnedSection";
-    pinned.className = "jj-feature-section";
-    pinned.innerHTML = '<h2 id="jjPinnedHeading">📌 Movies</h2><div id="jjPinnedGrid" class="movie-grid"></div>';
-    collection.parentNode.insertBefore(pinned, collection);
-  }
-
   if (collection && !document.getElementById("jjUpdatesSection")) {
     var updates = document.createElement("section");
     updates.id = "jjUpdatesSection";
@@ -141,6 +133,7 @@ function loadMovies() {
 
       setupYears();
       renderMovies();
+      renderShowcaseCarousel();
       loadMessages();
     })
     .catch(function (error) {
@@ -151,6 +144,57 @@ function loadMovies() {
       movieGrid.innerHTML = "";
       loadMessages();
     });
+}
+
+// Netflix Carousel system based on pinned data cards dynamic backdrop reading
+function renderShowcaseCarousel() {
+  var bannerContainer = document.getElementById("bannerCarousel");
+  if (!bannerContainer) return;
+
+  var showpiece = movies.filter(function (movie) { return movie.pinned; }).slice(0, 3);
+  if (!showpiece.length) return; // Fallback to default index template if zero pinned found
+
+  var carouselHTML = showpiece.map(function(movie, index) {
+    var isCurrent = index === 0 ? "active" : "";
+    var tagBadge = getMoviePinLabel(movie) || "POPULAR";
+    
+    // Background generation TMDB / backup fallbacks
+    var coverUrl = movie.poster;
+    if (coverUrl.includes("image.tmdb.org/t/p/")) {
+      coverUrl = coverUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/original");
+    }
+
+    return `
+      <div class="banner-slide ${isCurrent}">
+        <div class="banner-backdrop" style="background: linear-gradient(180deg, rgba(8,13,24,0.3) 0%, rgba(8,13,24,0.96) 100%), url('${coverUrl}') center 22%/cover no-repeat;"></div>
+        <div class="banner-overlay-content">
+          <div class="banner-badge-group">
+            <span class="banner-badge-tag crimson">${escapeHTML(tagBadge)}</span>
+            <span class="banner-badge-tag">${escapeHTML(movie.year || "LATEST")}</span>
+            ${movie.runtime ? `<span class="banner-badge-tag">${escapeHTML(movie.runtime)}</span>` : ""}
+          </div>
+          <h1 class="banner-title">${escapeHTML(movie.title)}</h1>
+          <p class="banner-desc">${escapeHTML(movie.description || "Grab complete audio downloads and version prints instantly on our Telegram bot.")}</p>
+          <div class="banner-action-row">
+            <button onclick="showMovieDetails('${movie.id}')" class="btn-banner-primary">⚡ View Movie Details</button>
+            ${movie.trailer ? `<a href="${escapeHTML(movie.trailer)}" target="_blank" rel="noopener" class="btn-banner-secondary">▶ Trailer</a>` : ""}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  bannerContainer.innerHTML = carouselHTML;
+
+  // Tiny simple auto switcher routine for top carousel rotation every 6.5s
+  var slideIndex = 0;
+  setInterval(function() {
+    var slides = document.querySelectorAll(".banner-slide");
+    if (slides.length <= 1) return;
+    slides[slideIndex].classList.remove("active");
+    slideIndex = (slideIndex + 1) % slides.length;
+    slides[slideIndex].classList.add("active");
+  }, 6500);
 }
 
 function setupYears() {
@@ -176,17 +220,59 @@ function matchesFilters(movie) {
   var year = yearFilter.value;
 
   var movieCategory = String(movie.category || "").toLowerCase().trim();
+  
+  // Quick Audio Sorting Integration with check index logic
+  var audioMatch = true;
+  if (window.activeAudio && window.activeAudio !== "all") {
+    var targetLanguage = window.activeAudio.toLowerCase();
+    // Verify descriptions / meta if version audio data is required
+    var hasLanguage = false;
+    if (movie.description && movie.description.toLowerCase().includes(targetLanguage)) {
+      hasLanguage = true;
+    }
+    // Fallback: search tags and details
+    if (movie.title && movie.title.toLowerCase().includes(targetLanguage)) {
+      hasLanguage = true;
+    }
+    audioMatch = hasLanguage;
+  }
 
   return (
     movie.title.toLowerCase().indexOf(search) !== -1 &&
     (selectedCategory === "all" || movieCategory === selectedCategory) &&
-    (year === "all" || String(movie.year) === year)
+    (year === "all" || String(movie.year) === year) &&
+    audioMatch
   );
 }
 
+// Card wrapper update containing top corner floating stamping badges for Ultra, HEVC, Telugu
 function createMovieCard(movie) {
   var card = document.createElement("article");
   card.className = "movie-card";
+
+  var wrapper = document.createElement("div");
+  wrapper.className = "card-poster-wrapper";
+
+  // Poster tag stamping: Top-left tag is used for category/quality check, Top-right tag serves as year badge
+  var tagBadgeLeftText = movie.category || "FILMS";
+  var yearTagRightText = movie.year || "2026";
+  
+  // Stamp the top labels if pinned or dynamic matching is present
+  var isPremium = getMoviePinLabel(movie);
+  if (isPremium) {
+    tagBadgeLeftText = "Featured";
+  }
+
+  var badgeLeft = document.createElement("div");
+  badgeLeft.className = "card-badge-top-left";
+  badgeLeft.textContent = tagBadgeLeftText;
+
+  var badgeRight = document.createElement("div");
+  badgeRight.className = "card-badge-top-right";
+  badgeRight.textContent = yearTagRightText;
+
+  wrapper.appendChild(badgeLeft);
+  wrapper.appendChild(badgeRight);
 
   if (movie.poster) {
     var image = document.createElement("img");
@@ -201,41 +287,34 @@ function createMovieCard(movie) {
       placeholder.textContent = movie.title;
       image.replaceWith(placeholder);
     };
-    card.appendChild(image);
+    wrapper.appendChild(image);
   } else {
     var placeholder = document.createElement("div");
     placeholder.className = "poster-placeholder";
     placeholder.textContent = movie.title;
-    card.appendChild(placeholder);
+    wrapper.appendChild(placeholder);
   }
+
+  card.appendChild(wrapper);
 
   var info = document.createElement("div");
   info.className = "movie-info";
-
-  var pinLabel = getMoviePinLabel(movie);
-  if (pinLabel) {
-    var badge = document.createElement("div");
-    badge.className = "jj-pin-badge";
-    badge.textContent = pinLabel;
-    info.appendChild(badge);
-  }
 
   var title = document.createElement("h3");
   title.textContent = movie.title;
 
   var metaParts = [];
-  metaParts.push(movie.year || "Year unknown");
-  if (movie.category) metaParts.push(movie.category);
   if (movie.runtime) metaParts.push(movie.runtime);
+  if (movie.category) metaParts.push(movie.category);
 
   var meta = document.createElement("div");
   meta.className = "movie-meta";
-  meta.textContent = metaParts.join(" • ");
+  meta.textContent = metaParts.length ? metaParts.join(" • ") : (movie.year || "Movie");
 
   var button = document.createElement("button");
   button.className = "details-button";
   button.type = "button";
-  button.textContent = "View Details";
+  button.textContent = "⚡ Get Downloads";
   button.addEventListener("click", function () {
     showMovieDetails(movie.id);
   });
@@ -317,9 +396,25 @@ async function showMovieDetails(movieId) {
     <div id="modalVersionContainer">
       <p style="color:#64748b; font-size:12px; text-align:center; padding:16px 0;">Loading prints from bot...</p>
     </div>
+
+    <!-- Smart share bar integrates native Deep Link share sheet or custom WhatsApp hook with dynamic text -->
+    <div class="modal-footer-sharing">
+      <span>Share with friends:</span>
+      <a id="btnShareModalWhatsApp" href="#" class="btn-whatsapp-share" target="_blank" rel="noopener">
+        💚 Share to WhatsApp
+      </a>
+    </div>
   `;
 
   movieModal.hidden = false;
+
+  // Custom live title dynamic share string configuration
+  var shareAnchor = document.getElementById("btnShareModalWhatsApp");
+  if (shareAnchor) {
+    var shareUrl = window.location.origin + window.location.pathname + "?movie=" + encodeURIComponent(movie.id);
+    var customText = "🍿 *Watch " + movie.title + "* (" + (movie.year || "Movie") + ") on JJ Movies! Check latest versions and print files instantly on Telegram bot direct from: " + shareUrl;
+    shareAnchor.href = "https://api.whatsapp.com/send?text=" + encodeURIComponent(customText);
+  }
 
   try {
     var res = await fetch(
@@ -333,7 +428,7 @@ async function showMovieDetails(movieId) {
     if (!container) return;
 
     if (!versions || versions.length === 0) {
-      container.innerHTML = `<p style="color:#64748b; font-size:12px; text-align:center; padding:12px;">No versions added yet.</p>`;
+      container.innerHTML = `<p style="color:#64748b; font-size:12px; text-align:center; padding:12px;">No prints added yet.</p>`;
       return;
     }
 
