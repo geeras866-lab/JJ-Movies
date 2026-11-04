@@ -305,7 +305,7 @@ async function showMovieDetails(movieId) {
           ${movie.runtime ? `<span>• ${escapeHTML(movie.runtime)}</span>` : ""}
           ${movie.category ? `<span class="genre-badge">• ${escapeHTML(movie.category)}</span>` : ""}
         </div>
-        <p class="movie-desc-text">${escapeHTML(movie.description || "Ingen beskrivning tillgänglig.")}</p>
+        <p class="movie-desc-text">${escapeHTML(movie.description || "No description available.")}</p>
       </div>
     </div>
 
@@ -315,7 +315,7 @@ async function showMovieDetails(movieId) {
     </div>
 
     <div id="modalVersionContainer">
-      <p style="color:#64748b; font-size:12px; text-align:center; padding:16px 0;">Laddar versioner från botten...</p>
+      <p style="color:#64748b; font-size:12px; text-align:center; padding:16px 0;">Loading prints from bot...</p>
     </div>
   `;
 
@@ -333,7 +333,7 @@ async function showMovieDetails(movieId) {
     if (!container) return;
 
     if (!versions || versions.length === 0) {
-      container.innerHTML = `<p style="color:#64748b; font-size:12px; text-align:center; padding:12px;">Inga versioner tillagda ännu.</p>`;
+      container.innerHTML = `<p style="color:#64748b; font-size:12px; text-align:center; padding:12px;">No versions added yet.</p>`;
       return;
     }
 
@@ -343,7 +343,7 @@ async function showMovieDetails(movieId) {
         <div class="version-tile">
           <div class="version-tile-info">
             <span class="version-quality-title">💾 ${escapeHTML(v.quality || "Standard")}</span>
-            <span class="version-audio-sub">Ljud: ${escapeHTML(v.audio_language || "Telugu")}</span>
+            <span class="version-audio-sub">Audio: ${escapeHTML(v.audio_language || "Telugu")}</span>
           </div>
           <a class="btn-tele-bot" href="${escapeHTML(botURL)}" target="_blank" rel="noopener noreferrer">
             ⚡ Get Files in Bot
@@ -356,7 +356,7 @@ async function showMovieDetails(movieId) {
   } catch (err) {
     console.error("Modal version load error:", err);
     var container = document.getElementById("modalVersionContainer");
-    if (container) container.innerHTML = `<p style="color:#ef4444; font-size:12px; text-align:center;">Kunde inte ladda versioner.</p>`;
+    if (container) container.innerHTML = `<p style="color:#ef4444; font-size:12px; text-align:center;">Failed to load prints.</p>`;
   }
 }
 
@@ -373,7 +373,7 @@ function loadMessages() {
       messages = data || [];
       updatesList.innerHTML = "";
       if (!messages.length) {
-        updatesList.textContent = "Inga nya uppdateringar ännu.";
+        updatesList.textContent = "No latest updates yet.";
         return;
       }
       messages.forEach(function (item) {
@@ -381,7 +381,7 @@ function loadMessages() {
         card.className = "jj-update-card";
 
         var linkHTML = item.link_url 
-          ? '<p><a class="jj-trailer-button" href="' + safeURL(item.link_url) + '" target="_blank" rel="noopener noreferrer">🔗 Öppna länk</a></p>' 
+          ? '<p><a class="jj-trailer-button" href="' + safeURL(item.link_url) + '" target="_blank" rel="noopener noreferrer">🔗 Open Link</a></p>' 
           : "";
 
         card.innerHTML = "<h3>" + escapeHTML(item.title) + "</h3><p>" + escapeHTML(item.message) + "</p>" + linkHTML;
