@@ -280,38 +280,38 @@ body {
 }
 
 /* ========================================================
-   SPOTLIGHT BOTTOM SEARCH BAR
+   SPOTLIGHT BOTTOM SEARCH BAR (BIG & PROMINENT)
    ======================================================== */
 .spotlight-search-container {
-  max-width: 900px;
-  margin: -22px auto 14px;
-  padding: 0 16px;
+  max-width: 1050px;
+  margin: -28px auto 18px;
+  padding: 0 18px;
   position: relative;
   z-index: 20;
 }
 
 .spotlight-search-box {
-  background: rgba(14, 22, 38, 0.94);
-  border: 1px solid rgba(255, 36, 80, 0.35);
-  border-radius: 30px;
-  padding: 9px 18px;
+  background: rgba(14, 22, 38, 0.96);
+  border: 2px solid rgba(255, 36, 80, 0.45);
+  border-radius: 35px;
+  padding: 14px 24px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65), 0 0 15px rgba(255, 36, 80, 0.15);
+  gap: 14px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.75), 0 0 20px rgba(255, 36, 80, 0.2);
   transition: all 0.25s ease;
 }
 
 .spotlight-search-box:focus-within {
   border-color: #ff2450;
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.75), 0 0 22px rgba(255, 36, 80, 0.35);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.85), 0 0 28px rgba(255, 36, 80, 0.45);
   transform: translateY(-2px);
 }
 
 .search-lens-icon {
-  font-size: 15px;
+  font-size: 19px;
   color: #ff2450;
 }
 
@@ -320,24 +320,33 @@ body {
   border: none;
   outline: none;
   color: #ffffff;
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 500;
   width: 100%;
 }
 
 #searchInput::placeholder {
-  color: #72849e;
+  color: #8fa0ba;
+  font-size: 15px;
 }
 
 .clear-search-btn {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.1);
   border: none;
-  color: #94a3b8;
-  font-size: 15px;
+  color: #cbd5e1;
+  font-size: 14px;
   cursor: pointer;
-  padding: 2px 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s;
 }
 
 .clear-search-btn:hover {
+  background: #ff2450;
   color: #ffffff;
 }
 
@@ -898,16 +907,25 @@ footer p {
   }
 
   .spotlight-search-container {
-    margin-top: -20px;
-    padding: 0 10px;
+    margin-top: -24px;
+    padding: 0 14px;
   }
 
   .spotlight-search-box {
-    padding: 7px 14px;
+    padding: 11px 18px;
+    border-radius: 28px;
+  }
+
+  .search-lens-icon {
+    font-size: 16px;
   }
 
   #searchInput {
-    font-size: 13px;
+    font-size: 14px;
+  }
+
+  #searchInput::placeholder {
+    font-size: 13.5px;
   }
 
   .container,
