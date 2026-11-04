@@ -70,17 +70,102 @@ function getAdaptivePosterUrl(originalUrl) {
   return originalUrl;
 }
 
+// Micro space alerts system creator setup inline
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
     var style = document.createElement("style");
     style.id = "jjExtraStyles";
     style.textContent = `
-      .jj-feature-section { max-width:1200px; margin:28px auto; padding:0 20px; }
-      .jj-feature-section h2 { color:#f4f5fa; margin-bottom:18px; }
-      .jj-update-card { background:#111827; border:1px solid #ff3867; border-radius:12px; padding:17px; margin:12px 0; overflow-wrap:anywhere; box-shadow: 0 4px 15px rgba(255, 56, 103, 0.15); }
-      .jj-update-card h3 { margin:0 0 8px; color:#ff7293; }
-      .jj-update-card p { color:#c5ccdc; line-height:1.6; margin-bottom:12px; }
-      .jj-trailer-button { display:inline-block; padding:10px 14px; background:#ff3867; color:white; text-decoration:none; border-radius:7px; margin:8px 0; font-weight:bold; }
+      .jj-feature-section { max-width:1200px; margin:14px auto 8px; padding:0 12px; }
+      
+      /* High-density Model 1 Single Row Ticker setup */
+      .jj-alert-ticker-container {
+        background: #0d1526;
+        border: 1px solid rgba(255, 36, 80, 0.15);
+        border-left: 3px solid #ff2450;
+        border-radius: 6px;
+        padding: 5px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 34px;
+        margin-top: 4px;
+      }
+      
+      .jj-alert-ticker-content {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: #e2e8f0;
+        font-weight: 500;
+        min-width: 0;
+        flex: 1;
+      }
+      
+      .jj-ticker-badge {
+        background: #ff2450;
+        color: #ffffff;
+        font-size: 8px;
+        font-weight: 800;
+        padding: 1px 4px;
+        border-radius: 3px;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+      
+      .jj-ticker-text-wrapper {
+        overflow: hidden;
+        position: relative;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        height: 16px;
+      }
+      
+      .jj-ticker-slide {
+        display: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: 100%;
+        animation: tickerFade 0.4s ease-in-out;
+      }
+      
+      .jj-ticker-slide.active {
+        display: inline-block;
+      }
+      
+      @keyframes tickerFade {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      
+      .jj-ticker-btn {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #f1f5f9;
+        text-decoration: none;
+        font-size: 9px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 4px;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        transition: 0.2s;
+      }
+      
+      .jj-ticker-btn:hover {
+        background: #ff2450;
+        border-color: #ff2450;
+        color: #ffffff;
+      }
+      
       .jj-pin-badge { color:#ff7293; font-size:12px; font-weight:bold; overflow-wrap:anywhere; }
       #modalVersionContainer { min-height: 80px; }
     `;
@@ -89,11 +174,31 @@ function createExtraSections() {
 
   var collection = document.getElementById("collection");
 
+  if (collection && !document.getElementById("jjPinnedSection")) {
+    var pinned = document.createElement("section");
+    pinned.id = "jjPinnedSection";
+    pinned.className = "jj-feature-section";
+    pinned.innerHTML = '<h2 id="jjPinnedHeading" style="color:#94a3b8; font-size:13px; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; font-weight:700;">📌 Featured Movies</h2><div id="jjPinnedGrid" class="movie-grid"></div>';
+    collection.parentNode.insertBefore(pinned, collection);
+  }
+
   if (collection && !document.getElementById("jjUpdatesSection")) {
     var updates = document.createElement("section");
     updates.id = "jjUpdatesSection";
     updates.className = "jj-feature-section";
-    updates.innerHTML = '<h2>📝 JJ Movies — Important Updates</h2><div id="jjUpdatesList"><p class="muted">Loading updates...</p></div>';
+    updates.innerHTML = `
+      <div id="jjAlertsTicker" class="jj-alert-ticker-container" style="display:none;">
+        <div class="jj-alert-ticker-content">
+          <span class="jj-ticker-badge">UPDATES</span>
+          <div id="jjTickerTextWrapper" class="jj-ticker-text-wrapper">
+            <!-- Loading dynamic slides indicators -->
+          </div>
+        </div>
+        <div id="jjTickerActionArea">
+          <!-- Button controls -->
+        </div>
+      </div>
+    `;
     collection.parentNode.insertBefore(updates, collection);
   }
 }
@@ -433,9 +538,12 @@ async function showMovieDetails(movieId) {
   }
 }
 
+// Model 1 high quality updates single row rotator loader configurations run
 function loadMessages() {
-  var updatesList = document.getElementById("jjUpdatesList");
-  if (!updatesList) return;
+  var tickerWrapper = document.getElementById("jjTickerTextWrapper");
+  var tickerContainer = document.getElementById("jjAlertsTicker");
+  var actionArea = document.getElementById("jjTickerActionArea");
+  if (!tickerWrapper || !tickerContainer) return;
 
   fetch(
     SUPABASE_URL + "/rest/v1/jj_messages?select=id,title,message,link_url,created_at&is_published=eq.true&order=created_at.desc",
@@ -443,23 +551,48 @@ function loadMessages() {
   )
     .then(function (response) { return response.json(); })
     .then(function (data) {
-      messages = data || [];
-      updatesList.innerHTML = "";
-      if (!messages.length) {
-        updatesList.textContent = "No latest updates yet.";
+      var activeMessages = data || [];
+      if (!activeMessages.length) {
+        tickerContainer.style.display = "none";
         return;
       }
-      messages.forEach(function (item) {
-        var card = document.createElement("article");
-        card.className = "jj-update-card";
-
-        var linkHTML = item.link_url 
-          ? '<p><a class="jj-trailer-button" href="' + safeURL(item.link_url) + '" target="_blank" rel="noopener noreferrer">🔗 Open Link</a></p>' 
-          : "";
-
-        card.innerHTML = "<h3>" + escapeHTML(item.title) + "</h3><p>" + escapeHTML(item.message) + "</p>" + linkHTML;
-        updatesList.appendChild(card);
+      
+      tickerContainer.style.display = "flex";
+      tickerWrapper.innerHTML = "";
+      
+      activeMessages.forEach(function (item, index) {
+        var slide = document.createElement("span");
+        slide.className = "jj-ticker-slide" + (index === 0 ? " active" : "");
+        slide.setAttribute("data-link", item.link_url || "");
+        slide.innerHTML = "📢 <strong>" + escapeHTML(item.title) + "</strong>: " + escapeHTML(item.message);
+        tickerWrapper.appendChild(slide);
       });
+
+      function updateButtonLink(activeSlide) {
+        if (!actionArea) return;
+        var link = activeSlide ? activeSlide.getAttribute("data-link") : "";
+        if (link) {
+          actionArea.innerHTML = `<a class="jj-ticker-btn" href="${safeURL(link)}" target="_blank" rel="noopener noreferrer">Open ➜</a>`;
+          actionArea.style.display = "block";
+        } else {
+          actionArea.innerHTML = "";
+          actionArea.style.display = "none";
+        }
+      }
+
+      var firstSlide = tickerWrapper.querySelector(".jj-ticker-slide.active");
+      updateButtonLink(firstSlide);
+
+      var slides = tickerWrapper.querySelectorAll(".jj-ticker-slide");
+      if (slides.length <= 1) return;
+
+      var current = 0;
+      setInterval(function () {
+        slides[current].classList.remove("active");
+        current = (current + 1) % slides.length;
+        slides[current].classList.add("active");
+        updateButtonLink(slides[current]);
+      }, 4000);
     });
 }
 
