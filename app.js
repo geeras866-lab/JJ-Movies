@@ -4,6 +4,7 @@ var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 
 var movies = [];
 var messages = [];
+window.activeAudio = "all";
 
 var movieGrid = document.getElementById("movieGrid");
 var searchInput = document.getElementById("searchInput");
@@ -103,7 +104,7 @@ function getHeaders() {
 }
 
 function loadMovies() {
-  movieCount.textContent = "Loading movies...";
+  if (movieCount) movieCount.textContent = "Loading movies...";
 
   fetch(
     SUPABASE_URL + "/rest/v1/movies?select=*&is_published=eq.true&order=created_at.desc",
@@ -138,29 +139,30 @@ function loadMovies() {
     })
     .catch(function (error) {
       console.error("JJ Movies error:", error);
-      movieCount.textContent = "Unable to load movies";
-      emptyMessage.hidden = false;
-      emptyMessage.textContent = "Movies load avvaledu.";
-      movieGrid.innerHTML = "";
+      if (movieCount) movieCount.textContent = "Unable to load movies";
+      if (emptyMessage) {
+        emptyMessage.hidden = false;
+        emptyMessage.textContent = "Movies load avvaledu.";
+      }
+      if (movieGrid) movieGrid.innerHTML = "";
       loadMessages();
     });
 }
 
-// Netflix Carousel system based on pinned data cards dynamic backdrop reading
 function renderShowcaseCarousel() {
   var bannerContainer = document.getElementById("bannerCarousel");
   if (!bannerContainer) return;
 
-  var showpiece = movies.filter(function (movie) { return movie.pinned; }).slice(0, 3);
-  if (!showpiece.length) return; // Fallback to default index template if zero pinned found
+  var pinnedList = movies.filter(function (movie) { return movie.pinned === true; });
+  var showpiece = pinnedList.length > 0 ? pinnedList.slice(0, 5) : movies.slice(0, 3);
+  if (!showpiece.length) return;
 
-  var carouselHTML = showpiece.map(function(movie, index) {
+  var carouselHTML = showpiece.map(function (movie, index) {
     var isCurrent = index === 0 ? "active" : "";
     var tagBadge = getMoviePinLabel(movie) || "POPULAR";
-    
-    // Background generation TMDB / backup fallbacks
+
     var coverUrl = movie.poster;
-    if (coverUrl.includes("image.tmdb.org/t/p/")) {
+    if (coverUrl && coverUrl.includes("image.tmdb.org/t/p/")) {
       coverUrl = coverUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/original");
     }
 
@@ -186,9 +188,8 @@ function renderShowcaseCarousel() {
 
   bannerContainer.innerHTML = carouselHTML;
 
-  // Tiny simple auto switcher routine for top carousel rotation every 6.5s
   var slideIndex = 0;
-  setInterval(function() {
+  setInterval(function () {
     var slides = document.querySelectorAll(".banner-slide");
     if (slides.length <= 1) return;
     slides[slideIndex].classList.remove("active");
@@ -198,6 +199,7 @@ function renderShowcaseCarousel() {
 }
 
 function setupYears() {
+  if (!yearFilter) return;
   yearFilter.innerHTML = '<option value="all">All Years</option>';
   var years = [];
   movies.forEach(function (movie) {
@@ -215,37 +217,27 @@ function setupYears() {
 }
 
 function matchesFilters(movie) {
-  var search = searchInput.value.toLowerCase().trim();
+  var search = searchInput ? searchInput.value.toLowerCase().trim() : "";
   var selectedCategory = genreFilter ? genreFilter.value.toLowerCase().trim() : "all";
-  var year = yearFilter.value;
+  var year = yearFilter ? yearFilter.value : "all";
 
-  var movieCategory = String(movie.category || "").toLowerCase().trim();
-  
-  // Quick Audio Sorting Integration with check index logic
-  var audioMatch = true;
+  var movieTitle = (movie.title || "").toLowerCase();
+  var movieCategory = (movie.category || "").toLowerCase().trim();
+
+  var matchesSearch = search === "" || movieTitle.indexOf(search) !== -1;
+  var matchesCategory = selectedCategory === "all" || movieCategory === selectedCategory;
+  var matchesYear = year === "all" || String(movie.year) === year;
+
+  var matchesAudio = true;
   if (window.activeAudio && window.activeAudio !== "all") {
-    var targetLanguage = window.activeAudio.toLowerCase();
-    // Verify descriptions / meta if version audio data is required
-    var hasLanguage = false;
-    if (movie.description && movie.description.toLowerCase().includes(targetLanguage)) {
-      hasLanguage = true;
-    }
-    // Fallback: search tags and details
-    if (movie.title && movie.title.toLowerCase().includes(targetLanguage)) {
-      hasLanguage = true;
-    }
-    audioMatch = hasLanguage;
+    var target = window.activeAudio.toLowerCase();
+    var desc = (movie.description || "").toLowerCase();
+    matchesAudio = movieTitle.includes(target) || desc.includes(target) || movieCategory.includes(target);
   }
 
-  return (
-    movie.title.toLowerCase().indexOf(search) !== -1 &&
-    (selectedCategory === "all" || movieCategory === selectedCategory) &&
-    (year === "all" || String(movie.year) === year) &&
-    audioMatch
-  );
+  return matchesSearch && matchesCategory && matchesYear && matchesAudio;
 }
 
-// Card wrapper update containing top corner floating stamping badges for Ultra, HEVC, Telugu
 function createMovieCard(movie) {
   var card = document.createElement("article");
   card.className = "movie-card";
@@ -253,14 +245,12 @@ function createMovieCard(movie) {
   var wrapper = document.createElement("div");
   wrapper.className = "card-poster-wrapper";
 
-  // Poster tag stamping: Top-left tag is used for category/quality check, Top-right tag serves as year badge
   var tagBadgeLeftText = movie.category || "FILMS";
   var yearTagRightText = movie.year || "2026";
-  
-  // Stamp the top labels if pinned or dynamic matching is present
+
   var isPremium = getMoviePinLabel(movie);
   if (isPremium) {
-    tagBadgeLeftText = "Featured";
+    tagBadgeLeftText = isPremium;
   }
 
   var badgeLeft = document.createElement("div");
@@ -328,9 +318,15 @@ function createMovieCard(movie) {
 }
 
 function renderMovies() {
+  if (!movieGrid) return;
+
   var filtered = movies.filter(matchesFilters);
-  var pinnedGrid = document.getElementById("jjPinnedGrid");
-  var pinnedHeading = document.getElementById("jjPinnedHeading");
+
+  filtered.sort(function (a, b) {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return 0;
+  });
 
   movieGrid.innerHTML = "";
 
@@ -338,31 +334,12 @@ function renderMovies() {
     movieGrid.appendChild(createMovieCard(movie));
   });
 
-  if (pinnedHeading) {
-    var pinnedMoviesWithLabel = movies.filter(function (movie) {
-      return movie.pinned && getMoviePinLabel(movie) !== "";
-    });
-    pinnedHeading.textContent = pinnedMoviesWithLabel.length
-      ? "📌 " + getMoviePinLabel(pinnedMoviesWithLabel[0])
-      : "📌 Featured Movies";
+  if (movieCount) {
+    movieCount.textContent = filtered.length + (filtered.length === 1 ? " movie" : " movies");
   }
-
-  if (pinnedGrid) {
-    pinnedGrid.innerHTML = "";
-    var pinnedMovies = filtered.filter(function (movie) { return movie.pinned; });
-    pinnedMovies.forEach(function (movie) {
-      pinnedGrid.appendChild(createMovieCard(movie));
-    });
-    if (!pinnedMovies.length) {
-      var note = document.createElement("p");
-      note.className = "muted";
-      note.textContent = "No pinned movies match your current filters.";
-      pinnedGrid.appendChild(note);
-    }
+  if (emptyMessage) {
+    emptyMessage.hidden = filtered.length !== 0;
   }
-
-  movieCount.textContent = filtered.length + (filtered.length === 1 ? " movie" : " movies");
-  emptyMessage.hidden = filtered.length !== 0;
 }
 
 async function showMovieDetails(movieId) {
@@ -397,7 +374,6 @@ async function showMovieDetails(movieId) {
       <p style="color:#64748b; font-size:12px; text-align:center; padding:16px 0;">Loading prints from bot...</p>
     </div>
 
-    <!-- Smart share bar integrates native Deep Link share sheet or custom WhatsApp hook with dynamic text -->
     <div class="modal-footer-sharing">
       <span>Share with friends:</span>
       <a id="btnShareModalWhatsApp" href="#" class="btn-whatsapp-share" target="_blank" rel="noopener">
@@ -408,11 +384,10 @@ async function showMovieDetails(movieId) {
 
   movieModal.hidden = false;
 
-  // Custom live title dynamic share string configuration
   var shareAnchor = document.getElementById("btnShareModalWhatsApp");
   if (shareAnchor) {
     var shareUrl = window.location.origin + window.location.pathname + "?movie=" + encodeURIComponent(movie.id);
-    var customText = "🍿 *Watch " + movie.title + "* (" + (movie.year || "Movie") + ") on JJ Movies! Check latest versions and print files instantly on Telegram bot direct from: " + shareUrl;
+    var customText = "🍿 *Watch " + movie.title + "* (" + (movie.year || "Movie") + ") on JJ Movies! Check downloads: " + shareUrl;
     shareAnchor.href = "https://api.whatsapp.com/send?text=" + encodeURIComponent(customText);
   }
 
@@ -489,14 +464,19 @@ function closeMovieModal() {
   movieModal.hidden = true;
 }
 
-searchInput.addEventListener("input", renderMovies);
+if (searchInput) searchInput.addEventListener("input", renderMovies);
 if (genreFilter) genreFilter.addEventListener("change", renderMovies);
-yearFilter.addEventListener("change", renderMovies);
+if (yearFilter) yearFilter.addEventListener("change", renderMovies);
 
-document.getElementById("closeModal").addEventListener("click", closeMovieModal);
-movieModal.addEventListener("click", function (event) {
-  if (event.target === movieModal) closeMovieModal();
-});
+var closeBtn = document.getElementById("closeModal");
+if (closeBtn) closeBtn.addEventListener("click", closeMovieModal);
+
+if (movieModal) {
+  movieModal.addEventListener("click", function (event) {
+    if (event.target === movieModal) closeMovieModal();
+  });
+}
+
 document.addEventListener("keydown", function (event) {
   if (event.key === "Escape") closeMovieModal();
 });
