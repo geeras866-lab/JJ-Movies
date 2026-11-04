@@ -4,7 +4,6 @@ var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 
 var movies = [];
 var messages = [];
-window.activeAudio = "all";
 
 var movieGrid = document.getElementById("movieGrid");
 var searchInput = document.getElementById("searchInput");
@@ -50,10 +49,8 @@ function getAdaptivePosterUrl(originalUrl) {
   var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   var isWifi = false;
 
-  if (conn) {
-    if (conn.type === "wifi" && !conn.saveData) {
-      isWifi = true;
-    }
+  if (conn && conn.type === "wifi" && !conn.saveData) {
+    isWifi = true;
   }
 
   if (originalUrl.includes("image.tmdb.org/t/p/")) {
@@ -70,7 +67,6 @@ function getAdaptivePosterUrl(originalUrl) {
   return originalUrl;
 }
 
-// Micro space alerts system creator setup inline
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
     var style = document.createElement("style");
@@ -78,7 +74,6 @@ function createExtraSections() {
     style.textContent = `
       .jj-feature-section { max-width:1200px; margin:14px auto 8px; padding:0 12px; }
       
-      /* High-density Model 1 Single Row Ticker setup */
       .jj-alert-ticker-container {
         background: #0d1526;
         border: 1px solid rgba(255, 36, 80, 0.15);
@@ -190,13 +185,9 @@ function createExtraSections() {
       <div id="jjAlertsTicker" class="jj-alert-ticker-container" style="display:none;">
         <div class="jj-alert-ticker-content">
           <span class="jj-ticker-badge">UPDATES</span>
-          <div id="jjTickerTextWrapper" class="jj-ticker-text-wrapper">
-            <!-- Loading dynamic slides indicators -->
-          </div>
+          <div id="jjTickerTextWrapper" class="jj-ticker-text-wrapper"></div>
         </div>
-        <div id="jjTickerActionArea">
-          <!-- Button controls -->
-        </div>
+        <div id="jjTickerActionArea"></div>
       </div>
     `;
     collection.parentNode.insertBefore(updates, collection);
@@ -283,7 +274,7 @@ function renderShowcaseCarousel() {
             ${movie.runtime ? `<span class="banner-badge-tag">${escapeHTML(movie.runtime)}</span>` : ""}
           </div>
           <h1 class="banner-title">${escapeHTML(movie.title)}</h1>
-          <p class="banner-desc">${escapeHTML(movie.description || "Grab complete audio downloads and quality prints instantly on Telegram bot.")}</p>
+          <p class="banner-desc">${escapeHTML(movie.description || "Grab complete downloads and quality prints instantly on Telegram bot.")}</p>
           <div class="banner-action-row">
             <button onclick="showMovieDetails('${movie.id}')" class="btn-banner-primary">⚡ View Movie Details</button>
             ${movie.trailer ? `<a href="${escapeHTML(movie.trailer)}" target="_blank" rel="noopener noreferrer" class="btn-banner-secondary">▶ Trailer</a>` : ""}
@@ -336,14 +327,7 @@ function matchesFilters(movie) {
   var matchesCategory = selectedCategory === "all" || movieCategory === selectedCategory;
   var matchesYear = year === "all" || String(movie.year) === year;
 
-  var matchesAudio = true;
-  if (window.activeAudio && window.activeAudio !== "all") {
-    var target = window.activeAudio.toLowerCase();
-    var desc = (movie.description || "").toLowerCase();
-    matchesAudio = movieTitle.includes(target) || desc.includes(target) || movieCategory.includes(target);
-  }
-
-  return matchesSearch && matchesCategory && matchesYear && matchesAudio;
+  return matchesSearch && matchesCategory && matchesYear;
 }
 
 function createMovieCard(movie) {
@@ -538,7 +522,6 @@ async function showMovieDetails(movieId) {
   }
 }
 
-// Model 1 high quality updates single row rotator loader configurations run
 function loadMessages() {
   var tickerWrapper = document.getElementById("jjTickerTextWrapper");
   var tickerContainer = document.getElementById("jjAlertsTicker");
