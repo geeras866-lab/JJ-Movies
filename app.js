@@ -41,29 +41,32 @@ function getMoviePinLabel(movie) {
   return String(movie.pinLabel || "").trim();
 }
 
+// Wi-Fi lo unte HD, Mobile Data lo unte super compressed WebP load avtundi
 function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
 
   var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  var isHighSpeedWifi = false;
+  var isWifi = false;
 
   if (conn) {
-    if (conn.type === "wifi" || (conn.effectiveType === "4g" && !conn.saveData)) {
-      isHighSpeedWifi = true;
+    if (conn.type === "wifi" && !conn.saveData) {
+      isWifi = true;
     }
-    if (conn.saveData) {
-      isHighSpeedWifi = false;
-    }
-  } else {
-    isHighSpeedWifi = true;
   }
 
+  // TMDB poster link aithe:
   if (originalUrl.includes("image.tmdb.org/t/p/")) {
-    if (isHighSpeedWifi) {
-      return originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w780");
+    if (isWifi) {
+      return originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w500");
     } else {
-      return originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w342");
+      return originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w185");
     }
+  }
+
+  // Telegram bot poster links aithe (wsrv.nl CDN dwara automatic ga 20-30 KB WebP ga convert avtundi):
+  if (originalUrl.includes("telegram.org")) {
+    var width = isWifi ? 400 : 200;
+    return "https://wsrv.nl/?url=" + encodeURIComponent(originalUrl) + "&w=" + width + "&q=65&output=webp";
   }
 
   return originalUrl;
