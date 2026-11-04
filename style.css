@@ -14,7 +14,9 @@ body {
   overflow-x: hidden;
 }
 
-/* Updated Header branding & right corner setup */
+/* ========================================================
+   TOPBAR & NAVIGATION
+   ======================================================== */
 .topbar {
   min-height: 64px;
   padding: 10px 3.5%;
@@ -100,7 +102,163 @@ body {
   background: #ff2450;
 }
 
-/* Category sliders list styling */
+/* ========================================================
+   HERO SPOTLIGHT CAROUSEL (Fixes Vertical Stacking)
+   ======================================================== */
+.hero-carousel {
+  position: relative;
+  width: 100%;
+  min-height: 400px;
+  background: #080d18;
+  overflow: hidden;
+  border-bottom: 1px solid #18233a;
+}
+
+.carousel-inner {
+  position: relative;
+  width: 100%;
+  min-height: 400px;
+}
+
+/* Prathi slide absolute ga undi okati meeda okati stack avvali */
+.banner-slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.8s ease-in-out, visibility 0.8s ease-in-out;
+  display: flex;
+  align-items: flex-end;
+  padding: 40px 5% 45px;
+  z-index: 1;
+}
+
+/* Active slide matrame kanipisthundi */
+.banner-slide.active {
+  opacity: 1;
+  visibility: visible;
+  z-index: 2;
+}
+
+.banner-backdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover !important;
+  background-position: center 25% !important;
+  z-index: 1;
+  filter: brightness(0.65);
+}
+
+.banner-overlay-content {
+  position: relative;
+  z-index: 5;
+  max-width: 580px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.banner-badge-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.banner-badge-tag {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  text-transform: uppercase;
+}
+
+.banner-badge-tag.crimson {
+  background: #ff2450;
+}
+
+.banner-title {
+  font-size: clamp(24px, 4vw, 38px);
+  font-weight: 900;
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: -1px;
+  color: #ffffff;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+}
+
+.banner-title span {
+  color: #ff2450;
+}
+
+.banner-desc {
+  font-size: clamp(12px, 1.6vw, 14px);
+  line-height: 1.5;
+  color: #cbd5e1;
+  margin: 0;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.banner-action-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.btn-banner-primary {
+  background: #ff2450;
+  border: 1px solid #ff4166;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 6px 18px rgba(255, 36, 80, 0.35);
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.btn-banner-primary:hover {
+  background: #e91441;
+  transform: translateY(-1px);
+}
+
+.btn-banner-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  text-decoration: none;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: 0.2s;
+}
+
+.btn-banner-secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ========================================================
+   CATEGORY BAR & AUDIO QUICK CHIPS
+   ======================================================== */
 .menu-bar {
   display: flex;
   overflow-x: auto;
@@ -128,12 +286,12 @@ body {
   transition: 0.3s;
 }
 
-.menu-btn.active, .menu-btn:hover {
+.menu-btn.active,
+.menu-btn:hover {
   background-color: #ff2450;
   color: #ffffff;
 }
 
-/* Secondary Audio chips filters Row styling */
 .sub-filter-row {
   display: flex;
   align-items: center;
@@ -175,142 +333,9 @@ body {
   color: #ff5274;
 }
 
-/* Modern Featured Showcase Carousel banner wrapper setup */
-.hero-carousel {
-  position: relative;
-  min-height: 280px;
-  max-height: 480px;
-  background: #080c15;
-  overflow: hidden;
-  border-bottom: 1px solid #18233a;
-}
-
-.carousel-inner {
-  position: relative;
-  width: 100%;
-}
-
-.banner-slide {
-  position: relative;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  padding: 45px 5%;
-  min-height: 320px;
-}
-
-.banner-backdrop {
-  position: absolute;
-  inset: 0;
-  background-size: cover !important;
-  background-position: center 30% !important;
-  z-index: 1;
-}
-
-.banner-overlay-content {
-  position: relative;
-  z-index: 5;
-  max-width: 580px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.banner-badge-group {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.banner-badge-tag {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  color: #ffffff;
-  font-size: 9px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-.banner-badge-tag.crimson {
-  background: #ff2450;
-}
-
-.banner-title {
-  font-size: clamp(26px, 4.5vw, 42px);
-  font-weight: 900;
-  margin: 0;
-  line-height: 1.1;
-  letter-spacing: -1.2px;
-  color: #ffffff;
-  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
-}
-
-.banner-title span {
-  color: #ff2450;
-}
-
-.banner-desc {
-  font-size: clamp(12px, 1.6vw, 14px);
-  line-height: 1.5;
-  color: #cbd5e1;
-  margin: 0;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.banner-action-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 6px;
-}
-
-.btn-banner-primary {
-  background: #ff2450;
-  border: 1px solid #ff4166;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 13px;
-  padding: 10px 20px;
-  border-radius: 8px;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  box-shadow: 0 6px 18px rgba(255, 36, 80, 0.35);
-  transition: transform 0.2s, background 0.2s;
-}
-
-.btn-banner-primary:hover {
-  background: #e91441;
-  transform: translateY(-1px);
-}
-
-.btn-banner-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 13px;
-  padding: 10px 18px;
-  border-radius: 8px;
-  text-decoration: none;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: 0.2s;
-}
-
-.btn-banner-secondary:hover {
-  background: rgba(255, 255, 255, 0.18);
-}
-
-/* General Layout spacing */
+/* ========================================================
+   MOVIE COLLECTION & POSTER BADGE CARDS
+   ======================================================== */
 .container {
   padding: 24px 3.5% 30px;
   max-width: 1600px;
@@ -336,7 +361,6 @@ body {
   font-size: 12px;
 }
 
-/* Movie cards grid view styling */
 .movie-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -361,7 +385,6 @@ body {
   box-shadow: 0 12px 28px rgba(0, 0, 0, .45);
 }
 
-/* Floating custom overlay tags/stamps on poster top-right/top-left design */
 .card-poster-wrapper {
   position: relative;
   width: 100%;
@@ -373,7 +396,7 @@ body {
   position: absolute;
   top: 8px;
   left: 8px;
-  background: rgba(8, 13, 24, 0.85);
+  background: rgba(8, 13, 24, 0.88);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -397,25 +420,6 @@ body {
   padding: 3px 6px;
   border-radius: 4px;
   z-index: 5;
-}
-
-.card-badge-bottom-left {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
-  background: rgba(8, 13, 24, 0.82);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  color: #94a3b8;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 5px;
-  border-radius: 3px;
-  z-index: 5;
-  max-width: calc(100% - 16px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .poster {
@@ -484,7 +488,15 @@ body {
   background: #e91441;
 }
 
-/* Updates section box rule */
+.empty-message {
+  text-align: center;
+  color: #b6c4d9;
+  padding: 35px 10px;
+}
+
+/* ========================================================
+   ABOUT & FOOTER
+   ======================================================== */
 .about-section {
   padding: 40px 20px;
   text-align: center;
@@ -540,7 +552,9 @@ footer p {
   background: #ff2450;
 }
 
-/* OTT Glass Blur Backdrop Overlay Design */
+/* ========================================================
+   DELUXE OTT MODAL (GLASS BLUR POPUP)
+   ======================================================== */
 .modal {
   position: fixed;
   inset: 0;
@@ -593,7 +607,6 @@ footer p {
   color: #ffffff;
 }
 
-/* Modal Inner OTT Header section details */
 .movie-header-flex {
   display: flex;
   gap: 14px;
@@ -650,7 +663,6 @@ footer p {
   overflow: hidden;
 }
 
-/* Quality list divider & online tag layout */
 .prints-header-bar {
   display: flex;
   justify-content: space-between;
@@ -675,7 +687,6 @@ footer p {
   text-transform: none !important;
 }
 
-/* Quality download card block design rules */
 .version-list-grid {
   display: flex;
   flex-direction: column;
@@ -714,7 +725,6 @@ footer p {
   color: #94a3b8;
 }
 
-/* Red Bot target pill call action download button with shadows */
 .btn-tele-bot {
   background: #ff2450;
   color: #ffffff !important;
@@ -739,7 +749,6 @@ footer p {
   transform: scale(1.03);
 }
 
-/* Deluxe Action sharing footer style for prompt deep sharing modal */
 .modal-footer-sharing {
   margin-top: 15px;
   padding-top: 12px;
@@ -781,7 +790,9 @@ footer p {
   display: none !important;
 }
 
-/* Screen Size optimization setups */
+/* ========================================================
+   RESPONSIVE DESIGN RULES
+   ======================================================== */
 @media (min-width: 1200px) {
   .movie-grid {
     grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -821,11 +832,16 @@ footer p {
   }
 
   .nav-download-app {
-    display: none; /* Hide top bar APK link on small mobile views */
+    display: none;
+  }
+
+  .hero-carousel,
+  .carousel-inner {
+    min-height: 340px;
   }
 
   .banner-slide {
-    padding: 30px 16px;
+    padding: 24px 14px 30px;
   }
 
   .banner-badge-group {
