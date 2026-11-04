@@ -41,6 +41,34 @@ function getMoviePinLabel(movie) {
   return String(movie.pinLabel || "").trim();
 }
 
+function getAdaptivePosterUrl(originalUrl) {
+  if (!originalUrl) return "";
+
+  var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  var isHighSpeedWifi = false;
+
+  if (conn) {
+    if (conn.type === "wifi" || (conn.effectiveType === "4g" && !conn.saveData)) {
+      isHighSpeedWifi = true;
+    }
+    if (conn.saveData) {
+      isHighSpeedWifi = false;
+    }
+  } else {
+    isHighSpeedWifi = true;
+  }
+
+  if (originalUrl.includes("image.tmdb.org/t/p/")) {
+    if (isHighSpeedWifi) {
+      return originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w780");
+    } else {
+      return originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w342");
+    }
+  }
+
+  return originalUrl;
+}
+
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
     var style = document.createElement("style");
@@ -198,9 +226,10 @@ function createMovieCard(movie) {
   if (movie.poster) {
     var image = document.createElement("img");
     image.className = "poster";
-    image.src = movie.poster;
+    image.src = getAdaptivePosterUrl(movie.poster);
     image.alt = movie.title + " poster";
     image.loading = "lazy";
+    image.decoding = "async";
     image.onerror = function () {
       var placeholder = document.createElement("div");
       placeholder.className = "poster-placeholder";
@@ -348,7 +377,7 @@ function loadMessages() {
 
         var linkHTML = item.link_url 
           ? '<p><a class="jj-trailer-button" href="' + safeURL(item.link_url) + '" target="_blank" rel="noopener noreferrer">🔗 Open Link</a></p>' 
-          : '';
+          : "";
 
         card.innerHTML = "<h3>" + escapeHTML(item.title) + "</h3><p>" + escapeHTML(item.message) + "</p>" + linkHTML;
         updatesList.appendChild(card);
