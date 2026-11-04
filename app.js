@@ -260,8 +260,6 @@ function renderShowcaseCarousel() {
   var carouselHTML = showpiece.map(function (movie, index) {
     var isCurrent = index === 0 ? "active" : "";
     var tagBadge = getMoviePinLabel(movie) || "POPULAR";
-
-    // Grid lo work ayye same URL ni theesukuni img tag dwara fail avvakunda load chesthunnam
     var posterSrc = getAdaptivePosterUrl(movie.poster) || movie.poster;
 
     return `
@@ -319,18 +317,14 @@ function setupYears() {
 }
 
 function matchesFilters(movie) {
-  var search = searchInput ? searchInput.value.toLowerCase().trim() : "";
   var selectedCategory = genreFilter ? genreFilter.value.toLowerCase().trim() : "all";
   var year = yearFilter ? yearFilter.value : "all";
 
-  var movieTitle = (movie.title || "").toLowerCase();
   var movieCategory = (movie.category || "").toLowerCase().trim();
-
-  var matchesSearch = search === "" || movieTitle.indexOf(search) !== -1;
   var matchesCategory = selectedCategory === "all" || movieCategory === selectedCategory;
   var matchesYear = year === "all" || String(movie.year) === year;
 
-  return matchesSearch && matchesCategory && matchesYear;
+  return matchesCategory && matchesYear;
 }
 
 function createMovieCard(movie) {
@@ -434,6 +428,62 @@ function renderMovies() {
   }
   if (emptyMessage) {
     emptyMessage.hidden = filtered.length !== 0;
+  }
+}
+
+// Spotlight Bottom Instant Live Search Logic
+function handleLiveSearch() {
+  var search = searchInput ? searchInput.value.trim().toLowerCase() : "";
+  var resultsSection = document.getElementById("searchResultsSection");
+  var searchGrid = document.getElementById("searchGrid");
+  var mainWrapper = document.getElementById("mainContentWrapper");
+  var clearBtn = document.getElementById("clearSearchBtn");
+  var countEl = document.getElementById("searchResultCount");
+  var titleEl = document.getElementById("searchResultsTitle");
+
+  if (!resultsSection || !searchGrid || !mainWrapper) {
+    renderMovies();
+    return;
+  }
+
+  if (clearBtn) clearBtn.style.display = search ? "block" : "none";
+
+  if (search === "") {
+    resultsSection.style.display = "none";
+    mainWrapper.style.display = "block";
+    renderMovies();
+    return;
+  }
+
+  mainWrapper.style.display = "none";
+  resultsSection.style.display = "block";
+
+  var matches = movies.filter(function (movie) {
+    var title = (movie.title || "").toLowerCase();
+    var desc = (movie.description || "").toLowerCase();
+    var category = (movie.category || "").toLowerCase();
+    return title.includes(search) || desc.includes(search) || category.includes(search);
+  });
+
+  searchGrid.innerHTML = "";
+  if (countEl) countEl.textContent = matches.length + (matches.length === 1 ? " movie" : " movies");
+  if (titleEl) titleEl.textContent = 'Results for "' + escapeHTML(search) + '"';
+
+  if (matches.length === 0) {
+    searchGrid.innerHTML = '<p class="empty-message" style="grid-column:1/-1;">No movies found matching your search.</p>';
+    return;
+  }
+
+  matches.forEach(function (movie) {
+    searchGrid.appendChild(createMovieCard(movie));
+  });
+}
+
+function clearLiveSearch() {
+  if (searchInput) {
+    searchInput.value = "";
+    handleLiveSearch();
+    searchInput.focus();
   }
 }
 
@@ -586,7 +636,7 @@ function closeMovieModal() {
   movieModal.hidden = true;
 }
 
-if (searchInput) searchInput.addEventListener("input", renderMovies);
+if (searchInput) searchInput.addEventListener("input", handleLiveSearch);
 if (genreFilter) genreFilter.addEventListener("change", renderMovies);
 if (yearFilter) yearFilter.addEventListener("change", renderMovies);
 
