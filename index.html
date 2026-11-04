@@ -9,15 +9,12 @@
 </head>
 <body>
   <header class="topbar">
-    <a href="#" class="logo">JJ <span>Movies</span></a>
+    <a href="#" class="logo">
+      <span class="logo-box">JJ</span>
+      <span class="logo-text">MOVIES</span>
+    </a>
     <div class="brand-divider"></div>
-    <span class="tagline">Your Movie Library</span>
-
-    <!-- Sleek OTT Search Bar -->
-    <div class="header-search-wrap">
-      <span class="search-icon">🔍</span>
-      <input type="text" id="searchInput" placeholder="Search movies, series..." autocomplete="off">
-    </div>
+    <span class="tagline">Premium OTT Hub</span>
 
     <div class="top-nav-right">
       <nav>
@@ -26,7 +23,7 @@
         <a href="#about">ⓘ About</a>
       </nav>
       <a href="./jj-movies.apk" class="nav-download-app" download>
-        <span>Our Android App</span>
+        <span>App</span>
       </a>
     </div>
   </header>
@@ -55,37 +52,58 @@
     </div>
   </section>
 
-  <!-- Horizontal Category Menu -->
-  <div class="menu-bar" id="categoryMenu">
-    <button class="menu-btn active" onclick="filterByCustomCategory('all', this)">ALL</button>
-    <button class="menu-btn" onclick="filterByCustomCategory('Marvel', this)">MARVEL</button>
-    <button class="menu-btn" onclick="filterByCustomCategory('DC', this)">DC</button>
-    <button class="menu-btn" onclick="filterByCustomCategory('Jurassic', this)">JURASSIC</button>
+  <!-- Spotlight Bottom Floating Search Bar -->
+  <div class="spotlight-search-container">
+    <div class="spotlight-search-box">
+      <span class="search-lens-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="Search any movie, language, actor..." autocomplete="off">
+      <button id="clearSearchBtn" class="clear-search-btn" style="display:none;" onclick="clearLiveSearch()">✕</button>
+    </div>
   </div>
 
-  <main class="container" id="collection">
+  <!-- Instant Search Results Section (Shown only when searching) -->
+  <section id="searchResultsSection" class="search-results-section" style="display:none;">
     <div class="collection-heading">
-      <h2>Movie Collection</h2>
-      <span id="movieCount">0 movies</span>
+      <h2 id="searchResultsTitle">Search Results</h2>
+      <span id="searchResultCount">0 found</span>
+    </div>
+    <div id="searchGrid" class="movie-grid"></div>
+  </section>
+
+  <!-- Main Default Content (Hidden during search) -->
+  <div id="mainContentWrapper">
+    <!-- Horizontal Category Menu -->
+    <div class="menu-bar" id="categoryMenu">
+      <button class="menu-btn active" onclick="filterByCustomCategory('all', this)">ALL</button>
+      <button class="menu-btn" onclick="filterByCustomCategory('Marvel', this)">MARVEL</button>
+      <button class="menu-btn" onclick="filterByCustomCategory('DC', this)">DC</button>
+      <button class="menu-btn" onclick="filterByCustomCategory('Jurassic', this)">JURASSIC</button>
     </div>
 
-    <!-- Hidden native filter selector for script category compatibility -->
-    <div style="display:none;">
-      <select id="genreFilter" aria-label="Filter by category">
-        <option value="all">All Categories</option>
-      </select>
-      <select id="yearFilter" aria-label="Filter by year">
-        <option value="all">All Years</option>
-      </select>
-    </div>
+    <main class="container" id="collection">
+      <div class="collection-heading">
+        <h2>Movie Collection</h2>
+        <span id="movieCount">0 movies</span>
+      </div>
 
-    <!-- Live Grid with quality/badge cards -->
-    <div id="movieGrid" class="movie-grid"></div>
+      <!-- Hidden native filter selectors for compatibility -->
+      <div style="display:none;">
+        <select id="genreFilter" aria-label="Filter by category">
+          <option value="all">All Categories</option>
+        </select>
+        <select id="yearFilter" aria-label="Filter by year">
+          <option value="all">All Years</option>
+        </select>
+      </div>
 
-    <p id="emptyMessage" class="empty-message" hidden>
-      No movies found. Try another search.
-    </p>
-  </main>
+      <!-- Movie Grid -->
+      <div id="movieGrid" class="movie-grid"></div>
+
+      <p id="emptyMessage" class="empty-message" hidden>
+        No movies found. Try another search.
+      </p>
+    </main>
+  </div>
 
   <section class="about-section" id="about">
     <h2>Welcome to JJ Movies</h2>
@@ -96,7 +114,10 @@
   </section>
 
   <footer>
-    <a href="#" class="footer-logo">JJ <span>Movies</span></a>
+    <a href="#" class="footer-logo">
+      <span class="logo-box">JJ</span>
+      <span class="logo-text">MOVIES</span>
+    </a>
     <p>Your Movie Library · © 2026 JJ Movies</p>
     <a href="./jj-movies.apk" class="footer-app-link" download>
       Download Android App
