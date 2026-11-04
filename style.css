@@ -15,7 +15,7 @@ body {
 }
 
 /* ========================================================
-   TOPBAR & NAVIGATION
+   TOPBAR & SEARCH BAR
    ======================================================== */
 .topbar {
   min-height: 64px;
@@ -28,6 +28,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 999;
+  gap: 14px;
 }
 
 .logo,
@@ -49,26 +50,66 @@ body {
   width: 1px;
   height: 24px;
   background: #252d3c;
-  margin: 0 14px;
+  margin: 0 4px;
 }
 
 .tagline {
   color: #8d9bb1;
   font-size: 13px;
   white-space: nowrap;
-  margin-right: auto;
+}
+
+/* Modern OTT Dark Glass Search Bar */
+.header-search-wrap {
+  display: flex;
+  align-items: center;
+  background: #111a2e;
+  border: 1px solid #22324d;
+  border-radius: 20px;
+  padding: 6px 14px;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 10px;
+  transition: all 0.25s ease;
+}
+
+.header-search-wrap:focus-within {
+  border-color: #ff2450;
+  background: #15223c;
+  box-shadow: 0 0 12px rgba(255, 36, 80, 0.25);
+  max-width: 320px;
+}
+
+.search-icon {
+  font-size: 12px;
+  margin-right: 8px;
+  opacity: 0.7;
+}
+
+#searchInput {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 12px;
+  width: 100%;
+}
+
+#searchInput::placeholder {
+  color: #64748b;
 }
 
 .top-nav-right {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
+  margin-left: auto;
 }
 
 .topbar nav {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 20px;
 }
 
 .topbar nav a {
@@ -769,13 +810,17 @@ footer p {
 }
 
 @media (max-width: 900px) {
-  .top-nav-right nav {
-    gap: 14px;
-  }
-
   .tagline,
   .brand-divider {
     display: none;
+  }
+
+  .header-search-wrap {
+    max-width: 180px;
+  }
+
+  .top-nav-right nav {
+    gap: 12px;
   }
 
   .movie-grid {
@@ -785,15 +830,24 @@ footer p {
 
 @media (max-width: 600px) {
   .topbar {
-    padding: 12px 4%;
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .logo {
-    font-size: 24px;
+    font-size: 22px;
   }
 
-  .top-nav-right nav {
-    gap: 11px;
+  .header-search-wrap {
+    order: 3;
+    max-width: 100%;
+    margin: 4px 0 0 0;
+  }
+
+  .top-nav-right {
+    margin-left: auto;
+    gap: 8px;
   }
 
   .topbar nav a {
@@ -813,16 +867,8 @@ footer p {
     padding: 24px 14px 30px;
   }
 
-  .banner-badge-group {
-    gap: 4px;
-  }
-
   .container {
     padding: 20px 12px 30px;
-  }
-
-  .collection-heading h2 {
-    font-size: 19px;
   }
 
   .movie-grid {
@@ -832,10 +878,6 @@ footer p {
 
   .movie-info {
     padding: 10px 8px;
-  }
-
-  .movie-info h3 {
-    font-size: 13px;
   }
 
   .modal-content {
