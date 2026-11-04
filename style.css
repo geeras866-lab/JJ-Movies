@@ -103,7 +103,7 @@ body {
 }
 
 /* ========================================================
-   HERO SPOTLIGHT CAROUSEL (Fixes Vertical Stacking)
+   HERO SPOTLIGHT CAROUSEL
    ======================================================== */
 .hero-carousel {
   position: relative;
@@ -120,7 +120,6 @@ body {
   min-height: 400px;
 }
 
-/* Prathi slide absolute ga undi okati meeda okati stack avvali */
 .banner-slide {
   position: absolute;
   inset: 0;
@@ -135,7 +134,6 @@ body {
   z-index: 1;
 }
 
-/* Active slide matrame kanipisthundi */
 .banner-slide.active {
   opacity: 1;
   visibility: visible;
@@ -145,10 +143,22 @@ body {
 .banner-backdrop {
   position: absolute;
   inset: 0;
-  background-size: cover !important;
-  background-position: center 25% !important;
+  overflow: hidden;
   z-index: 1;
-  filter: brightness(0.65);
+}
+
+.banner-bg-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 25%;
+  filter: brightness(0.55);
+}
+
+.banner-vignette {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8,13,24,0.2) 0%, rgba(8,13,24,0.95) 100%);
 }
 
 .banner-overlay-content {
@@ -257,7 +267,7 @@ body {
 }
 
 /* ========================================================
-   CATEGORY BAR & AUDIO QUICK CHIPS
+   CATEGORY BAR
    ======================================================== */
 .menu-bar {
   display: flex;
@@ -290,47 +300,6 @@ body {
 .menu-btn:hover {
   background-color: #ff2450;
   color: #ffffff;
-}
-
-.sub-filter-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 3.5%;
-  background: #090e19;
-  border-bottom: 1px solid #141c2c;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.sub-filter-row::-webkit-scrollbar {
-  display: none;
-}
-
-.sub-filter-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: #4b5a75;
-  text-transform: uppercase;
-  margin-right: 4px;
-}
-
-.chip-btn {
-  background: #101625;
-  border: 1px solid #1c273a;
-  color: #8da2c4;
-  padding: 5px 12px;
-  font-size: 11px;
-  border-radius: 15px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.chip-btn.active {
-  background: rgba(255, 36, 80, 0.15);
-  border-color: #ff2450;
-  color: #ff5274;
 }
 
 /* ========================================================
@@ -553,7 +522,7 @@ footer p {
 }
 
 /* ========================================================
-   DELUXE OTT MODAL (GLASS BLUR POPUP)
+   DELUXE OTT MODAL
    ======================================================== */
 .modal {
   position: fixed;
