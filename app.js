@@ -154,8 +154,9 @@ function loadMovies() {
 
       var ids = movies.map(function (movie) { return movie.id; });
 
+      // Clean comma-separated IDs without encodeURIComponent
       return fetch(
-        SUPABASE_URL + "/rest/v1/movie_versions?select=id,movie_id,quality,audio_language,source_type,viewing_url&movie_id=in.(" + encodeURIComponent(ids.join(",")) + ")",
+        SUPABASE_URL + "/rest/v1/movie_versions?select=id,movie_id,quality,audio_language,source_type,viewing_url&movie_id=in.(" + ids.join(",") + ")",
         { headers: getHeaders() }
       )
         .then(function (response) {
