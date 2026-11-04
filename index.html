@@ -13,6 +13,12 @@
     <div class="brand-divider"></div>
     <span class="tagline">Your Movie Library</span>
 
+    <!-- Sleek OTT Search Bar -->
+    <div class="header-search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="Search movies, series..." autocomplete="off">
+    </div>
+
     <div class="top-nav-right">
       <nav>
         <a href="#home" class="active">⌂ Home</a>
@@ -29,7 +35,10 @@
   <section class="hero-carousel" id="home">
     <div id="bannerCarousel" class="carousel-inner">
       <div class="banner-slide active">
-        <div class="banner-backdrop" style="background: linear-gradient(180deg, rgba(8,13,24,0.1) 0%, rgba(8,13,24,0.95) 100%), url('https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1600&q=85') center/cover;"></div>
+        <div class="banner-backdrop">
+          <img src="https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1600&q=85" alt="Banner" class="banner-bg-img">
+          <div class="banner-vignette"></div>
+        </div>
         <div class="banner-overlay-content">
           <div class="banner-badge-group">
             <span class="banner-badge-tag crimson">POPULAR</span>
@@ -60,15 +69,14 @@
       <span id="movieCount">0 movies</span>
     </div>
 
-    <!-- Hidden native filter selectors for script compatibility -->
-    <div class="filters" style="display:none;">
+    <!-- Hidden native filter selector for script category compatibility -->
+    <div style="display:none;">
       <select id="genreFilter" aria-label="Filter by category">
         <option value="all">All Categories</option>
       </select>
       <select id="yearFilter" aria-label="Filter by year">
         <option value="all">All Years</option>
       </select>
-      <input type="text" id="searchInput" placeholder="Search movies...">
     </div>
 
     <!-- Live Grid with quality/badge cards -->
