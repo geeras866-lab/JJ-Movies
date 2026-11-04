@@ -41,7 +41,7 @@ function getMoviePinLabel(movie) {
   return String(movie.pinLabel || "").trim();
 }
 
-// Wi-Fi lo unte HD, Mobile Data lo unte super compressed WebP load avtundi
+// Wi-Fi lo unte HD, Mobile Data lo unte compressed WebP load avtundi
 function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
 
@@ -84,6 +84,7 @@ function createExtraSections() {
       .jj-update-card p { color:#c5ccdc; line-height:1.6; margin-bottom:12px; }
       .jj-trailer-button { display:inline-block; padding:10px 14px; background:#ff3867; color:white; text-decoration:none; border-radius:7px; margin:8px 0; font-weight:bold; }
       .jj-pin-badge { color:#ff7293; font-size:12px; font-weight:bold; overflow-wrap:anywhere; }
+      #modalVersionContainer { min-height: 80px; }
     `;
     document.head.appendChild(style);
   }
@@ -144,43 +145,8 @@ function loadMovies() {
       });
 
       setupYears();
-
-      if (!movies.length) {
-        renderMovies();
-        movieCount.textContent = "0 movies";
-        loadMessages();
-        return;
-      }
-
-      var ids = movies.map(function (movie) { return movie.id; });
-
-      // Clean comma-separated IDs without encodeURIComponent
-      return fetch(
-        SUPABASE_URL + "/rest/v1/movie_versions?select=id,movie_id,quality,audio_language,source_type,viewing_url&movie_id=in.(" + ids.join(",") + ")",
-        { headers: getHeaders() }
-      )
-        .then(function (response) {
-          if (!response.ok) throw new Error("Versions request failed");
-          return response.json();
-        })
-        .then(function (versions) {
-          movies.forEach(function (movie) {
-            movie.versions = versions
-              .filter(function (version) { return String(version.movie_id) === String(movie.id); })
-              .map(function (version) {
-                return {
-                  id: version.id,
-                  quality: version.quality || "Standard",
-                  audio: version.audio_language || "Not specified",
-                  source: version.source_type || "Telegram",
-                  viewingUrl: version.viewing_url || ""
-                };
-              });
-          });
-
-          renderMovies();
-          loadMessages();
-        });
+      renderMovies();
+      loadMessages();
     })
     .catch(function (error) {
       console.error("JJ Movies error:", error);
@@ -325,27 +291,17 @@ function renderMovies() {
   emptyMessage.hidden = filtered.length !== 0;
 }
 
-function showMovieDetails(movieId) {
+// On-demand Instant Version Fetching (Bypasses Supabase 1000 row limits)
+async function showMovieDetails(movieId) {
   var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
   if (!movie) return;
+
+  var pinLabel = getMoviePinLabel(movie);
+  var pinBadgeHTML = pinLabel ? '<p class="jj-pin-badge">' + escapeHTML(pinLabel) + "</p>" : "";
 
   var trailerHTML = movie.trailer
     ? '<p><a class="jj-trailer-button" href="' + escapeHTML(movie.trailer) + '" target="_blank" rel="noopener noreferrer">▶ Watch Trailer</a></p>'
     : "";
-
-  var versionHTML = movie.versions.map(function (version) {
-    var botURL = "https://t.me/" + TELEGRAM_BOT_USERNAME + "?start=" + encodeURIComponent(String(version.id));
-    return (
-      '<div class="version-item">' +
-      "<strong>" + escapeHTML(version.quality) + "</strong>" +
-      "<p>Audio: " + escapeHTML(version.audio) + "</p>" +
-      '<p><a class="details-button telegram-download-button" href="' + escapeHTML(botURL) + '" target="_blank" rel="noopener noreferrer">Get with Telegram Bot</a></p>' +
-      "</div>"
-    );
-  }).join("");
-
-  var pinLabel = getMoviePinLabel(movie);
-  var pinBadgeHTML = pinLabel ? '<p class="jj-pin-badge">' + escapeHTML(pinLabel) + "</p>" : "";
 
   modalDetails.innerHTML =
     pinBadgeHTML +
@@ -354,9 +310,44 @@ function showMovieDetails(movieId) {
     "<p>" + escapeHTML(movie.description) + "</p>" +
     trailerHTML +
     "<h3>Available Versions</h3>" +
-    (versionHTML ? '<div class="version-list">' + versionHTML + "</div>" : "<p>No versions added yet.</p>");
+    '<div id="modalVersionContainer"><p class="muted">Loading available versions...</p></div>';
 
   movieModal.hidden = false;
+
+  try {
+    var res = await fetch(
+      SUPABASE_URL + "/rest/v1/movie_versions?select=id,quality,audio_language,source_type,viewing_url&movie_id=eq." + movieId + "&order=sort_order.asc",
+      { headers: getHeaders() }
+    );
+
+    if (!res.ok) throw new Error("Fetch failed");
+    var versions = await res.json();
+
+    var container = document.getElementById("modalVersionContainer");
+    if (!container) return;
+
+    if (!versions || versions.length === 0) {
+      container.innerHTML = "<p>No versions added yet.</p>";
+      return;
+    }
+
+    var versionHTML = versions.map(function (v) {
+      var botURL = "https://t.me/" + TELEGRAM_BOT_USERNAME + "?start=" + encodeURIComponent(String(v.id));
+      return (
+        '<div class="version-item">' +
+        "<strong>" + escapeHTML(v.quality || "Standard") + "</strong>" +
+        "<p>Audio: " + escapeHTML(v.audio_language || "Telugu") + "</p>" +
+        '<p><a class="details-button telegram-download-button" href="' + escapeHTML(botURL) + '" target="_blank" rel="noopener noreferrer">Get with Telegram Bot</a></p>' +
+        "</div>"
+      );
+    }).join("");
+
+    container.innerHTML = '<div class="version-list">' + versionHTML + "</div>";
+  } catch (err) {
+    console.error("Modal version load error:", err);
+    var container = document.getElementById("modalVersionContainer");
+    if (container) container.innerHTML = "<p>Unable to load versions right now.</p>";
+  }
 }
 
 function loadMessages() {
