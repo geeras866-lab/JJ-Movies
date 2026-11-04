@@ -49,8 +49,10 @@ function getAdaptivePosterUrl(originalUrl) {
   var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   var isWifi = false;
 
-  if (conn && conn.type === "wifi" && !conn.saveData) {
-    isWifi = true;
+  if (conn) {
+    if (conn.type === "wifi" && !conn.saveData) {
+      isWifi = true;
+    }
   }
 
   if (originalUrl.includes("image.tmdb.org/t/p/")) {
@@ -64,6 +66,17 @@ function getAdaptivePosterUrl(originalUrl) {
     return "https://wsrv.nl/?url=" + encodeURIComponent(originalUrl) + "&w=" + width + "&q=65&output=webp";
   }
 
+  return originalUrl;
+}
+
+function getCarouselCoverUrl(originalUrl) {
+  if (!originalUrl) return "";
+  if (originalUrl.includes("image.tmdb.org/t/p/")) {
+    return originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w780");
+  }
+  if (originalUrl.includes("telegram.org")) {
+    return "https://wsrv.nl/?url=" + encodeURIComponent(originalUrl) + "&w=800&q=75&output=webp";
+  }
   return originalUrl;
 }
 
@@ -252,21 +265,21 @@ function renderShowcaseCarousel() {
   if (!bannerContainer) return;
 
   var pinnedList = movies.filter(function (movie) { return movie.pinned === true; });
-  var showpiece = pinnedList.length > 0 ? pinnedList.slice(0, 5) : movies.slice(0, 3);
+  
+  // Meeru enni pin chesthe anni movies spotlight banner rotation loki vasthayi
+  var showpiece = pinnedList.length > 0 ? pinnedList : movies.slice(0, 3);
   if (!showpiece.length) return;
 
   var carouselHTML = showpiece.map(function (movie, index) {
     var isCurrent = index === 0 ? "active" : "";
     var tagBadge = getMoviePinLabel(movie) || "POPULAR";
 
-    var coverUrl = movie.poster;
-    if (coverUrl && coverUrl.includes("image.tmdb.org/t/p/")) {
-      coverUrl = coverUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w1280");
-    }
+    // Safe adaptive image (TMDB size 404 fix mariyu Telegram proxy fix)
+    var coverUrl = getCarouselCoverUrl(movie.poster);
 
     return `
       <div class="banner-slide ${isCurrent}">
-        <div class="banner-backdrop" style="background: linear-gradient(180deg, rgba(8,13,24,0.2) 0%, rgba(8,13,24,0.95) 100%), url('${coverUrl}') center 20%/cover no-repeat;"></div>
+        <div class="banner-backdrop" style="background: linear-gradient(180deg, rgba(8,13,24,0.3) 0%, rgba(8,13,24,0.95) 100%), url('${coverUrl}') center 20%/cover no-repeat;"></div>
         <div class="banner-overlay-content">
           <div class="banner-badge-group">
             <span class="banner-badge-tag crimson">${escapeHTML(tagBadge)}</span>
