@@ -15,6 +15,8 @@ var emptyMessage = document.getElementById("emptyMessage");
 var movieModal = document.getElementById("movieModal");
 var modalDetails = document.getElementById("modalDetails");
 
+var carouselInterval = null;
+
 function escapeHTML(value) {
   return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
     return {
@@ -163,23 +165,23 @@ function renderShowcaseCarousel() {
 
     var coverUrl = movie.poster;
     if (coverUrl && coverUrl.includes("image.tmdb.org/t/p/")) {
-      coverUrl = coverUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/original");
+      coverUrl = coverUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w1280");
     }
 
     return `
       <div class="banner-slide ${isCurrent}">
-        <div class="banner-backdrop" style="background: linear-gradient(180deg, rgba(8,13,24,0.3) 0%, rgba(8,13,24,0.96) 100%), url('${coverUrl}') center 22%/cover no-repeat;"></div>
+        <div class="banner-backdrop" style="background: linear-gradient(180deg, rgba(8,13,24,0.2) 0%, rgba(8,13,24,0.95) 100%), url('${coverUrl}') center 20%/cover no-repeat;"></div>
         <div class="banner-overlay-content">
           <div class="banner-badge-group">
             <span class="banner-badge-tag crimson">${escapeHTML(tagBadge)}</span>
-            <span class="banner-badge-tag">${escapeHTML(movie.year || "LATEST")}</span>
+            <span class="banner-badge-tag">${escapeHTML(movie.year || "2026")}</span>
             ${movie.runtime ? `<span class="banner-badge-tag">${escapeHTML(movie.runtime)}</span>` : ""}
           </div>
           <h1 class="banner-title">${escapeHTML(movie.title)}</h1>
-          <p class="banner-desc">${escapeHTML(movie.description || "Grab complete audio downloads and version prints instantly on our Telegram bot.")}</p>
+          <p class="banner-desc">${escapeHTML(movie.description || "Grab complete audio downloads and quality prints instantly on Telegram bot.")}</p>
           <div class="banner-action-row">
             <button onclick="showMovieDetails('${movie.id}')" class="btn-banner-primary">⚡ View Movie Details</button>
-            ${movie.trailer ? `<a href="${escapeHTML(movie.trailer)}" target="_blank" rel="noopener" class="btn-banner-secondary">▶ Trailer</a>` : ""}
+            ${movie.trailer ? `<a href="${escapeHTML(movie.trailer)}" target="_blank" rel="noopener noreferrer" class="btn-banner-secondary">▶ Trailer</a>` : ""}
           </div>
         </div>
       </div>
@@ -188,14 +190,15 @@ function renderShowcaseCarousel() {
 
   bannerContainer.innerHTML = carouselHTML;
 
-  var slideIndex = 0;
-  setInterval(function () {
+  if (carouselInterval) clearInterval(carouselInterval);
+  var currentSlide = 0;
+  carouselInterval = setInterval(function () {
     var slides = document.querySelectorAll(".banner-slide");
     if (slides.length <= 1) return;
-    slides[slideIndex].classList.remove("active");
-    slideIndex = (slideIndex + 1) % slides.length;
-    slides[slideIndex].classList.add("active");
-  }, 6500);
+    slides[currentSlide].classList.remove("active");
+    currentSlide = (currentSlide + 1) % slides.length;
+    slides[currentSlide].classList.add("active");
+  }, 5500);
 }
 
 function setupYears() {
@@ -376,7 +379,7 @@ async function showMovieDetails(movieId) {
 
     <div class="modal-footer-sharing">
       <span>Share with friends:</span>
-      <a id="btnShareModalWhatsApp" href="#" class="btn-whatsapp-share" target="_blank" rel="noopener">
+      <a id="btnShareModalWhatsApp" href="#" class="btn-whatsapp-share" target="_blank" rel="noopener noreferrer">
         💚 Share to WhatsApp
       </a>
     </div>
