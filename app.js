@@ -41,7 +41,6 @@ function getMoviePinLabel(movie) {
   return String(movie.pinLabel || "").trim();
 }
 
-// Wi-Fi lo unte HD, Mobile Data lo unte compressed WebP load avtundi
 function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
 
@@ -54,16 +53,12 @@ function getAdaptivePosterUrl(originalUrl) {
     }
   }
 
-  // TMDB poster link aithe:
   if (originalUrl.includes("image.tmdb.org/t/p/")) {
-    if (isWifi) {
-      return originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w500");
-    } else {
-      return originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w185");
-    }
+    return isWifi
+      ? originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w500")
+      : originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w185");
   }
 
-  // Telegram bot poster links aithe (wsrv.nl CDN dwara automatic ga 20-30 KB WebP ga convert avtundi):
   if (originalUrl.includes("telegram.org")) {
     var width = isWifi ? 400 : 200;
     return "https://wsrv.nl/?url=" + encodeURIComponent(originalUrl) + "&w=" + width + "&q=65&output=webp";
@@ -291,26 +286,38 @@ function renderMovies() {
   emptyMessage.hidden = filtered.length !== 0;
 }
 
-// On-demand Instant Version Fetching (Bypasses Supabase 1000 row limits)
 async function showMovieDetails(movieId) {
   var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
   if (!movie) return;
 
   var pinLabel = getMoviePinLabel(movie);
-  var pinBadgeHTML = pinLabel ? '<p class="jj-pin-badge">' + escapeHTML(pinLabel) + "</p>" : "";
+  var pinBadgeHTML = pinLabel ? '<div class="jj-pin-badge" style="margin-bottom:8px;">' + escapeHTML(pinLabel) + '</div>' : '';
 
-  var trailerHTML = movie.trailer
-    ? '<p><a class="jj-trailer-button" href="' + escapeHTML(movie.trailer) + '" target="_blank" rel="noopener noreferrer">▶ Watch Trailer</a></p>'
-    : "";
+  modalDetails.innerHTML = `
+    ${pinBadgeHTML}
 
-  modalDetails.innerHTML =
-    pinBadgeHTML +
-    "<h2>" + escapeHTML(movie.title) + (movie.year ? " (" + escapeHTML(movie.year) + ")" : "") + "</h2>" +
-    (movie.category ? "<p><strong>Category:</strong> " + escapeHTML(movie.category) + "</p>" : "") +
-    "<p>" + escapeHTML(movie.description) + "</p>" +
-    trailerHTML +
-    "<h3>Available Versions</h3>" +
-    '<div id="modalVersionContainer"><p class="muted">Loading available versions...</p></div>';
+    <div class="movie-header-flex">
+      <img class="modal-mini-poster" src="${getAdaptivePosterUrl(movie.poster)}" alt="${escapeHTML(movie.title)}" onerror="this.style.display='none'">
+      <div class="movie-header-info">
+        <h2>${escapeHTML(movie.title)}</h2>
+        <div class="movie-meta-chips">
+          <span>${escapeHTML(movie.year || "N/A")}</span>
+          ${movie.runtime ? `<span>• ${escapeHTML(movie.runtime)}</span>` : ""}
+          ${movie.category ? `<span class="genre-badge">• ${escapeHTML(movie.category)}</span>` : ""}
+        </div>
+        <p class="movie-desc-text">${escapeHTML(movie.description || "Ingen beskrivning tillgänglig.")}</p>
+      </div>
+    </div>
+
+    <div class="prints-header-bar">
+      <span>Available Quality Prints</span>
+      <span class="status-dot-active">● Ready to Download</span>
+    </div>
+
+    <div id="modalVersionContainer">
+      <p style="color:#64748b; font-size:12px; text-align:center; padding:16px 0;">Laddar versioner från botten...</p>
+    </div>
+  `;
 
   movieModal.hidden = false;
 
@@ -322,31 +329,34 @@ async function showMovieDetails(movieId) {
 
     if (!res.ok) throw new Error("Fetch failed");
     var versions = await res.json();
-
     var container = document.getElementById("modalVersionContainer");
     if (!container) return;
 
     if (!versions || versions.length === 0) {
-      container.innerHTML = "<p>No versions added yet.</p>";
+      container.innerHTML = `<p style="color:#64748b; font-size:12px; text-align:center; padding:12px;">Inga versioner tillagda ännu.</p>`;
       return;
     }
 
-    var versionHTML = versions.map(function (v) {
+    var listHTML = versions.map(function (v) {
       var botURL = "https://t.me/" + TELEGRAM_BOT_USERNAME + "?start=" + encodeURIComponent(String(v.id));
-      return (
-        '<div class="version-item">' +
-        "<strong>" + escapeHTML(v.quality || "Standard") + "</strong>" +
-        "<p>Audio: " + escapeHTML(v.audio_language || "Telugu") + "</p>" +
-        '<p><a class="details-button telegram-download-button" href="' + escapeHTML(botURL) + '" target="_blank" rel="noopener noreferrer">Get with Telegram Bot</a></p>' +
-        "</div>"
-      );
+      return `
+        <div class="version-tile">
+          <div class="version-tile-info">
+            <span class="version-quality-title">💾 ${escapeHTML(v.quality || "Standard")}</span>
+            <span class="version-audio-sub">Ljud: ${escapeHTML(v.audio_language || "Telugu")}</span>
+          </div>
+          <a class="btn-tele-bot" href="${escapeHTML(botURL)}" target="_blank" rel="noopener noreferrer">
+            ⚡ Get Files in Bot
+          </a>
+        </div>
+      `;
     }).join("");
 
-    container.innerHTML = '<div class="version-list">' + versionHTML + "</div>";
+    container.innerHTML = `<div class="version-list-grid">${listHTML}</div>`;
   } catch (err) {
     console.error("Modal version load error:", err);
     var container = document.getElementById("modalVersionContainer");
-    if (container) container.innerHTML = "<p>Unable to load versions right now.</p>";
+    if (container) container.innerHTML = `<p style="color:#ef4444; font-size:12px; text-align:center;">Kunde inte ladda versioner.</p>`;
   }
 }
 
@@ -363,7 +373,7 @@ function loadMessages() {
       messages = data || [];
       updatesList.innerHTML = "";
       if (!messages.length) {
-        updatesList.textContent = "No latest updates yet.";
+        updatesList.textContent = "Inga nya uppdateringar ännu.";
         return;
       }
       messages.forEach(function (item) {
@@ -371,7 +381,7 @@ function loadMessages() {
         card.className = "jj-update-card";
 
         var linkHTML = item.link_url 
-          ? '<p><a class="jj-trailer-button" href="' + safeURL(item.link_url) + '" target="_blank" rel="noopener noreferrer">🔗 Open Link</a></p>' 
+          ? '<p><a class="jj-trailer-button" href="' + safeURL(item.link_url) + '" target="_blank" rel="noopener noreferrer">🔗 Öppna länk</a></p>' 
           : "";
 
         card.innerHTML = "<h3>" + escapeHTML(item.title) + "</h3><p>" + escapeHTML(item.message) + "</p>" + linkHTML;
