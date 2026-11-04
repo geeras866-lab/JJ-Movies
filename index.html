@@ -25,10 +25,9 @@
     </div>
   </header>
 
-  <!-- Banner section replaces standard hero text -->
+  <!-- Hero Spotlight Carousel -->
   <section class="hero-carousel" id="home">
     <div id="bannerCarousel" class="carousel-inner">
-      <!-- Generated via app.js -->
       <div class="banner-slide active">
         <div class="banner-backdrop" style="background: linear-gradient(180deg, rgba(8,13,24,0.1) 0%, rgba(8,13,24,0.95) 100%), url('https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1600&q=85') center/cover;"></div>
         <div class="banner-overlay-content">
@@ -37,7 +36,7 @@
             <span class="banner-badge-tag">ULTRA HD</span>
           </div>
           <h1 class="banner-title">Welcome to <span>JJ Movies</span></h1>
-          <p class="banner-desc">Explore thousands of cinema files, multiple sound options and quick bot grab links.</p>
+          <p class="banner-desc">Explore cinema files, high quality prints and grab links on Telegram bot.</p>
           <div class="banner-action-row">
             <a href="#collection" class="btn-banner-primary">⚡ Explore collection</a>
             <a href="./jj-movies.apk" class="btn-banner-secondary">⬇ Android App</a>
@@ -47,22 +46,12 @@
     </div>
   </section>
 
-  <!-- Dual Custom Slider Row for Categories -->
+  <!-- Horizontal Category Menu -->
   <div class="menu-bar" id="categoryMenu">
     <button class="menu-btn active" onclick="filterByCustomCategory('all', this)">ALL</button>
     <button class="menu-btn" onclick="filterByCustomCategory('Marvel', this)">MARVEL</button>
     <button class="menu-btn" onclick="filterByCustomCategory('DC', this)">DC</button>
     <button class="menu-btn" onclick="filterByCustomCategory('Jurassic', this)">JURASSIC</button>
-  </div>
-
-  <!-- Audio filters quick line for Telugu/Hindi chips -->
-  <div class="sub-filter-row" id="audioChipsRow">
-    <span class="sub-filter-label">Audio:</span>
-    <button class="chip-btn active" onclick="filterByAudio('all', this)">All</button>
-    <button class="chip-btn" onclick="filterByAudio('Telugu', this)">Telugu</button>
-    <button class="chip-btn" onclick="filterByAudio('Hindi', this)">Hindi</button>
-    <button class="chip-btn" onclick="filterByAudio('Tamil', this)">Tamil</button>
-    <button class="chip-btn" onclick="filterByAudio('English', this)">English</button>
   </div>
 
   <main class="container" id="collection">
@@ -79,6 +68,7 @@
       <select id="yearFilter" aria-label="Filter by year">
         <option value="all">All Years</option>
       </select>
+      <input type="text" id="searchInput" placeholder="Search movies...">
     </div>
 
     <!-- Live Grid with quality/badge cards -->
@@ -92,7 +82,7 @@
   <section class="about-section" id="about">
     <h2>Welcome to JJ Movies</h2>
     <p>
-      Explore movie information, languages, quality options
+      Explore movie information, categories, quality options
       and available download sources.
     </p>
   </section>
@@ -105,14 +95,10 @@
     </a>
   </footer>
 
-  <!-- Deluxe OTT design blur-overlay dynamic Modal popup -->
+  <!-- OTT Dark Blur Modal -->
   <div id="movieModal" class="modal" hidden>
     <div class="modal-content">
-      <button
-        id="closeModal"
-        class="close-button"
-        aria-label="Close"
-      >&times;</button>
+      <button id="closeModal" class="close-button" aria-label="Close">&times;</button>
       <div id="modalDetails"></div>
     </div>
   </div>
@@ -136,19 +122,6 @@
         }
         genreSelect.value = category;
         genreSelect.dispatchEvent(new Event('change'));
-      }
-    }
-
-    // Audio sorting integration
-    var activeAudio = "all";
-    function filterByAudio(language, btnElement) {
-      document.querySelectorAll('.chip-btn').forEach(function(btn) {
-        btn.classList.remove('active');
-      });
-      if (btnElement) btnElement.classList.add('active');
-      activeAudio = language;
-      if (typeof window.renderMovies === "function") {
-        window.renderMovies();
       }
     }
   </script>
