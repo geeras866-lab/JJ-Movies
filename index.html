@@ -6,36 +6,6 @@
   <meta name="theme-color" content="#090d18">
   <title>JJ Movies | Discover Movies</title>
   <link rel="stylesheet" href="style.css">
-  <style>
-    .menu-bar {
-      display: flex;
-      overflow-x: auto;
-      gap: 8px;
-      background-color: #121826;
-      padding: 12px 15px;
-      border-bottom: 2px solid #1e293b;
-      white-space: nowrap;
-      scrollbar-width: none;
-    }
-    .menu-bar::-webkit-scrollbar {
-      display: none;
-    }
-    .menu-btn {
-      background-color: #1e293b;
-      color: #94a3b8;
-      border: none;
-      padding: 8px 16px;
-      font-size: 13px;
-      font-weight: bold;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-    .menu-btn.active, .menu-btn:hover {
-      background-color: #e50914;
-      color: #ffffff;
-    }
-  </style>
 </head>
 <body>
   <header class="topbar">
@@ -43,49 +13,57 @@
     <div class="brand-divider"></div>
     <span class="tagline">Your Movie Library</span>
 
-    <nav>
-      <a href="#home" class="active">⌂ Home</a>
-      <a href="#collection">▦ Categories</a>
-      <a href="#about">ⓘ About</a>
-    </nav>
+    <div class="top-nav-right">
+      <nav>
+        <a href="#home" class="active">⌂ Home</a>
+        <a href="#collection">▦ Categories</a>
+        <a href="#about">ⓘ About</a>
+      </nav>
+      <a href="./jj-movies.apk" class="nav-download-app" download>
+        <span>Our Android App</span>
+      </a>
+    </div>
   </header>
 
+  <!-- Banner section replaces standard hero text -->
+  <section class="hero-carousel" id="home">
+    <div id="bannerCarousel" class="carousel-inner">
+      <!-- Generated via app.js -->
+      <div class="banner-slide active">
+        <div class="banner-backdrop" style="background: linear-gradient(180deg, rgba(8,13,24,0.1) 0%, rgba(8,13,24,0.95) 100%), url('https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1600&q=85') center/cover;"></div>
+        <div class="banner-overlay-content">
+          <div class="banner-badge-group">
+            <span class="banner-badge-tag crimson">POPULAR</span>
+            <span class="banner-badge-tag">ULTRA HD</span>
+          </div>
+          <h1 class="banner-title">Welcome to <span>JJ Movies</span></h1>
+          <p class="banner-desc">Explore thousands of cinema files, multiple sound options and quick bot grab links.</p>
+          <div class="banner-action-row">
+            <a href="#collection" class="btn-banner-primary">⚡ Explore collection</a>
+            <a href="./jj-movies.apk" class="btn-banner-secondary">⬇ Android App</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dual Custom Slider Row for Categories -->
   <div class="menu-bar" id="categoryMenu">
-    <button class="menu-btn active" onclick="filterByCustomCategory('all', this)">HOME</button>
+    <button class="menu-btn active" onclick="filterByCustomCategory('all', this)">ALL</button>
     <button class="menu-btn" onclick="filterByCustomCategory('Marvel', this)">MARVEL</button>
     <button class="menu-btn" onclick="filterByCustomCategory('DC', this)">DC</button>
     <button class="menu-btn" onclick="filterByCustomCategory('Jurassic', this)">JURASSIC</button>
   </div>
 
-  <section class="hero" id="home">
-    <div class="hero-content">
-      <h1>Discover <span>Movies</span></h1>
-      <p>Search movies, explore categories and find your preferred version.</p>
-
-      <div class="search-box">
-        <span class="search-icon">⌕</span>
-        <input
-          id="searchInput"
-          type="search"
-          placeholder="Search movie name..."
-          aria-label="Search movies"
-        >
-      </div>
-
-      <a
-        href="./jj-movies.apk"
-        class="app-download-btn"
-        download
-      >
-        <span aria-hidden="true">⬇</span>
-        Download JJ Movies App
-      </a>
-
-      <p class="app-download-note">
-        Android app · Free download
-      </p>
-    </div>
-  </section>
+  <!-- Audio filters quick line for Telugu/Hindi chips -->
+  <div class="sub-filter-row" id="audioChipsRow">
+    <span class="sub-filter-label">Audio:</span>
+    <button class="chip-btn active" onclick="filterByAudio('all', this)">All</button>
+    <button class="chip-btn" onclick="filterByAudio('Telugu', this)">Telugu</button>
+    <button class="chip-btn" onclick="filterByAudio('Hindi', this)">Hindi</button>
+    <button class="chip-btn" onclick="filterByAudio('Tamil', this)">Tamil</button>
+    <button class="chip-btn" onclick="filterByAudio('English', this)">English</button>
+  </div>
 
   <main class="container" id="collection">
     <div class="collection-heading">
@@ -93,6 +71,7 @@
       <span id="movieCount">0 movies</span>
     </div>
 
+    <!-- Hidden native filter selectors for script compatibility -->
     <div class="filters" style="display:none;">
       <select id="genreFilter" aria-label="Filter by category">
         <option value="all">All Categories</option>
@@ -102,6 +81,7 @@
       </select>
     </div>
 
+    <!-- Live Grid with quality/badge cards -->
     <div id="movieGrid" class="movie-grid"></div>
 
     <p id="emptyMessage" class="empty-message" hidden>
@@ -125,6 +105,7 @@
     </a>
   </footer>
 
+  <!-- Deluxe OTT design blur-overlay dynamic Modal popup -->
   <div id="movieModal" class="modal" hidden>
     <div class="modal-content">
       <button
@@ -157,11 +138,22 @@
         genreSelect.dispatchEvent(new Event('change'));
       }
     }
+
+    // Audio sorting integration
+    var activeAudio = "all";
+    function filterByAudio(language, btnElement) {
+      document.querySelectorAll('.chip-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+      });
+      if (btnElement) btnElement.classList.add('active');
+      activeAudio = language;
+      if (typeof window.renderMovies === "function") {
+        window.renderMovies();
+      }
+    }
   </script>
 
   <!-- Cloudflare Web Analytics -->
   <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9d70c824b627424b8b486d665627804c"}'></script>
-  <!-- End Cloudflare Web Analytics -->
-
 </body>
 </html>
