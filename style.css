@@ -641,25 +641,25 @@ footer p {
 
 .close-button {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  background: rgba(255, 255, 255, 0.06);
+  top: 14px;
+  right: 14px;
+  background: rgba(255, 255, 255, 0.08);
   border: none;
   color: #94a3b8;
   width: 32px;
   height: 32px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background 0.2s, color 0.2s;
-  z-index: 10;
+  z-index: 20;
 }
 
 .close-button:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.18);
   color: #ffffff;
 }
 
@@ -682,15 +682,16 @@ footer p {
 .movie-header-info {
   flex: 1;
   min-width: 0;
+  padding-right: 32px; /* Close button title meeda overlap avvakunda protection */
 }
 
 .movie-header-info h2 {
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 700;
   color: #ffffff;
   margin: 0 0 4px 0;
-  padding-right: 25px;
   line-height: 1.3;
+  word-break: break-word;
 }
 
 .movie-meta-chips {
@@ -706,6 +707,29 @@ footer p {
 .movie-meta-chips .genre-badge {
   color: #38bdf8;
   font-weight: 600;
+}
+
+/* Modal Trailer Button */
+.btn-modal-trailer {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 36, 80, 0.15);
+  border: 1px solid #ff2450;
+  color: #ffffff !important;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  margin: 4px 0 6px 0;
+  transition: 0.2s;
+  width: fit-content;
+}
+
+.btn-modal-trailer:hover {
+  background: #ff2450;
+  color: #ffffff;
 }
 
 .movie-desc-text {
