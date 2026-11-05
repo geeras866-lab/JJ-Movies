@@ -28,7 +28,6 @@ function escapeHTML(value) {
   });
 }
 
-// Elaanti format lo unna (https lenappudu add chesukuni) safe URL generate chese function
 function safeURL(value) {
   if (!value) return "";
   var val = String(value).trim();
@@ -244,7 +243,6 @@ function loadMovies() {
     })
     .then(function (data) {
       movies = data.map(function (item) {
-        // Table lo trailer_url unna leka trailer column unna check chesthundhi
         var rawTrailer = item.trailer_url || item.trailer || item.trailerUrl || "";
 
         return {
@@ -525,15 +523,10 @@ async function showMovieDetails(movieId) {
   var pinLabel = getMoviePinLabel(movie);
   var pinBadgeHTML = pinLabel ? '<div class="jj-pin-badge" style="margin-bottom:8px;">' + escapeHTML(pinLabel) + '</div>' : '';
 
-  // Database lo string undi unte direct ga trailer button render aipothundi
-  var trailerBtnHTML = "";
-  if (movie.trailer && movie.trailer.length > 5) {
-    trailerBtnHTML = `
-      <a href="${escapeHTML(movie.trailer)}" target="_blank" rel="noopener noreferrer" class="btn-modal-trailer">
-        ▶ Watch Trailer
-      </a>
-    `;
-  }
+  // Direct database link lekapothe automatic ga YouTube search link generate avthundi
+  var trailerLink = (movie.trailer && movie.trailer.length > 5)
+    ? movie.trailer
+    : "https://www.youtube.com/results?search_query=" + encodeURIComponent(movie.title + " Telugu trailer");
 
   modalDetails.innerHTML = `
     ${pinBadgeHTML}
@@ -547,7 +540,9 @@ async function showMovieDetails(movieId) {
           ${movie.runtime ? `<span>• ${escapeHTML(movie.runtime)}</span>` : ""}
           ${movie.category ? `<span class="genre-badge">• ${escapeHTML(movie.category)}</span>` : ""}
         </div>
-        ${trailerBtnHTML}
+        <a href="${escapeHTML(trailerLink)}" target="_blank" rel="noopener noreferrer" class="btn-modal-trailer">
+          ▶ Watch Trailer
+        </a>
         <p class="movie-desc-text" style="margin-top:6px;">${escapeHTML(movie.description || "No description available.")}</p>
       </div>
     </div>
