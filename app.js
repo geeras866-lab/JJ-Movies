@@ -28,6 +28,7 @@ function escapeHTML(value) {
   });
 }
 
+// Clean direct link resolver
 function safeURL(value) {
   if (!value) return "";
   var val = String(value).trim();
@@ -35,12 +36,7 @@ function safeURL(value) {
   if (!val.startsWith("http://") && !val.startsWith("https://")) {
     val = "https://" + val;
   }
-  try {
-    var url = new URL(val);
-    return url.href;
-  } catch (e) {
-    return val;
-  }
+  return val;
 }
 
 function getMoviePinLabel(movie) {
@@ -243,7 +239,8 @@ function loadMovies() {
     })
     .then(function (data) {
       movies = data.map(function (item) {
-        var rawTrailer = item.trailer_url || item.trailer || item.trailerUrl || "";
+        // Checking all possible column names for trailer url
+        var rawTrailer = item.trailer_url || item.trailer || item.trailer_link || item.video_url || item.youtube_link || item.trailerUrl || "";
 
         return {
           id: item.id,
@@ -523,9 +520,9 @@ async function showMovieDetails(movieId) {
   var pinLabel = getMoviePinLabel(movie);
   var pinBadgeHTML = pinLabel ? '<div class="jj-pin-badge" style="margin-bottom:8px;">' + escapeHTML(pinLabel) + '</div>' : '';
 
-  // Direct database link lekapothe automatic ga YouTube search link generate avthundi
-  var trailerLink = (movie.trailer && movie.trailer.length > 5)
-    ? movie.trailer
+  // Direct database link unte danine vaadatam, lekapothe matrame safe search
+  var trailerLink = movie.trailer 
+    ? movie.trailer 
     : "https://www.youtube.com/results?search_query=" + encodeURIComponent(movie.title + " Telugu trailer");
 
   modalDetails.innerHTML = `
