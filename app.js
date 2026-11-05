@@ -28,14 +28,20 @@ function escapeHTML(value) {
   });
 }
 
+// Elaanti format lo unna (https lenappudu add chesukuni) safe URL generate chese function
 function safeURL(value) {
+  if (!value) return "";
+  var val = String(value).trim();
+  if (!val) return "";
+  if (!val.startsWith("http://") && !val.startsWith("https://")) {
+    val = "https://" + val;
+  }
   try {
-    var url = new URL(value);
-    if (url.protocol === "https:" || url.protocol === "http:") {
-      return url.href;
-    }
-  } catch (e) {}
-  return "";
+    var url = new URL(val);
+    return url.href;
+  } catch (e) {
+    return val;
+  }
 }
 
 function getMoviePinLabel(movie) {
@@ -170,7 +176,7 @@ function createExtraSections() {
         display: inline-flex;
         align-items: center;
         gap: 5px;
-        background: rgba(255, 36, 80, 0.12);
+        background: rgba(255, 36, 80, 0.15);
         border: 1px solid #ff2450;
         color: #ffffff !important;
         text-decoration: none;
@@ -178,7 +184,7 @@ function createExtraSections() {
         font-weight: 700;
         padding: 4px 10px;
         border-radius: 6px;
-        margin: 6px 0 4px 0;
+        margin: 4px 0 6px 0;
         transition: 0.2s;
         width: fit-content;
       }
@@ -238,6 +244,9 @@ function loadMovies() {
     })
     .then(function (data) {
       movies = data.map(function (item) {
+        // Table lo trailer_url unna leka trailer column unna check chesthundhi
+        var rawTrailer = item.trailer_url || item.trailer || item.trailerUrl || "";
+
         return {
           id: item.id,
           title: item.title || "Untitled",
@@ -249,7 +258,7 @@ function loadMovies() {
           description: item.description || "",
           pinned: item.is_pinned === true,
           pinLabel: String(item.pin_label || "").trim(),
-          trailer: safeURL(item.trailer_url || ""),
+          trailer: safeURL(rawTrailer),
           versions: []
         };
       });
@@ -516,12 +525,15 @@ async function showMovieDetails(movieId) {
   var pinLabel = getMoviePinLabel(movie);
   var pinBadgeHTML = pinLabel ? '<div class="jj-pin-badge" style="margin-bottom:8px;">' + escapeHTML(pinLabel) + '</div>' : '';
 
-  // Visar trailer-knapp om en giltig trailer-länk finns i databasen
-  var trailerBtnHTML = movie.trailer ? `
-    <a href="${escapeHTML(movie.trailer)}" target="_blank" rel="noopener noreferrer" class="btn-modal-trailer">
-      ▶ Watch Trailer
-    </a>
-  ` : '';
+  // Database lo string undi unte direct ga trailer button render aipothundi
+  var trailerBtnHTML = "";
+  if (movie.trailer && movie.trailer.length > 5) {
+    trailerBtnHTML = `
+      <a href="${escapeHTML(movie.trailer)}" target="_blank" rel="noopener noreferrer" class="btn-modal-trailer">
+        ▶ Watch Trailer
+      </a>
+    `;
+  }
 
   modalDetails.innerHTML = `
     ${pinBadgeHTML}
