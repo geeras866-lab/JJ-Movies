@@ -165,6 +165,28 @@ function createExtraSections() {
       
       .jj-pin-badge { color:#ff7293; font-size:12px; font-weight:bold; overflow-wrap:anywhere; }
       #modalVersionContainer { min-height: 80px; }
+
+      .btn-modal-trailer {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: rgba(255, 36, 80, 0.12);
+        border: 1px solid #ff2450;
+        color: #ffffff !important;
+        text-decoration: none;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 6px;
+        margin: 6px 0 4px 0;
+        transition: 0.2s;
+        width: fit-content;
+      }
+
+      .btn-modal-trailer:hover {
+        background: #ff2450;
+        color: #ffffff;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -494,6 +516,13 @@ async function showMovieDetails(movieId) {
   var pinLabel = getMoviePinLabel(movie);
   var pinBadgeHTML = pinLabel ? '<div class="jj-pin-badge" style="margin-bottom:8px;">' + escapeHTML(pinLabel) + '</div>' : '';
 
+  // Visar trailer-knapp om en giltig trailer-länk finns i databasen
+  var trailerBtnHTML = movie.trailer ? `
+    <a href="${escapeHTML(movie.trailer)}" target="_blank" rel="noopener noreferrer" class="btn-modal-trailer">
+      ▶ Watch Trailer
+    </a>
+  ` : '';
+
   modalDetails.innerHTML = `
     ${pinBadgeHTML}
 
@@ -506,7 +535,8 @@ async function showMovieDetails(movieId) {
           ${movie.runtime ? `<span>• ${escapeHTML(movie.runtime)}</span>` : ""}
           ${movie.category ? `<span class="genre-badge">• ${escapeHTML(movie.category)}</span>` : ""}
         </div>
-        <p class="movie-desc-text">${escapeHTML(movie.description || "No description available.")}</p>
+        ${trailerBtnHTML}
+        <p class="movie-desc-text" style="margin-top:6px;">${escapeHTML(movie.description || "No description available.")}</p>
       </div>
     </div>
 
