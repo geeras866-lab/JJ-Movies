@@ -37,6 +37,21 @@ button:disabled{opacity:.5;cursor:not-allowed}
 #suggestionsBox div{padding:10px 12px;cursor:pointer;border-bottom:1px solid #293044;color:#f4f5fa}
 #suggestionsBox div:hover{background:#1e293b}
 hr{border-color:#303a50;margin:24px 0}
+
+/* Festival Switch Custom CSS */
+.switch-label { position: relative; display: inline-block; width: 48px; height: 26px; }
+.switch-label input { opacity: 0; width: 0; height: 0; }
+.switch-slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background-color: #35405a; transition: .3s; border-radius: 26px;
+}
+.switch-slider:before {
+  position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px;
+  background-color: white; transition: .3s; border-radius: 50%;
+}
+.switch-label input:checked + .switch-slider { background-color: #00f0ff; box-shadow: 0 0 10px rgba(0, 240, 255, 0.6); }
+.switch-label input:checked + .switch-slider:before { transform: translateX(22px); }
+
 @media(max-width:500px){.movie-row{flex-direction:column}header{padding:15px}.panel{padding:15px}}
 </style>
 </head>
@@ -61,6 +76,28 @@ hr{border-color:#303a50;margin:24px 0}
   </section>
 
   <section id="adminPanel" class="hidden">
+    <!-- FESTIVAL NEON CONTROLS -->
+    <div class="panel" style="border: 1px solid #00f0ff; box-shadow: 0 0 12px rgba(0, 240, 255, 0.15);">
+      <h2 style="color: #00f0ff; display:flex; align-items:center; gap:8px;">
+        🎉 Neon Festival Mode
+      </h2>
+      <p class="muted">Festival mode ON chesi custom name ivvandi. Main site lo neon text & crackers auto ga render avthayi.</p>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin:16px 0; padding:12px; background:#090d18; border-radius:8px; border:1px solid #35405a;">
+        <span style="font-weight:bold; font-size:15px;">Enable Festival Mode:</span>
+        <label class="switch-label">
+          <input type="checkbox" id="festivalToggle">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
+      <label for="festivalNameInput">Custom Festival Wishes / Name</label>
+      <input id="festivalNameInput" type="text" placeholder="e.g. HAPPY DIWALI or HAPPY SANKRANTI">
+
+      <button type="button" id="btnSaveFestival">Save Festival Settings</button>
+      <span id="festivalStatusMsg" style="margin-left:10px; font-size:14px; font-weight:bold; color:#00f0ff;"></span>
+    </div>
+
     <!-- ADD / EDIT MOVIE PANEL -->
     <div class="panel">
       <h2 id="formTitle">Add Movie</h2>
@@ -247,6 +284,12 @@ hr{border-color:#303a50;margin:24px 0}
   var selectedMovieCardContainer = document.getElementById("selectedMovieCardContainer");
   var announcementList = document.getElementById("announcementList");
 
+  // Festival Elements
+  var festivalToggle = document.getElementById("festivalToggle");
+  var festivalNameInput = document.getElementById("festivalNameInput");
+  var btnSaveFestival = document.getElementById("btnSaveFestival");
+  var festivalStatusMsg = document.getElementById("festivalStatusMsg");
+
   function showMessage(text) { message.textContent = text; }
   function safeHttpUrl(value) {
     if (!value) return "";
@@ -286,7 +329,40 @@ hr{border-color:#303a50;margin:24px 0}
     adminPanel.classList.remove("hidden");
     loadMovies();
     loadAnnouncements();
+    loadFestivalSettings();
   }
+
+  // --- FESTIVAL SETTINGS LOGIC ---
+  async function loadFestivalSettings() {
+    try {
+      var res = await supabase.from("site_settings").select("value").eq("key", "festival_config").single();
+      if (res.data && res.data.value) {
+        festivalToggle.checked = res.data.value.enabled === true;
+        festivalNameInput.value = res.data.value.name || "";
+      }
+    } catch (err) {
+      console.warn("Could not load festival settings:", err);
+    }
+  }
+
+  btnSaveFestival.addEventListener("click", async function () {
+    festivalStatusMsg.textContent = "Saving...";
+    var payload = {
+      key: "festival_config",
+      value: {
+        enabled: festivalToggle.checked,
+        name: (festivalNameInput.value || "HAPPY FESTIVAL").trim()
+      }
+    };
+
+    var res = await supabase.from("site_settings").upsert(payload);
+    if (res.error) {
+      festivalStatusMsg.textContent = "❌ Failed: " + res.error.message;
+    } else {
+      festivalStatusMsg.textContent = "✅ Saved Successfully!";
+    }
+    setTimeout(function () { festivalStatusMsg.textContent = ""; }, 3500);
+  });
 
   document.getElementById("loginForm").addEventListener("submit", async function (e) {
     e.preventDefault();
