@@ -197,35 +197,187 @@ function getHeaders() {
 }
 
 // ========================================================
-// ADVANCED MULTI-FESTIVAL INTELLIGENT ENGINE
+// 🇮🇳 ALL-INDIA MASTER LIVE FESTIVAL ENGINE 🇮🇳
 // ========================================================
+
+// Auto Calendar Database covering Pan-India Celebrations
+function getSmartCalendarFestival() {
+  var now = new Date();
+  var m = now.getMonth() + 1; // 1-12
+  var d = now.getDate();      // 1-31
+  var y = now.getFullYear();
+
+  // 1. New Year (Dec 31 to Jan 2)
+  if ((m === 12 && d >= 31) || (m === 1 && d <= 2)) {
+    var nYear = (m === 12) ? y + 1 : y;
+    return { name: "HAPPY NEW YEAR " + nYear, type: "newyear" };
+  }
+
+  // 2. Sankranti / Pongal / Lohri (Jan 13 to Jan 17)
+  if (m === 1 && d >= 13 && d <= 17) {
+    return { name: "HAPPY SANKRANTI", type: "sankranti" };
+  }
+
+  // 3. Republic Day (Jan 25 to Jan 27)
+  if (m === 1 && d >= 25 && d <= 27) {
+    return { name: "HAPPY REPUBLIC DAY", type: "tricolor" };
+  }
+
+  // 4. Maha Shivaratri (Mid Feb / Early March)
+  if ((m === 2 && d >= 24) || (m === 3 && d <= 3)) {
+    return { name: "HAPPY MAHA SHIVARATRI", type: "diwali" };
+  }
+
+  // 5. Holi (Mid/Late March)
+  if (m === 3 && d >= 20 && d <= 26) {
+    return { name: "HAPPY HOLI", type: "holi" };
+  }
+
+  // 6. Ugadi / Gudi Padwa (March 28 to April 2)
+  if ((m === 3 && d >= 28) || (m === 4 && d <= 2)) {
+    return { name: "HAPPY UGADI", type: "sankranti" };
+  }
+
+  // 7. Eid-ul-Fitr / Ramzan (April / May window)
+  if ((m === 3 && d >= 29) || (m === 4 && d <= 5)) {
+    return { name: "EID MUBARAK", type: "eid" };
+  }
+
+  // 8. Sri Rama Navami (April 5 to April 9)
+  if (m === 4 && d >= 5 && d <= 9) {
+    return { name: "HAPPY SRI RAMA NAVAMI", type: "diwali" };
+  }
+
+  // 9. Bakrid / Eid-al-Adha (June 14 to June 18)
+  if (m === 6 && d >= 14 && d <= 18) {
+    return { name: "EID-AL-ADHA MUBARAK", type: "eid" };
+  }
+
+  // 10. Independence Day (August 14 to Aug 16)
+  if (m === 8 && d >= 14 && d <= 16) {
+    return { name: "HAPPY INDEPENDENCE DAY", type: "tricolor" };
+  }
+
+  // 11. Raksha Bandhan (Late August)
+  if (m === 8 && d >= 26 && d <= 29) {
+    return { name: "HAPPY RAKSHA BANDHAN", type: "sankranti" };
+  }
+
+  // 12. Krishna Janmashtami (Late August / Early Sept)
+  if ((m === 8 && d >= 30) || (m === 9 && d <= 4)) {
+    return { name: "HAPPY KRISHNA JANMASHTAMI", type: "diwali" };
+  }
+
+  // 13. Vinayaka Chavithi / Ganesh Chaturthi (September 10 to Sep 16)
+  if (m === 9 && d >= 10 && d <= 16) {
+    return { name: "HAPPY VINAYAKA CHAVITHI", type: "diwali" };
+  }
+
+  // 14. Dussehra / Vijayadashami / Navratri (October 15 to Oct 22)
+  if (m === 10 && d >= 15 && d <= 22) {
+    return { name: "HAPPY DUSSEHRA", type: "diwali" };
+  }
+
+  // 15. Diwali / Deepavali (November 5 to Nov 12)
+  if (m === 11 && d >= 5 && d <= 12) {
+    return { name: "HAPPY DIWALI", type: "diwali" };
+  }
+
+  // 16. Christmas (December 22 to Dec 27)
+  if (m === 12 && d >= 22 && d <= 27) {
+    return { name: "MERRY CHRISTMAS", type: "christmas" };
+  }
+
+  return null;
+}
+
+// Live Online Indian Holidays API Lookup (Auto-syncs live tithis & official dates)
+async function fetchOnlineIndianFestival() {
+  try {
+    var now = new Date();
+    var y = now.getFullYear();
+    var isoToday = now.toISOString().split("T")[0]; // YYYY-MM-DD
+
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function () { controller.abort(); }, 2500); // Fast 2.5s fallback
+
+    var res = await fetch("https://date.nager.at/api/v3/PublicHolidays/" + y + "/IN", {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return null;
+    var holidays = await res.json();
+    
+    // Find holiday matching today or +/- 1 day buffer
+    var match = holidays.find(function (h) {
+      var hDate = new Date(h.date);
+      var diffDays = Math.abs((now - hDate) / (1000 * 60 * 60 * 24));
+      return diffDays <= 1.2;
+    });
+
+    if (match) {
+      var name = match.localName || match.name;
+      var lower = name.toLowerCase();
+      var type = "general";
+
+      if (lower.includes("diwali") || lower.includes("deepavali")) type = "diwali";
+      else if (lower.includes("sankranti") || lower.includes("pongal")) type = "sankranti";
+      else if (lower.includes("holi")) type = "holi";
+      else if (lower.includes("eid") || lower.includes("id-ul") || lower.includes("muharram")) type = "eid";
+      else if (lower.includes("christmas")) type = "christmas";
+      else if (lower.includes("republic") || lower.includes("independence")) type = "tricolor";
+      else if (lower.includes("year")) type = "newyear";
+
+      return { name: "HAPPY " + name.toUpperCase(), type: type };
+    }
+  } catch (e) {
+    // Falls back to offline calendar instantly
+  }
+  return null;
+}
+
 async function initNeonFestivalMode() {
+  var activeFestival = null;
+
+  // 1. Check Supabase for manual Admin Override
   try {
     var res = await fetch(SUPABASE_URL + "/rest/v1/site_settings?key=eq.festival_config&select=value", {
       headers: getHeaders()
     });
     var data = await res.json();
-    if (!data || !data[0] || !data[0].value || data[0].value.enabled !== true) return;
+    if (data && data[0] && data[0].value && data[0].value.enabled === true) {
+      var custName = (data[0].value.name || "HAPPY FESTIVAL").trim();
+      var lower = custName.toLowerCase();
+      var manualType = "general";
+      if (lower.includes("diwali") || lower.includes("deepavali")) manualType = "diwali";
+      else if (lower.includes("sankranti") || lower.includes("pongal") || lower.includes("kite")) manualType = "sankranti";
+      else if (lower.includes("holi") || lower.includes("color")) manualType = "holi";
+      else if (lower.includes("eid") || lower.includes("ramzan")) manualType = "eid";
+      else if (lower.includes("christmas")) manualType = "christmas";
+      else if (lower.includes("republic") || lower.includes("independence")) manualType = "tricolor";
+      else if (lower.includes("new year") || lower.includes("202")) manualType = "newyear";
 
-    var festivalName = (data[0].value.name || "HAPPY FESTIVAL").trim();
-    var lower = festivalName.toLowerCase();
-
-    // Auto-detect festival type
-    var type = "general";
-    if (lower.includes("diwali") || lower.includes("deepavali")) {
-      type = "diwali";
-    } else if (lower.includes("sankranti") || lower.includes("pongal") || lower.includes("kite")) {
-      type = "sankranti";
-    } else if (lower.includes("holi") || lower.includes("color")) {
-      type = "holi";
-    } else if (lower.includes("new year") || lower.includes("202")) {
-      type = "newyear";
+      activeFestival = { name: custName, type: manualType };
     }
-
-    renderAdaptiveNeonBanner(festivalName, type);
-    startAdaptiveVisualEffect(type);
   } catch (err) {
-    console.warn("Festival mode check skipped:", err);
+    console.warn("Manual check skipped:", err);
+  }
+
+  // 2. If no manual override, try Live Online API
+  if (!activeFestival) {
+    activeFestival = await fetchOnlineIndianFestival();
+  }
+
+  // 3. If online API is offline or today is a regional festival, use Auto Smart Calendar
+  if (!activeFestival) {
+    activeFestival = getSmartCalendarFestival();
+  }
+
+  // Render Festival Engine
+  if (activeFestival) {
+    renderAdaptiveNeonBanner(activeFestival.name, activeFestival.type);
+    startAdaptiveVisualEffect(activeFestival.type);
   }
 }
 
@@ -238,29 +390,26 @@ function renderAdaptiveNeonBanner(text, type) {
   var rightIcon = "✨";
 
   if (type === "diwali") {
-    borderCol = "#ffb703";
-    shadowCol1 = "#fb8500";
-    shadowCol2 = "#ffd166";
-    leftIcon = "🪔";
-    rightIcon = "🪔";
+    borderCol = "#ffb703"; shadowCol1 = "#fb8500"; shadowCol2 = "#ffd166";
+    leftIcon = "🪔"; rightIcon = "🪔";
   } else if (type === "sankranti") {
-    borderCol = "#06d6a0";
-    shadowCol1 = "#ffd166";
-    shadowCol2 = "#118ab2";
-    leftIcon = "🪁";
-    rightIcon = "🪁";
+    borderCol = "#06d6a0"; shadowCol1 = "#ffd166"; shadowCol2 = "#118ab2";
+    leftIcon = "🪁"; rightIcon = "🪁";
   } else if (type === "holi") {
-    borderCol = "#ff007f";
-    shadowCol1 = "#00f0ff";
-    shadowCol2 = "#70e000";
-    leftIcon = "🎨";
-    rightIcon = "🎨";
+    borderCol = "#ff007f"; shadowCol1 = "#00f0ff"; shadowCol2 = "#70e000";
+    leftIcon = "🎨"; rightIcon = "🎨";
+  } else if (type === "eid") {
+    borderCol = "#2ec4b6"; shadowCol1 = "#20bf6b"; shadowCol2 = "#ffd166";
+    leftIcon = "🌙"; rightIcon = "⭐";
+  } else if (type === "christmas") {
+    borderCol = "#ff3838"; shadowCol1 = "#2ed573"; shadowCol2 = "#ffffff";
+    leftIcon = "🎄"; rightIcon = "🎅";
+  } else if (type === "tricolor") {
+    borderCol = "#ff9933"; shadowCol1 = "#138808"; shadowCol2 = "#ffffff";
+    leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
   } else if (type === "newyear") {
-    borderCol = "#00f0ff";
-    shadowCol1 = "#7209b7";
-    shadowCol2 = "#4cc9f0";
-    leftIcon = "🎆";
-    rightIcon = "🎆";
+    borderCol = "#00f0ff"; shadowCol1 = "#7209b7"; shadowCol2 = "#4cc9f0";
+    leftIcon = "🎆"; rightIcon = "🎆";
   }
 
   style.textContent = `
@@ -275,7 +424,7 @@ function renderAdaptiveNeonBanner(text, type) {
       z-index: 1001;
     }
     .neon-fest-title {
-      font-size: clamp(16px, 3.2vw, 22px);
+      font-size: clamp(15px, 3.2vw, 22px);
       font-weight: 900;
       letter-spacing: 2px;
       color: #ffffff;
@@ -323,11 +472,13 @@ function startAdaptiveVisualEffect(type) {
   var particles = [];
   var kites = [];
 
-  // ================= 1. DIWALI & NEW YEAR FIREWORKS =================
-  if (type === "diwali" || type === "newyear" || type === "general") {
-    var palette = type === "diwali" 
-      ? ["#ffd700", "#ff3d00", "#ff007f", "#ffffff", "#ffea00", "#ff8800"]
-      : ["#00f0ff", "#7209b7", "#4cc9f0", "#f72585", "#ffffff", "#3a0ca3"];
+  // ================= 1. FIREWORKS (Diwali, New Year, National Days, Eid, Christmas) =================
+  if (type === "diwali" || type === "newyear" || type === "tricolor" || type === "eid" || type === "christmas" || type === "general") {
+    var palette = ["#ffd700", "#ff3d00", "#ff007f", "#ffffff", "#ffea00", "#ff8800"];
+    if (type === "newyear") palette = ["#00f0ff", "#7209b7", "#4cc9f0", "#f72585", "#ffffff", "#3a0ca3"];
+    if (type === "tricolor") palette = ["#ff9933", "#ffffff", "#128807", "#000080"];
+    if (type === "eid") palette = ["#2ec4b6", "#20bf6b", "#ffd166", "#ffffff", "#00f0ff"];
+    if (type === "christmas") palette = ["#ff3838", "#2ed573", "#ffffff", "#ffd700", "#ff6b81"];
 
     function FireworkRocket() {
       this.x = width * (0.15 + Math.random() * 0.7);
@@ -424,7 +575,7 @@ function startAdaptiveVisualEffect(type) {
     animFireworks();
   }
 
-  // ================= 2. SANKRANTI KITES & STRINGS =================
+  // ================= 2. SANKRANTI / UGADI (Flying Kites) =================
   else if (type === "sankranti") {
     var kiteColors = ["#ff0055", "#00f0ff", "#ffd166", "#06d6a0", "#a855f7"];
 
@@ -450,7 +601,6 @@ function startAdaptiveVisualEffect(type) {
       ctx.translate(this.x, this.y);
       ctx.rotate(Math.sin(this.swayCount) * 0.2);
 
-      // Kite Body
       ctx.fillStyle = this.color;
       ctx.shadowBlur = 10;
       ctx.shadowColor = this.color;
@@ -462,7 +612,6 @@ function startAdaptiveVisualEffect(type) {
       ctx.closePath();
       ctx.fill();
 
-      // Kite Thread / Manja Tail
       ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -489,7 +638,7 @@ function startAdaptiveVisualEffect(type) {
     animKites();
   }
 
-  // ================= 3. HOLI COLOR GULAL BLASTS =================
+  // ================= 3. HOLI (Gulal Color Splash) =================
   else if (type === "holi") {
     var holiColors = ["#ff007f", "#00f0ff", "#76ff03", "#ffea00", "#d500f9", "#ff6d00"];
 
