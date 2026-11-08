@@ -226,6 +226,113 @@ function getHeaders() {
   };
 }
 
+// ========================================================
+// NEON FESTIVAL MODE ENGINE
+// ========================================================
+async function initNeonFestivalMode() {
+  try {
+    var res = await fetch(SUPABASE_URL + "/rest/v1/site_settings?key=eq.festival_config&select=value", {
+      headers: getHeaders()
+    });
+    var data = await res.json();
+    if (!data || !data[0] || !data[0].value || data[0].value.enabled !== true) return;
+
+    var festivalName = data[0].value.name || "HAPPY FESTIVAL";
+    renderNeonBanner(festivalName);
+    startNeonCrackers();
+  } catch (err) {
+    console.warn("Festival mode check skipped:", err);
+  }
+}
+
+function renderNeonBanner(text) {
+  var style = document.createElement("style");
+  style.textContent = `
+    .neon-fest-container {
+      background: radial-gradient(circle at center, #111a2f 0%, #070b14 100%);
+      border-bottom: 2px solid #00f0ff;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.45), inset 0 0 15px rgba(255, 0, 128, 0.3);
+      padding: 10px 14px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 1001;
+    }
+    .neon-fest-title {
+      font-size: clamp(14px, 2.8vw, 20px);
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: #fff;
+      text-transform: uppercase;
+      text-shadow:
+        0 0 5px #fff,
+        0 0 10px #ff007f,
+        0 0 20px #ff007f,
+        0 0 40px #ff007f;
+      animation: neonPulse 2s infinite alternate;
+      margin: 0;
+    }
+    .neon-fest-sub {
+      font-size: clamp(10px, 1.8vw, 12px);
+      letter-spacing: 1.5px;
+      color: #00f0ff;
+      font-weight: 700;
+      margin-top: 3px;
+      text-shadow: 0 0 8px rgba(0, 240, 255, 0.8);
+      text-transform: uppercase;
+    }
+    @keyframes neonPulse {
+      0% {
+        text-shadow: 0 0 5px #fff, 0 0 10px #ff007f, 0 0 20px #ff007f, 0 0 35px #ff007f;
+      }
+      100% {
+        text-shadow: 0 0 8px #fff, 0 0 15px #00f0ff, 0 0 30px #00f0ff, 0 0 50px #00f0ff;
+      }
+    }
+    .neon-spark {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      animation: sparkFall linear forwards;
+    }
+    @keyframes sparkFall {
+      0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(105vh) rotate(360deg); opacity: 0; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  var banner = document.createElement("div");
+  banner.className = "neon-fest-container";
+  banner.innerHTML = `
+    <div class="neon-fest-title">🪔 ${escapeHTML(text)} 🪔</div>
+    <div class="neon-fest-sub">✨ JJ MOVIES WISHES YOU A PROSPEROUS CELEBRATION ✨</div>
+  `;
+  document.body.prepend(banner);
+}
+
+function startNeonCrackers() {
+  var neonColors = ["#00f0ff", "#ff007f", "#ffe600", "#39ff14", "#bc13fe", "#ffffff"];
+  setInterval(function () {
+    var spark = document.createElement("div");
+    spark.className = "neon-spark";
+    var size = Math.random() * 6 + 4;
+    spark.style.width = size + "px";
+    spark.style.height = size + "px";
+    var col = neonColors[Math.floor(Math.random() * neonColors.length)];
+    spark.style.background = col;
+    spark.style.boxShadow = "0 0 8px " + col;
+    spark.style.borderRadius = "50%";
+    spark.style.left = Math.random() * 100 + "vw";
+    spark.style.top = "0px";
+    spark.style.animationDuration = (Math.random() * 2.5 + 2) + "s";
+    spark.style.opacity = Math.random() * 0.7 + 0.3;
+    document.body.appendChild(spark);
+
+    setTimeout(function () { spark.remove(); }, 4000);
+  }, 220);
+}
+
 function loadMovies() {
   if (movieCount) movieCount.textContent = "Loading movies...";
 
@@ -239,7 +346,6 @@ function loadMovies() {
     })
     .then(function (data) {
       movies = data.map(function (item) {
-        // Checking all possible column names for trailer url
         var rawTrailer = item.trailer_url || item.trailer || item.trailer_link || item.video_url || item.youtube_link || item.trailerUrl || "";
 
         return {
@@ -520,7 +626,6 @@ async function showMovieDetails(movieId) {
   var pinLabel = getMoviePinLabel(movie);
   var pinBadgeHTML = pinLabel ? '<div class="jj-pin-badge" style="margin-bottom:8px;">' + escapeHTML(pinLabel) + '</div>' : '';
 
-  // Direct database link unte danine vaadatam, lekapothe matrame safe search
   var trailerLink = movie.trailer 
     ? movie.trailer 
     : "https://www.youtube.com/results?search_query=" + encodeURIComponent(movie.title + " Telugu trailer");
@@ -689,3 +794,4 @@ document.addEventListener("keydown", function (event) {
 
 createExtraSections();
 loadMovies();
+initNeonFestivalMode();
