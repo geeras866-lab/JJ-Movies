@@ -197,184 +197,113 @@ function getHeaders() {
 }
 
 // ========================================================
-// 🇮🇳 ALL-INDIA MASTER LIVE FESTIVAL ENGINE 🇮🇳
+// 🌟 CUSTOM FESTIVAL ARTWORK & ANIMATION ENGINE 🌟
 // ========================================================
 
-// Auto Calendar Database covering Pan-India Celebrations
 function getSmartCalendarFestival() {
   var now = new Date();
-  var m = now.getMonth() + 1; // 1-12
-  var d = now.getDate();      // 1-31
+  var m = now.getMonth() + 1;
+  var d = now.getDate();
   var y = now.getFullYear();
 
-  // 1. New Year (Dec 31 to Jan 2)
-  if ((m === 12 && d >= 31) || (m === 1 && d <= 2)) {
-    var nYear = (m === 12) ? y + 1 : y;
-    return { name: "HAPPY NEW YEAR " + nYear, type: "newyear" };
-  }
-
-  // 2. Sankranti / Pongal / Lohri (Jan 13 to Jan 17)
-  if (m === 1 && d >= 13 && d <= 17) {
-    return { name: "HAPPY SANKRANTI", type: "sankranti" };
-  }
-
-  // 3. Republic Day (Jan 25 to Jan 27)
-  if (m === 1 && d >= 25 && d <= 27) {
-    return { name: "HAPPY REPUBLIC DAY", type: "tricolor" };
-  }
-
-  // 4. Maha Shivaratri (Mid Feb / Early March)
-  if ((m === 2 && d >= 24) || (m === 3 && d <= 3)) {
-    return { name: "HAPPY MAHA SHIVARATRI", type: "diwali" };
-  }
-
-  // 5. Holi (Mid/Late March)
-  if (m === 3 && d >= 20 && d <= 26) {
-    return { name: "HAPPY HOLI", type: "holi" };
-  }
-
-  // 6. Ugadi / Gudi Padwa (March 28 to April 2)
-  if ((m === 3 && d >= 28) || (m === 4 && d <= 2)) {
-    return { name: "HAPPY UGADI", type: "sankranti" };
-  }
-
-  // 7. Eid-ul-Fitr / Ramzan (April / May window)
-  if ((m === 3 && d >= 29) || (m === 4 && d <= 5)) {
-    return { name: "EID MUBARAK", type: "eid" };
-  }
-
-  // 8. Sri Rama Navami (April 5 to April 9)
-  if (m === 4 && d >= 5 && d <= 9) {
-    return { name: "HAPPY SRI RAMA NAVAMI", type: "diwali" };
-  }
-
-  // 9. Bakrid / Eid-al-Adha (June 14 to June 18)
-  if (m === 6 && d >= 14 && d <= 18) {
-    return { name: "EID-AL-ADHA MUBARAK", type: "eid" };
-  }
-
-  // 10. Independence Day (August 14 to Aug 16)
-  if (m === 8 && d >= 14 && d <= 16) {
-    return { name: "HAPPY INDEPENDENCE DAY", type: "tricolor" };
-  }
-
-  // 11. Raksha Bandhan (Late August)
-  if (m === 8 && d >= 26 && d <= 29) {
-    return { name: "HAPPY RAKSHA BANDHAN", type: "sankranti" };
-  }
-
-  // 12. Krishna Janmashtami (Late August / Early Sept)
-  if ((m === 8 && d >= 30) || (m === 9 && d <= 4)) {
-    return { name: "HAPPY KRISHNA JANMASHTAMI", type: "diwali" };
-  }
-
-  // 13. Vinayaka Chavithi / Ganesh Chaturthi (September 10 to Sep 16)
-  if (m === 9 && d >= 10 && d <= 16) {
-    return { name: "HAPPY VINAYAKA CHAVITHI", type: "diwali" };
-  }
-
-  // 14. Dussehra / Vijayadashami / Navratri (October 15 to Oct 22)
-  if (m === 10 && d >= 15 && d <= 22) {
-    return { name: "HAPPY DUSSEHRA", type: "diwali" };
-  }
-
-  // 15. Diwali / Deepavali (November 5 to Nov 12)
-  if (m === 11 && d >= 5 && d <= 12) {
-    return { name: "HAPPY DIWALI", type: "diwali" };
-  }
-
-  // 16. Christmas (December 22 to Dec 27)
-  if (m === 12 && d >= 22 && d <= 27) {
-    return { name: "MERRY CHRISTMAS", type: "christmas" };
-  }
+  if ((m === 12 && d >= 31) || (m === 1 && d <= 2)) return { name: "HAPPY NEW YEAR " + ((m === 12) ? y + 1 : y), type: "newyear" };
+  if (m === 1 && d >= 13 && d <= 17) return { name: "HAPPY SANKRANTI", type: "sankranti" };
+  if (m === 1 && d >= 25 && d <= 27) return { name: "HAPPY REPUBLIC DAY", type: "tricolor" };
+  if ((m === 2 && d >= 24) || (m === 3 && d <= 3)) return { name: "HAPPY MAHA SHIVARATRI", type: "diwali" };
+  if (m === 3 && d >= 20 && d <= 26) return { name: "HAPPY HOLI", type: "holi" };
+  if ((m === 3 && d >= 28) || (m === 4 && d <= 2)) return { name: "HAPPY UGADI", type: "sankranti" };
+  if ((m === 3 && d >= 29) || (m === 4 && d <= 5)) return { name: "EID MUBARAK", type: "eid" };
+  if (m === 4 && d >= 5 && d <= 9) return { name: "HAPPY SRI RAMA NAVAMI", type: "diwali" };
+  if (m === 6 && d >= 14 && d <= 18) return { name: "EID-AL-ADHA MUBARAK", type: "eid" };
+  if (m === 8 && d >= 14 && d <= 16) return { name: "HAPPY INDEPENDENCE DAY", type: "tricolor" };
+  if (m === 8 && d >= 26 && d <= 29) return { name: "HAPPY RAKSHA BANDHAN", type: "sankranti" };
+  if ((m === 8 && d >= 30) || (m === 9 && d <= 4)) return { name: "HAPPY KRISHNA JANMASHTAMI", type: "diwali" };
+  if (m === 9 && d >= 10 && d <= 16) return { name: "HAPPY VINAYAKA CHAVITHI", type: "diwali" };
+  if (m === 10 && d >= 15 && d <= 22) return { name: "HAPPY DUSSEHRA", type: "diwali" };
+  if (m === 11 && d >= 5 && d <= 12) return { name: "HAPPY DIWALI", type: "diwali" };
+  if (m === 12 && d >= 22 && d <= 27) return { name: "MERRY CHRISTMAS", type: "christmas" };
 
   return null;
 }
 
-// Live Online Indian Holidays API Lookup (Auto-syncs live tithis & official dates)
 async function fetchOnlineIndianFestival() {
   try {
     var now = new Date();
     var y = now.getFullYear();
-    var isoToday = now.toISOString().split("T")[0]; // YYYY-MM-DD
-
     var controller = new AbortController();
-    var timeoutId = setTimeout(function () { controller.abort(); }, 2500); // Fast 2.5s fallback
+    var timeoutId = setTimeout(function () { controller.abort(); }, 2500);
 
-    var res = await fetch("https://date.nager.at/api/v3/PublicHolidays/" + y + "/IN", {
-      signal: controller.signal
-    });
+    var res = await fetch("https://date.nager.at/api/v3/PublicHolidays/" + y + "/IN", { signal: controller.signal });
     clearTimeout(timeoutId);
-
     if (!res.ok) return null;
     var holidays = await res.json();
     
-    // Find holiday matching today or +/- 1 day buffer
     var match = holidays.find(function (h) {
       var hDate = new Date(h.date);
-      var diffDays = Math.abs((now - hDate) / (1000 * 60 * 60 * 24));
-      return diffDays <= 1.2;
+      return Math.abs((now - hDate) / (1000 * 60 * 60 * 24)) <= 1.2;
     });
 
     if (match) {
       var name = match.localName || match.name;
       var lower = name.toLowerCase();
       var type = "general";
-
       if (lower.includes("diwali") || lower.includes("deepavali")) type = "diwali";
       else if (lower.includes("sankranti") || lower.includes("pongal")) type = "sankranti";
       else if (lower.includes("holi")) type = "holi";
-      else if (lower.includes("eid") || lower.includes("id-ul") || lower.includes("muharram")) type = "eid";
+      else if (lower.includes("eid") || lower.includes("id-ul")) type = "eid";
       else if (lower.includes("christmas")) type = "christmas";
       else if (lower.includes("republic") || lower.includes("independence")) type = "tricolor";
       else if (lower.includes("year")) type = "newyear";
 
       return { name: "HAPPY " + name.toUpperCase(), type: type };
     }
-  } catch (e) {
-    // Falls back to offline calendar instantly
-  }
+  } catch (e) {}
   return null;
 }
 
 async function initNeonFestivalMode() {
   var activeFestival = null;
 
-  // 1. Check Supabase for manual Admin Override
   try {
     var res = await fetch(SUPABASE_URL + "/rest/v1/site_settings?key=eq.festival_config&select=value", {
       headers: getHeaders()
     });
     var data = await res.json();
-    if (data && data[0] && data[0].value && data[0].value.enabled === true) {
-      var custName = (data[0].value.name || "HAPPY FESTIVAL").trim();
-      var lower = custName.toLowerCase();
-      var manualType = "general";
-      if (lower.includes("diwali") || lower.includes("deepavali")) manualType = "diwali";
-      else if (lower.includes("sankranti") || lower.includes("pongal") || lower.includes("kite")) manualType = "sankranti";
-      else if (lower.includes("holi") || lower.includes("color")) manualType = "holi";
-      else if (lower.includes("eid") || lower.includes("ramzan")) manualType = "eid";
-      else if (lower.includes("christmas")) manualType = "christmas";
-      else if (lower.includes("republic") || lower.includes("independence")) manualType = "tricolor";
-      else if (lower.includes("new year") || lower.includes("202")) manualType = "newyear";
+    if (data && data[0] && data[0].value) {
+      // ADMIN SWITCH OFF => STOP IMMEDIATELY
+      if (data[0].value.enabled === false) {
+        return;
+      }
 
-      activeFestival = { name: custName, type: manualType };
+      if (data[0].value.enabled === true) {
+        var custName = (data[0].value.name || "").trim();
+        if (custName && custName !== "HAPPY FESTIVAL") {
+          var lower = custName.toLowerCase();
+          var manualType = "general";
+          if (lower.includes("diwali") || lower.includes("deepavali") || lower.includes("cracker")) manualType = "diwali";
+          else if (lower.includes("sankranti") || lower.includes("pongal") || lower.includes("kite")) manualType = "sankranti";
+          else if (lower.includes("holi") || lower.includes("color")) manualType = "holi";
+          else if (lower.includes("christmas") || lower.includes("xmas") || lower.includes("santa")) manualType = "christmas";
+          else if (lower.includes("eid") || lower.includes("ramzan")) manualType = "eid";
+          else if (lower.includes("republic") || lower.includes("independence")) manualType = "tricolor";
+          else if (lower.includes("new year") || lower.includes("202")) manualType = "newyear";
+
+          activeFestival = { name: custName, type: manualType };
+        }
+      }
     }
   } catch (err) {
-    console.warn("Manual check skipped:", err);
+    console.warn("Manual check bypassed:", err);
   }
 
-  // 2. If no manual override, try Live Online API
+  // If enabled without custom name, check online then offline calendar
   if (!activeFestival) {
     activeFestival = await fetchOnlineIndianFestival();
   }
-
-  // 3. If online API is offline or today is a regional festival, use Auto Smart Calendar
   if (!activeFestival) {
     activeFestival = getSmartCalendarFestival();
   }
 
-  // Render Festival Engine
   if (activeFestival) {
     renderAdaptiveNeonBanner(activeFestival.name, activeFestival.type);
     startAdaptiveVisualEffect(activeFestival.type);
@@ -395,15 +324,15 @@ function renderAdaptiveNeonBanner(text, type) {
   } else if (type === "sankranti") {
     borderCol = "#06d6a0"; shadowCol1 = "#ffd166"; shadowCol2 = "#118ab2";
     leftIcon = "🪁"; rightIcon = "🪁";
+  } else if (type === "christmas") {
+    borderCol = "#ff3838"; shadowCol1 = "#2ed573"; shadowCol2 = "#ffffff";
+    leftIcon = "🎅"; rightIcon = "🦌";
   } else if (type === "holi") {
     borderCol = "#ff007f"; shadowCol1 = "#00f0ff"; shadowCol2 = "#70e000";
     leftIcon = "🎨"; rightIcon = "🎨";
   } else if (type === "eid") {
     borderCol = "#2ec4b6"; shadowCol1 = "#20bf6b"; shadowCol2 = "#ffd166";
     leftIcon = "🌙"; rightIcon = "⭐";
-  } else if (type === "christmas") {
-    borderCol = "#ff3838"; shadowCol1 = "#2ed573"; shadowCol2 = "#ffffff";
-    leftIcon = "🎄"; rightIcon = "🎅";
   } else if (type === "tricolor") {
     borderCol = "#ff9933"; shadowCol1 = "#138808"; shadowCol2 = "#ffffff";
     leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
@@ -468,86 +397,44 @@ function startAdaptiveVisualEffect(type) {
     height = canvas.height = window.innerHeight;
   });
 
-  var rockets = [];
-  var particles = [];
-  var kites = [];
+  // ========================================================
+  // 1. DIWALI (CHICHUBUDLU / FOUNTAINS + GROUND CRACKERS)
+  // ========================================================
+  if (type === "diwali") {
+    var sparks = [];
+    var fountains = [
+      { x: width * 0.15, y: height - 10 },
+      { x: width * 0.5, y: height - 10 },
+      { x: width * 0.85, y: height - 10 }
+    ];
 
-  // ================= 1. FIREWORKS (Diwali, New Year, National Days, Eid, Christmas) =================
-  if (type === "diwali" || type === "newyear" || type === "tricolor" || type === "eid" || type === "christmas" || type === "general") {
-    var palette = ["#ffd700", "#ff3d00", "#ff007f", "#ffffff", "#ffea00", "#ff8800"];
-    if (type === "newyear") palette = ["#00f0ff", "#7209b7", "#4cc9f0", "#f72585", "#ffffff", "#3a0ca3"];
-    if (type === "tricolor") palette = ["#ff9933", "#ffffff", "#128807", "#000080"];
-    if (type === "eid") palette = ["#2ec4b6", "#20bf6b", "#ffd166", "#ffffff", "#00f0ff"];
-    if (type === "christmas") palette = ["#ff3838", "#2ed573", "#ffffff", "#ffd700", "#ff6b81"];
-
-    function FireworkRocket() {
-      this.x = width * (0.15 + Math.random() * 0.7);
-      this.y = height;
-      this.targetY = height * (0.12 + Math.random() * 0.35);
-      this.color = palette[Math.floor(Math.random() * palette.length)];
-      var angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.3;
-      var speed = Math.random() * 3 + 12;
-      this.vx = Math.cos(angle) * speed;
-      this.vy = Math.sin(angle) * speed;
-      this.trail = [];
-    }
-
-    FireworkRocket.prototype.update = function () {
-      this.trail.push({ x: this.x, y: this.y });
-      if (this.trail.length > 5) this.trail.shift();
-      this.x += this.vx;
-      this.y += this.vy;
-      this.vy += 0.08;
-
-      if (this.vy >= -1 || this.y <= this.targetY) {
-        var count = Math.floor(Math.random() * 25) + 45;
-        for (var i = 0; i < count; i++) {
-          particles.push(new FireworkParticle(this.x, this.y, this.color, palette));
-        }
-        return false;
-      }
-      return true;
-    };
-
-    FireworkRocket.prototype.draw = function () {
-      ctx.strokeStyle = this.color;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      for (var i = 0; i < this.trail.length; i++) {
-        var p = this.trail[i];
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      ctx.stroke();
-    };
-
-    function FireworkParticle(x, y, color, pal) {
-      this.x = x;
-      this.y = y;
-      this.color = Math.random() > 0.4 ? color : pal[Math.floor(Math.random() * pal.length)];
-      var angle = Math.random() * Math.PI * 2;
-      var speed = Math.random() * 5 + 1.2;
+    function FlowerPotSpark(fx, fy) {
+      this.x = fx + (Math.random() - 0.5) * 20;
+      this.y = fy;
+      var angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.7; // Shoot upwards like flowerpot fountain
+      var speed = Math.random() * 9 + 8;
       this.vx = Math.cos(angle) * speed;
       this.vy = Math.sin(angle) * speed;
       this.alpha = 1;
-      this.decay = Math.random() * 0.015 + 0.012;
-      this.size = Math.random() * 2.5 + 1.2;
+      this.decay = Math.random() * 0.025 + 0.015;
+      this.size = Math.random() * 2.8 + 1.2;
+      var colors = ["#ffd700", "#ffea00", "#ff6b00", "#ffffff", "#ff0055"];
+      this.color = colors[Math.floor(Math.random() * colors.length)];
     }
 
-    FireworkParticle.prototype.update = function () {
+    FlowerPotSpark.prototype.update = function () {
       this.x += this.vx;
       this.y += this.vy;
-      this.vy += 0.06;
-      this.vx *= 0.98;
+      this.vy += 0.28; // Gravity pulls sparks down gracefully
       this.alpha -= this.decay;
       return this.alpha > 0;
     };
 
-    FireworkParticle.prototype.draw = function () {
+    FlowerPotSpark.prototype.draw = function () {
       ctx.save();
       ctx.globalAlpha = this.alpha;
       ctx.fillStyle = this.color;
-      ctx.shadowBlur = 9;
+      ctx.shadowBlur = 10;
       ctx.shadowColor = this.color;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
@@ -555,29 +442,106 @@ function startAdaptiveVisualEffect(type) {
       ctx.restore();
     };
 
-    setInterval(function () {
-      rockets.push(new FireworkRocket());
-    }, 1100);
-    rockets.push(new FireworkRocket());
-
-    function animFireworks() {
+    function animDiwali() {
       ctx.clearRect(0, 0, width, height);
-      for (var r = rockets.length - 1; r >= 0; r--) {
-        if (!rockets[r].update()) rockets.splice(r, 1);
-        else rockets[r].draw();
+
+      // Continuously emit sparks from fountains
+      fountains.forEach(function (f) {
+        for (var i = 0; i < 4; i++) {
+          sparks.push(new FlowerPotSpark(f.x, f.y));
+        }
+      });
+
+      for (var s = sparks.length - 1; s >= 0; s--) {
+        if (!sparks[s].update()) sparks.splice(s, 1);
+        else sparks[s].draw();
       }
-      for (var p = particles.length - 1; p >= 0; p--) {
-        if (!particles[p].update()) particles.splice(p, 1);
-        else particles[p].draw();
-      }
-      requestAnimationFrame(animFireworks);
+      requestAnimationFrame(animDiwali);
     }
-    animFireworks();
+    animDiwali();
   }
 
-  // ================= 2. SANKRANTI / UGADI (Flying Kites) =================
+  // ========================================================
+  // 2. CHRISTMAS (SANTA SLEIGH WITH REINDEER + RICH SNOW SPARKS)
+  // ========================================================
+  else if (type === "christmas") {
+    var snowflakes = [];
+    var santaX = -200;
+    var santaY = height * 0.25;
+    var santaSpeed = 2.4;
+
+    // Rich snowfall & crystal falling effect
+    for (var i = 0; i < 90; i++) {
+      snowflakes.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        r: Math.random() * 3 + 1,
+        sy: Math.random() * 2 + 0.8,
+        sw: Math.random() * 0.03,
+        opacity: Math.random() * 0.8 + 0.2
+      });
+    }
+
+    function animChristmas() {
+      ctx.clearRect(0, 0, width, height);
+
+      // Flying Santa Sleigh
+      santaX += santaSpeed;
+      santaY = (height * 0.2) + Math.sin(santaX * 0.015) * 30; // Smooth wave flying
+      if (santaX > width + 250) {
+        santaX = -260;
+      }
+
+      ctx.save();
+      ctx.font = "34px sans-serif";
+      ctx.fillText("🦌 🦌 🛷 🎅", santaX, santaY);
+
+      // Magic dust dropped from the sleigh (sparkling trail)
+      if (Math.random() > 0.3) {
+        snowflakes.push({
+          x: santaX + 30 + (Math.random() * 25),
+          y: santaY + 15,
+          r: Math.random() * 3.5 + 1.2,
+          sy: Math.random() * 2 + 1.5,
+          sw: 0.04,
+          opacity: 0.9,
+          color: "#ffd700" // Golden magic trail particles
+        });
+      }
+      ctx.restore();
+
+      // Fall / Draw snowflakes & magic dust
+      snowflakes.forEach(function (snow) {
+        snow.y += snow.sy;
+        snow.x += Math.sin(snow.y * snow.sw) * 0.5;
+        if (snow.y > height) {
+          snow.y = -10;
+          snow.x = Math.random() * width;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = snow.opacity;
+        ctx.fillStyle = snow.color || "#ffffff";
+        ctx.shadowBlur = snow.color ? 12 : 6;
+        ctx.shadowColor = snow.color || "#ffffff";
+        ctx.beginPath();
+        ctx.arc(snow.x, snow.y, snow.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      requestAnimationFrame(animChristmas);
+    }
+    animChristmas();
+  }
+
+  // ========================================================
+  // 3. SANKRANTI (KITES + BHOGI FIRE + FESTIVE CONFETTI)
+  // ========================================================
   else if (type === "sankranti") {
     var kiteColors = ["#ff0055", "#00f0ff", "#ffd166", "#06d6a0", "#a855f7"];
+    var kites = [];
+    var particles = []; // Multi-color festive bhogi confetti & sparks
 
     function FlyingKite() {
       this.x = Math.random() * width;
@@ -622,6 +586,42 @@ function startAdaptiveVisualEffect(type) {
       ctx.restore();
     };
 
+    // Confetti particles blown from bhogi fire
+    function FestivalConfetti(bx, by) {
+      this.x = bx + (Math.random() - 0.5) * 40;
+      this.y = by;
+      var angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
+      var speed = Math.random() * 7 + 4;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.alpha = 1;
+      this.decay = Math.random() * 0.015 + 0.01;
+      this.size = Math.random() * 3.5 + 1.5;
+      this.color = kiteColors[Math.floor(Math.random() * kiteColors.length)];
+    }
+
+    FestivalConfetti.prototype.update = function () {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.06; // Falls back down like confetti
+      this.vx += Math.sin(this.y * 0.05) * 0.08; // sway sideways
+      this.alpha -= this.decay;
+      return this.alpha > 0;
+    };
+
+    FestivalConfetti.prototype.draw = function () {
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = this.color;
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    // Continuous kites launch
     setInterval(function () {
       if (kites.length < 8) kites.push(new FlyingKite());
     }, 2200);
@@ -629,18 +629,37 @@ function startAdaptiveVisualEffect(type) {
 
     function animKites() {
       ctx.clearRect(0, 0, width, height);
+
+      // Emit bhogi festive confetti at the bottom middle of screen
+      if (Math.random() > 0.4) {
+        particles.push(new FestivalConfetti(width * 0.5, height - 10));
+        particles.push(new FestivalConfetti(width * 0.2, height - 10));
+        particles.push(new FestivalConfetti(width * 0.8, height - 10));
+      }
+
+      // Kites Draw
       for (var k = kites.length - 1; k >= 0; k--) {
         if (!kites[k].update()) kites.splice(k, 1);
         else kites[k].draw();
       }
+
+      // Confetti & Sparks Draw
+      for (var p = particles.length - 1; p >= 0; p--) {
+        if (!particles[p].update()) particles.splice(p, 1);
+        else particles[p].draw();
+      }
+
       requestAnimationFrame(animKites);
     }
     animKites();
   }
 
-  // ================= 3. HOLI (Gulal Color Splash) =================
+  // ========================================================
+  // 4. HOLI (GULAL COLOR POWDER EXPLOSIONS)
+  // ========================================================
   else if (type === "holi") {
     var holiColors = ["#ff007f", "#00f0ff", "#76ff03", "#ffea00", "#d500f9", "#ff6d00"];
+    var holiParticles = [];
 
     function GulalDrop(x, y, color) {
       this.x = x;
@@ -682,7 +701,7 @@ function startAdaptiveVisualEffect(type) {
       var by = Math.random() * (height * 0.6) + height * 0.15;
       var col = holiColors[Math.floor(Math.random() * holiColors.length)];
       for (var i = 0; i < 40; i++) {
-        particles.push(new GulalDrop(bx, by, col));
+        holiParticles.push(new GulalDrop(bx, by, col));
       }
     }
 
@@ -691,13 +710,118 @@ function startAdaptiveVisualEffect(type) {
 
     function animHoli() {
       ctx.clearRect(0, 0, width, height);
-      for (var p = particles.length - 1; p >= 0; p--) {
-        if (!particles[p].update()) particles.splice(p, 1);
-        else particles[p].draw();
+      for (var p = holiParticles.length - 1; p >= 0; p--) {
+        if (!holiParticles[p].update()) holiParticles.splice(p, 1);
+        else holiParticles[p].draw();
       }
       requestAnimationFrame(animHoli);
     }
     animHoli();
+  }
+
+  // ========================================================
+  // 5. NEW YEAR / TRICOLOR / GENERAL (GRAND SKY FIREWORKS)
+  // ========================================================
+  else {
+    var skyPalette = (type === "tricolor") 
+      ? ["#ff9933", "#ffffff", "#128807", "#000080"]
+      : ["#00f0ff", "#7209b7", "#4cc9f0", "#f72585", "#ffffff", "#3a0ca3"];
+    var rockets = [];
+    var rParticles = [];
+
+    function SkyRocket() {
+      this.x = width * (0.15 + Math.random() * 0.7);
+      this.y = height;
+      this.targetY = height * (0.12 + Math.random() * 0.35);
+      this.color = skyPalette[Math.floor(Math.random() * skyPalette.length)];
+      var angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.3;
+      var speed = Math.random() * 3 + 12;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.trail = [];
+    }
+
+    SkyRocket.prototype.update = function () {
+      this.trail.push({ x: this.x, y: this.y });
+      if (this.trail.length > 5) this.trail.shift();
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.08;
+
+      if (this.vy >= -1 || this.y <= this.targetY) {
+        var count = Math.floor(Math.random() * 25) + 45;
+        for (var i = 0; i < count; i++) {
+          rParticles.push(new SkyParticle(this.x, this.y, this.color, skyPalette));
+        }
+        return false;
+      }
+      return true;
+    };
+
+    SkyRocket.prototype.draw = function () {
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (var i = 0; i < this.trail.length; i++) {
+        var p = this.trail[i];
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    };
+
+    function SkyParticle(x, y, color, pal) {
+      this.x = x;
+      this.y = y;
+      this.color = Math.random() > 0.4 ? color : pal[Math.floor(Math.random() * pal.length)];
+      var angle = Math.random() * Math.PI * 2;
+      var speed = Math.random() * 5 + 1.2;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.alpha = 1;
+      this.decay = Math.random() * 0.015 + 0.012;
+      this.size = Math.random() * 2.5 + 1.2;
+    }
+
+    SkyParticle.prototype.update = function () {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.06;
+      this.vx *= 0.98;
+      this.alpha -= this.decay;
+      return this.alpha > 0;
+    };
+
+    SkyParticle.prototype.draw = function () {
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = this.color;
+      ctx.shadowBlur = 9;
+      ctx.shadowColor = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    setInterval(function () {
+      rockets.push(new SkyRocket());
+    }, 1100);
+    rockets.push(new SkyRocket());
+
+    function animSky() {
+      ctx.clearRect(0, 0, width, height);
+      for (var r = rockets.length - 1; r >= 0; r--) {
+        if (!rockets[r].update()) rockets.splice(r, 1);
+        else rockets[r].draw();
+      }
+      for (var p = rParticles.length - 1; p >= 0; p--) {
+        if (!rParticles[p].update()) rParticles.splice(p, 1);
+        else rParticles[p].draw();
+      }
+      requestAnimationFrame(animSky);
+    }
+    animSky();
   }
 }
 
