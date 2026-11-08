@@ -28,7 +28,6 @@ function escapeHTML(value) {
   });
 }
 
-// Clean direct link resolver
 function safeURL(value) {
   if (!value) return "";
   var val = String(value).trim();
@@ -46,27 +45,20 @@ function getMoviePinLabel(movie) {
 
 function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
-
   var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   var isWifi = false;
-
-  if (conn) {
-    if (conn.type === "wifi" && !conn.saveData) {
-      isWifi = true;
-    }
+  if (conn && conn.type === "wifi" && !conn.saveData) {
+    isWifi = true;
   }
-
   if (originalUrl.includes("image.tmdb.org/t/p/")) {
     return isWifi
       ? originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w500")
       : originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w185");
   }
-
   if (originalUrl.includes("telegram.org")) {
     var width = isWifi ? 400 : 200;
     return "https://wsrv.nl/?url=" + encodeURIComponent(originalUrl) + "&w=" + width + "&q=65&output=webp";
   }
-
   return originalUrl;
 }
 
@@ -76,7 +68,6 @@ function createExtraSections() {
     style.id = "jjExtraStyles";
     style.textContent = `
       .jj-feature-section { max-width:1200px; margin:14px auto 8px; padding:0 12px; }
-      
       .jj-alert-ticker-container {
         background: #0d1526;
         border: 1px solid rgba(255, 36, 80, 0.15);
@@ -90,7 +81,6 @@ function createExtraSections() {
         min-height: 34px;
         margin-top: 4px;
       }
-      
       .jj-alert-ticker-content {
         display: flex;
         align-items: center;
@@ -101,7 +91,6 @@ function createExtraSections() {
         min-width: 0;
         flex: 1;
       }
-      
       .jj-ticker-badge {
         background: #ff2450;
         color: #ffffff;
@@ -113,7 +102,6 @@ function createExtraSections() {
         text-transform: uppercase;
         flex-shrink: 0;
       }
-      
       .jj-ticker-text-wrapper {
         overflow: hidden;
         position: relative;
@@ -122,7 +110,6 @@ function createExtraSections() {
         align-items: center;
         height: 16px;
       }
-      
       .jj-ticker-slide {
         display: none;
         white-space: nowrap;
@@ -131,16 +118,11 @@ function createExtraSections() {
         width: 100%;
         animation: tickerFade 0.4s ease-in-out;
       }
-      
-      .jj-ticker-slide.active {
-        display: inline-block;
-      }
-      
+      .jj-ticker-slide.active { display: inline-block; }
       @keyframes tickerFade {
         from { opacity: 0; transform: translateY(4px); }
         to { opacity: 1; transform: translateY(0); }
       }
-      
       .jj-ticker-btn {
         background: rgba(255, 255, 255, 0.08);
         border: 1px solid rgba(255, 255, 255, 0.12);
@@ -157,16 +139,9 @@ function createExtraSections() {
         flex-shrink: 0;
         transition: 0.2s;
       }
-      
-      .jj-ticker-btn:hover {
-        background: #ff2450;
-        border-color: #ff2450;
-        color: #ffffff;
-      }
-      
+      .jj-ticker-btn:hover { background: #ff2450; border-color: #ff2450; color: #ffffff; }
       .jj-pin-badge { color:#ff7293; font-size:12px; font-weight:bold; overflow-wrap:anywhere; }
       #modalVersionContainer { min-height: 80px; }
-
       .btn-modal-trailer {
         display: inline-flex;
         align-items: center;
@@ -183,17 +158,12 @@ function createExtraSections() {
         transition: 0.2s;
         width: fit-content;
       }
-
-      .btn-modal-trailer:hover {
-        background: #ff2450;
-        color: #ffffff;
-      }
+      .btn-modal-trailer:hover { background: #ff2450; color: #ffffff; }
     `;
     document.head.appendChild(style);
   }
 
   var collection = document.getElementById("collection");
-
   if (collection && !document.getElementById("jjPinnedSection")) {
     var pinned = document.createElement("section");
     pinned.id = "jjPinnedSection";
@@ -227,7 +197,7 @@ function getHeaders() {
 }
 
 // ========================================================
-// NEON FESTIVAL MODE ENGINE
+// ADVANCED MULTI-FESTIVAL INTELLIGENT ENGINE
 // ========================================================
 async function initNeonFestivalMode() {
   try {
@@ -237,21 +207,67 @@ async function initNeonFestivalMode() {
     var data = await res.json();
     if (!data || !data[0] || !data[0].value || data[0].value.enabled !== true) return;
 
-    var festivalName = data[0].value.name || "HAPPY FESTIVAL";
-    renderNeonBanner(festivalName);
-    startNeonCrackers();
+    var festivalName = (data[0].value.name || "HAPPY FESTIVAL").trim();
+    var lower = festivalName.toLowerCase();
+
+    // Auto-detect festival type
+    var type = "general";
+    if (lower.includes("diwali") || lower.includes("deepavali")) {
+      type = "diwali";
+    } else if (lower.includes("sankranti") || lower.includes("pongal") || lower.includes("kite")) {
+      type = "sankranti";
+    } else if (lower.includes("holi") || lower.includes("color")) {
+      type = "holi";
+    } else if (lower.includes("new year") || lower.includes("202")) {
+      type = "newyear";
+    }
+
+    renderAdaptiveNeonBanner(festivalName, type);
+    startAdaptiveVisualEffect(type);
   } catch (err) {
     console.warn("Festival mode check skipped:", err);
   }
 }
 
-function renderNeonBanner(text) {
+function renderAdaptiveNeonBanner(text, type) {
   var style = document.createElement("style");
+  var borderCol = "#00f0ff";
+  var shadowCol1 = "#ff007f";
+  var shadowCol2 = "#00f0ff";
+  var leftIcon = "✨";
+  var rightIcon = "✨";
+
+  if (type === "diwali") {
+    borderCol = "#ffb703";
+    shadowCol1 = "#fb8500";
+    shadowCol2 = "#ffd166";
+    leftIcon = "🪔";
+    rightIcon = "🪔";
+  } else if (type === "sankranti") {
+    borderCol = "#06d6a0";
+    shadowCol1 = "#ffd166";
+    shadowCol2 = "#118ab2";
+    leftIcon = "🪁";
+    rightIcon = "🪁";
+  } else if (type === "holi") {
+    borderCol = "#ff007f";
+    shadowCol1 = "#00f0ff";
+    shadowCol2 = "#70e000";
+    leftIcon = "🎨";
+    rightIcon = "🎨";
+  } else if (type === "newyear") {
+    borderCol = "#00f0ff";
+    shadowCol1 = "#7209b7";
+    shadowCol2 = "#4cc9f0";
+    leftIcon = "🎆";
+    rightIcon = "🎆";
+  }
+
   style.textContent = `
     .neon-fest-container {
-      background: radial-gradient(circle at center, #111a2f 0%, #070b14 100%);
-      border-bottom: 2px solid #00f0ff;
-      box-shadow: 0 0 20px rgba(0, 240, 255, 0.45), inset 0 0 15px rgba(255, 0, 128, 0.3);
+      background: radial-gradient(circle at center, #101726 0%, #060911 100%);
+      border-bottom: 2px solid ${borderCol};
+      box-shadow: 0 0 20px ${borderCol}80, inset 0 0 14px ${shadowCol1}40;
       padding: 12px 14px;
       text-align: center;
       position: sticky;
@@ -262,63 +278,278 @@ function renderNeonBanner(text) {
       font-size: clamp(16px, 3.2vw, 22px);
       font-weight: 900;
       letter-spacing: 2px;
-      color: #fff;
+      color: #ffffff;
       text-transform: uppercase;
-      text-shadow:
-        0 0 5px #fff,
-        0 0 10px #ff007f,
-        0 0 20px #ff007f,
-        0 0 40px #ff007f;
-      animation: neonPulse 2s infinite alternate;
+      text-shadow: 0 0 5px #fff, 0 0 10px ${shadowCol1}, 0 0 22px ${shadowCol1}, 0 0 40px ${shadowCol2};
+      animation: neonPulseFest 2s infinite alternate;
       margin: 0;
     }
-    @keyframes neonPulse {
-      0% {
-        text-shadow: 0 0 5px #fff, 0 0 10px #ff007f, 0 0 20px #ff007f, 0 0 35px #ff007f;
-      }
-      100% {
-        text-shadow: 0 0 8px #fff, 0 0 15px #00f0ff, 0 0 30px #00f0ff, 0 0 50px #00f0ff;
-      }
+    @keyframes neonPulseFest {
+      0% { text-shadow: 0 0 5px #fff, 0 0 10px ${shadowCol1}, 0 0 22px ${shadowCol1}, 0 0 35px ${shadowCol2}; }
+      100% { text-shadow: 0 0 8px #fff, 0 0 15px ${shadowCol2}, 0 0 30px ${shadowCol2}, 0 0 50px ${shadowCol1}; }
     }
-    .neon-spark {
+    #festVisualCanvas {
       position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
       pointer-events: none;
       z-index: 9999;
-      animation: sparkFall linear forwards;
-    }
-    @keyframes sparkFall {
-      0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
-      100% { transform: translateY(105vh) rotate(360deg); opacity: 0; }
     }
   `;
   document.head.appendChild(style);
 
   var banner = document.createElement("div");
   banner.className = "neon-fest-container";
-  banner.innerHTML = `<div class="neon-fest-title">✨ ${escapeHTML(text)} ✨</div>`;
+  banner.innerHTML = `<div class="neon-fest-title">${leftIcon} ${escapeHTML(text)} ${rightIcon}</div>`;
   document.body.prepend(banner);
 }
 
-function startNeonCrackers() {
-  var neonColors = ["#00f0ff", "#ff007f", "#ffe600", "#39ff14", "#bc13fe", "#ffffff"];
-  setInterval(function () {
-    var spark = document.createElement("div");
-    spark.className = "neon-spark";
-    var size = Math.random() * 6 + 4;
-    spark.style.width = size + "px";
-    spark.style.height = size + "px";
-    var col = neonColors[Math.floor(Math.random() * neonColors.length)];
-    spark.style.background = col;
-    spark.style.boxShadow = "0 0 8px " + col;
-    spark.style.borderRadius = "50%";
-    spark.style.left = Math.random() * 100 + "vw";
-    spark.style.top = "0px";
-    spark.style.animationDuration = (Math.random() * 2.5 + 2) + "s";
-    spark.style.opacity = Math.random() * 0.7 + 0.3;
-    document.body.appendChild(spark);
+function startAdaptiveVisualEffect(type) {
+  var canvas = document.createElement("canvas");
+  canvas.id = "festVisualCanvas";
+  document.body.appendChild(canvas);
 
-    setTimeout(function () { spark.remove(); }, 4000);
-  }, 220);
+  var ctx = canvas.getContext("2d");
+  var width = (canvas.width = window.innerWidth);
+  var height = (canvas.height = window.innerHeight);
+
+  window.addEventListener("resize", function () {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  var rockets = [];
+  var particles = [];
+  var kites = [];
+
+  // ================= 1. DIWALI & NEW YEAR FIREWORKS =================
+  if (type === "diwali" || type === "newyear" || type === "general") {
+    var palette = type === "diwali" 
+      ? ["#ffd700", "#ff3d00", "#ff007f", "#ffffff", "#ffea00", "#ff8800"]
+      : ["#00f0ff", "#7209b7", "#4cc9f0", "#f72585", "#ffffff", "#3a0ca3"];
+
+    function FireworkRocket() {
+      this.x = width * (0.15 + Math.random() * 0.7);
+      this.y = height;
+      this.targetY = height * (0.12 + Math.random() * 0.35);
+      this.color = palette[Math.floor(Math.random() * palette.length)];
+      var angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.3;
+      var speed = Math.random() * 3 + 12;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.trail = [];
+    }
+
+    FireworkRocket.prototype.update = function () {
+      this.trail.push({ x: this.x, y: this.y });
+      if (this.trail.length > 5) this.trail.shift();
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.08;
+
+      if (this.vy >= -1 || this.y <= this.targetY) {
+        var count = Math.floor(Math.random() * 25) + 45;
+        for (var i = 0; i < count; i++) {
+          particles.push(new FireworkParticle(this.x, this.y, this.color, palette));
+        }
+        return false;
+      }
+      return true;
+    };
+
+    FireworkRocket.prototype.draw = function () {
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (var i = 0; i < this.trail.length; i++) {
+        var p = this.trail[i];
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    };
+
+    function FireworkParticle(x, y, color, pal) {
+      this.x = x;
+      this.y = y;
+      this.color = Math.random() > 0.4 ? color : pal[Math.floor(Math.random() * pal.length)];
+      var angle = Math.random() * Math.PI * 2;
+      var speed = Math.random() * 5 + 1.2;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.alpha = 1;
+      this.decay = Math.random() * 0.015 + 0.012;
+      this.size = Math.random() * 2.5 + 1.2;
+    }
+
+    FireworkParticle.prototype.update = function () {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.06;
+      this.vx *= 0.98;
+      this.alpha -= this.decay;
+      return this.alpha > 0;
+    };
+
+    FireworkParticle.prototype.draw = function () {
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = this.color;
+      ctx.shadowBlur = 9;
+      ctx.shadowColor = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    setInterval(function () {
+      rockets.push(new FireworkRocket());
+    }, 1100);
+    rockets.push(new FireworkRocket());
+
+    function animFireworks() {
+      ctx.clearRect(0, 0, width, height);
+      for (var r = rockets.length - 1; r >= 0; r--) {
+        if (!rockets[r].update()) rockets.splice(r, 1);
+        else rockets[r].draw();
+      }
+      for (var p = particles.length - 1; p >= 0; p--) {
+        if (!particles[p].update()) particles.splice(p, 1);
+        else particles[p].draw();
+      }
+      requestAnimationFrame(animFireworks);
+    }
+    animFireworks();
+  }
+
+  // ================= 2. SANKRANTI KITES & STRINGS =================
+  else if (type === "sankranti") {
+    var kiteColors = ["#ff0055", "#00f0ff", "#ffd166", "#06d6a0", "#a855f7"];
+
+    function FlyingKite() {
+      this.x = Math.random() * width;
+      this.y = height + 40;
+      this.size = Math.random() * 14 + 20;
+      this.speedY = Math.random() * 1.5 + 1.2;
+      this.sway = Math.random() * 0.04 + 0.02;
+      this.swayCount = Math.random() * 10;
+      this.color = kiteColors[Math.floor(Math.random() * kiteColors.length)];
+    }
+
+    FlyingKite.prototype.update = function () {
+      this.y -= this.speedY;
+      this.swayCount += this.sway;
+      this.x += Math.sin(this.swayCount) * 1.5;
+      return this.y > -80;
+    };
+
+    FlyingKite.prototype.draw = function () {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(Math.sin(this.swayCount) * 0.2);
+
+      // Kite Body
+      ctx.fillStyle = this.color;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = this.color;
+      ctx.beginPath();
+      ctx.moveTo(0, -this.size);
+      ctx.lineTo(this.size * 0.7, 0);
+      ctx.lineTo(0, this.size);
+      ctx.lineTo(-this.size * 0.7, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Kite Thread / Manja Tail
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, this.size);
+      ctx.quadraticCurveTo(Math.sin(this.swayCount) * 15, this.size + 20, 0, this.size + 40);
+      ctx.stroke();
+
+      ctx.restore();
+    };
+
+    setInterval(function () {
+      if (kites.length < 8) kites.push(new FlyingKite());
+    }, 2200);
+    kites.push(new FlyingKite());
+
+    function animKites() {
+      ctx.clearRect(0, 0, width, height);
+      for (var k = kites.length - 1; k >= 0; k--) {
+        if (!kites[k].update()) kites.splice(k, 1);
+        else kites[k].draw();
+      }
+      requestAnimationFrame(animKites);
+    }
+    animKites();
+  }
+
+  // ================= 3. HOLI COLOR GULAL BLASTS =================
+  else if (type === "holi") {
+    var holiColors = ["#ff007f", "#00f0ff", "#76ff03", "#ffea00", "#d500f9", "#ff6d00"];
+
+    function GulalDrop(x, y, color) {
+      this.x = x;
+      this.y = y;
+      this.color = color;
+      var angle = Math.random() * Math.PI * 2;
+      var speed = Math.random() * 7 + 2;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+      this.alpha = 0.95;
+      this.decay = Math.random() * 0.015 + 0.01;
+      this.size = Math.random() * 6 + 3;
+    }
+
+    GulalDrop.prototype.update = function () {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += 0.05;
+      this.vx *= 0.96;
+      this.size *= 0.98;
+      this.alpha -= this.decay;
+      return this.alpha > 0;
+    };
+
+    GulalDrop.prototype.draw = function () {
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.fillStyle = this.color;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    function triggerGulalBlast() {
+      var bx = Math.random() * (width * 0.8) + width * 0.1;
+      var by = Math.random() * (height * 0.6) + height * 0.15;
+      var col = holiColors[Math.floor(Math.random() * holiColors.length)];
+      for (var i = 0; i < 40; i++) {
+        particles.push(new GulalDrop(bx, by, col));
+      }
+    }
+
+    setInterval(triggerGulalBlast, 1300);
+    triggerGulalBlast();
+
+    function animHoli() {
+      ctx.clearRect(0, 0, width, height);
+      for (var p = particles.length - 1; p >= 0; p--) {
+        if (!particles[p].update()) particles.splice(p, 1);
+        else particles[p].draw();
+      }
+      requestAnimationFrame(animHoli);
+    }
+    animHoli();
+  }
 }
 
 function loadMovies() {
@@ -335,7 +566,6 @@ function loadMovies() {
     .then(function (data) {
       movies = data.map(function (item) {
         var rawTrailer = item.trailer_url || item.trailer || item.trailer_link || item.video_url || item.youtube_link || item.trailerUrl || "";
-
         return {
           id: item.id,
           title: item.title || "Untitled",
@@ -439,11 +669,9 @@ function setupYears() {
 function matchesFilters(movie) {
   var selectedCategory = genreFilter ? genreFilter.value.toLowerCase().trim() : "all";
   var year = yearFilter ? yearFilter.value : "all";
-
   var movieCategory = (movie.category || "").toLowerCase().trim();
   var matchesCategory = selectedCategory === "all" || movieCategory === selectedCategory;
   var matchesYear = year === "all" || String(movie.year) === year;
-
   return matchesCategory && matchesYear;
 }
 
@@ -456,11 +684,8 @@ function createMovieCard(movie) {
 
   var tagBadgeLeftText = movie.category || "FILMS";
   var yearTagRightText = movie.year || "2026";
-
   var isPremium = getMoviePinLabel(movie);
-  if (isPremium) {
-    tagBadgeLeftText = isPremium;
-  }
+  if (isPremium) tagBadgeLeftText = isPremium;
 
   var badgeLeft = document.createElement("div");
   badgeLeft.className = "card-badge-top-left";
@@ -530,7 +755,6 @@ function renderMovies() {
   if (!movieGrid) return;
 
   var filtered = movies.filter(matchesFilters);
-
   filtered.sort(function (a, b) {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
@@ -538,7 +762,6 @@ function renderMovies() {
   });
 
   movieGrid.innerHTML = "";
-
   filtered.forEach(function (movie) {
     movieGrid.appendChild(createMovieCard(movie));
   });
@@ -551,7 +774,6 @@ function renderMovies() {
   }
 }
 
-// Spotlight Bottom Instant Live Search Logic
 function handleLiveSearch() {
   var search = searchInput ? searchInput.value.trim().toLowerCase() : "";
   var resultsSection = document.getElementById("searchResultsSection");
@@ -620,7 +842,6 @@ async function showMovieDetails(movieId) {
 
   modalDetails.innerHTML = `
     ${pinBadgeHTML}
-
     <div class="movie-header-flex">
       <img class="modal-mini-poster" src="${getAdaptivePosterUrl(movie.poster)}" alt="${escapeHTML(movie.title)}" onerror="this.style.display='none'">
       <div class="movie-header-info">
@@ -636,16 +857,13 @@ async function showMovieDetails(movieId) {
         <p class="movie-desc-text" style="margin-top:6px;">${escapeHTML(movie.description || "No description available.")}</p>
       </div>
     </div>
-
     <div class="prints-header-bar">
       <span>Available Quality Prints</span>
       <span class="status-dot-active">● Ready to Download</span>
     </div>
-
     <div id="modalVersionContainer">
       <p style="color:#64748b; font-size:12px; text-align:center; padding:16px 0;">Loading prints from bot...</p>
     </div>
-
     <div class="modal-footer-sharing">
       <span>Share with friends:</span>
       <a id="btnShareModalWhatsApp" href="#" class="btn-whatsapp-share" target="_blank" rel="noopener noreferrer">
