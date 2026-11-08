@@ -197,67 +197,30 @@ function getHeaders() {
 }
 
 // ========================================================
-// 🌟 CLEAN TOP-BANNER FESTIVAL ENGINE 🌟
+// 🌟 EXACT 12 AM TIME-TRIGGERED FESTIVAL ENGINE 🌟
 // ========================================================
 
 function getSmartCalendarFestival() {
   var now = new Date();
-  var m = now.getMonth() + 1;
-  var d = now.getDate();
+  var m = now.getMonth() + 1; // 1-12
+  var d = now.getDate();      // 1-31
+  var h = now.getHours();     // 0-23 (Exact Time Check)
   var y = now.getFullYear();
 
-  if ((m === 12 && d >= 31) || (m === 1 && d <= 2)) return { name: "HAPPY NEW YEAR " + ((m === 12) ? y + 1 : y), type: "newyear" };
-  if (m === 1 && d >= 13 && d <= 17) return { name: "HAPPY SANKRANTI", type: "sankranti" };
-  if (m === 1 && d >= 25 && d <= 27) return { name: "HAPPY REPUBLIC DAY", type: "tricolor" };
-  if ((m === 2 && d >= 24) || (m === 3 && d <= 3)) return { name: "HAPPY MAHA SHIVARATRI", type: "diwali" };
-  if (m === 3 && d >= 20 && d <= 26) return { name: "HAPPY HOLI", type: "holi" };
-  if ((m === 3 && d >= 28) || (m === 4 && d <= 2)) return { name: "HAPPY UGADI", type: "sankranti" };
-  if ((m === 3 && d >= 29) || (m === 4 && d <= 5)) return { name: "EID MUBARAK", type: "eid" };
-  if (m === 4 && d >= 5 && d <= 9) return { name: "HAPPY SRI RAMA NAVAMI", type: "diwali" };
-  if (m === 6 && d >= 14 && d <= 18) return { name: "EID-AL-ADHA MUBARAK", type: "eid" };
-  if (m === 8 && d >= 14 && d <= 16) return { name: "HAPPY INDEPENDENCE DAY", type: "tricolor" };
-  if (m === 8 && d >= 26 && d <= 29) return { name: "HAPPY RAKSHA BANDHAN", type: "sankranti" };
-  if ((m === 8 && d >= 30) || (m === 9 && d <= 4)) return { name: "HAPPY KRISHNA JANMASHTAMI", type: "diwali" };
-  if (m === 9 && d >= 10 && d <= 16) return { name: "HAPPY VINAYAKA CHAVITHI", type: "diwali" };
-  if (m === 10 && d >= 15 && d <= 22) return { name: "HAPPY DUSSEHRA", type: "diwali" };
-  if (m === 11 && d >= 5 && d <= 12) return { name: "HAPPY DIWALI", type: "diwali" };
-  if (m === 12 && d >= 22 && d <= 27) return { name: "MERRY CHRISTMAS", type: "christmas" };
+  function isFestivalActive(festMonth, festDay) {
+    if (m === festMonth && d === festDay && h >= 0) return true; 
+    if (m === festMonth && d === (festDay + 1) && h <= 23) return true; 
+    return false;
+  }
 
-  return null;
-}
+  if ((m === 12 && d >= 31 && h >= 0) || (m === 1 && d <= 1)) return { name: "HAPPY NEW YEAR " + ((m === 12) ? y + 1 : y), type: "newyear" };
+  if (m === 1 && d >= 14 && d <= 15) return { name: "HAPPY SANKRANTI", type: "sankranti" };
+  if (m === 1 && d === 26) return { name: "HAPPY REPUBLIC DAY", type: "tricolor" };
+  if (m === 3 && d === 25) return { name: "HAPPY HOLI", type: "holi" };
+  if (m === 8 && d === 15) return { name: "HAPPY INDEPENDENCE DAY", type: "tricolor" };
+  if (m === 11 && d >= 1 && d <= 2) return { name: "HAPPY DIWALI", type: "diwali" };
+  if (m === 12 && d === 25) return { name: "MERRY CHRISTMAS", type: "christmas" };
 
-async function fetchOnlineIndianFestival() {
-  try {
-    var now = new Date();
-    var y = now.getFullYear();
-    var controller = new AbortController();
-    var timeoutId = setTimeout(function () { controller.abort(); }, 2500);
-
-    var res = await fetch("https://date.nager.at/api/v3/PublicHolidays/" + y + "/IN", { signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (!res.ok) return null;
-    var holidays = await res.json();
-    
-    var match = holidays.find(function (h) {
-      var hDate = new Date(h.date);
-      return Math.abs((now - hDate) / (1000 * 60 * 60 * 24)) <= 1.2;
-    });
-
-    if (match) {
-      var name = match.localName || match.name;
-      var lower = name.toLowerCase();
-      var type = "general";
-      if (lower.includes("diwali") || lower.includes("deepavali")) type = "diwali";
-      else if (lower.includes("sankranti") || lower.includes("pongal")) type = "sankranti";
-      else if (lower.includes("holi")) type = "holi";
-      else if (lower.includes("eid") || lower.includes("id-ul")) type = "eid";
-      else if (lower.includes("christmas")) type = "christmas";
-      else if (lower.includes("republic") || lower.includes("independence")) type = "tricolor";
-      else if (lower.includes("year")) type = "newyear";
-
-      return { name: "HAPPY " + name.toUpperCase(), type: type };
-    }
-  } catch (e) {}
   return null;
 }
 
@@ -271,7 +234,7 @@ async function initNeonFestivalMode() {
     var data = await res.json();
     if (data && data[0] && data[0].value) {
       if (data[0].value.enabled === false) {
-        return; // OFF means complete shutdown
+        return; // Admin OFF means complete shutdown
       }
 
       if (data[0].value.enabled === true) {
@@ -279,24 +242,24 @@ async function initNeonFestivalMode() {
         if (custName && custName !== "HAPPY FESTIVAL") {
           var lower = custName.toLowerCase();
           var manualType = "general";
-          if (lower.includes("diwali") || lower.includes("deepavali") || lower.includes("cracker")) manualType = "diwali";
-          else if (lower.includes("sankranti") || lower.includes("pongal") || lower.includes("kite")) manualType = "sankranti";
-          else if (lower.includes("holi") || lower.includes("color")) manualType = "holi";
-          else if (lower.includes("christmas") || lower.includes("xmas") || lower.includes("santa")) manualType = "christmas";
-          else if (lower.includes("eid") || lower.includes("ramzan")) manualType = "eid";
+          if (lower.includes("diwali") || lower.includes("deepavali")) manualType = "diwali";
+          else if (lower.includes("sankranti") || lower.includes("pongal")) manualType = "sankranti";
+          else if (lower.includes("holi")) manualType = "holi";
+          else if (lower.includes("christmas") || lower.includes("santa")) manualType = "christmas";
           else if (lower.includes("republic") || lower.includes("independence")) manualType = "tricolor";
-          else if (lower.includes("new year") || lower.includes("202")) manualType = "newyear";
+          else if (lower.includes("new year")) manualType = "newyear";
 
           activeFestival = { name: custName, type: manualType };
         }
       }
     }
   } catch (err) {
-    console.warn("Manual check bypassed:", err);
+    console.warn("Manual check skipped:", err);
   }
 
-  if (!activeFestival) activeFestival = await fetchOnlineIndianFestival();
-  if (!activeFestival) activeFestival = getSmartCalendarFestival();
+  if (!activeFestival) {
+    activeFestival = getSmartCalendarFestival();
+  }
 
   if (activeFestival) {
     renderSubtleNeonBanner(activeFestival.name, activeFestival.type);
@@ -323,9 +286,6 @@ function renderSubtleNeonBanner(text, type) {
   } else if (type === "holi") {
     borderCol = "#ff007f"; shadowCol = "#00e5ff";
     leftIcon = "🎨"; rightIcon = "🎨";
-  } else if (type === "eid") {
-    borderCol = "#2ec4b6"; shadowCol = "#ffd166";
-    leftIcon = "🌙"; rightIcon = "⭐";
   } else if (type === "tricolor") {
     borderCol = "#ff9933"; shadowCol = "#138808";
     leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
