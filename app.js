@@ -197,7 +197,7 @@ function getHeaders() {
 }
 
 // ========================================================
-// 🌟 CUSTOM FESTIVAL ARTWORK & ANIMATION ENGINE 🌟
+// 🌟 CLEAN TOP-BANNER FESTIVAL ENGINE 🌟
 // ========================================================
 
 function getSmartCalendarFestival() {
@@ -270,9 +270,8 @@ async function initNeonFestivalMode() {
     });
     var data = await res.json();
     if (data && data[0] && data[0].value) {
-      // ADMIN SWITCH OFF => STOP IMMEDIATELY
       if (data[0].value.enabled === false) {
-        return;
+        return; // OFF means complete shutdown
       }
 
       if (data[0].value.enabled === true) {
@@ -296,533 +295,184 @@ async function initNeonFestivalMode() {
     console.warn("Manual check bypassed:", err);
   }
 
-  // If enabled without custom name, check online then offline calendar
-  if (!activeFestival) {
-    activeFestival = await fetchOnlineIndianFestival();
-  }
-  if (!activeFestival) {
-    activeFestival = getSmartCalendarFestival();
-  }
+  if (!activeFestival) activeFestival = await fetchOnlineIndianFestival();
+  if (!activeFestival) activeFestival = getSmartCalendarFestival();
 
   if (activeFestival) {
-    renderAdaptiveNeonBanner(activeFestival.name, activeFestival.type);
-    startAdaptiveVisualEffect(activeFestival.type);
+    renderSubtleNeonBanner(activeFestival.name, activeFestival.type);
+    startSubtleHeaderSparks(activeFestival.type);
   }
 }
 
-function renderAdaptiveNeonBanner(text, type) {
+function renderSubtleNeonBanner(text, type) {
   var style = document.createElement("style");
   var borderCol = "#00f0ff";
-  var shadowCol1 = "#ff007f";
-  var shadowCol2 = "#00f0ff";
+  var shadowCol = "#ff007f";
   var leftIcon = "✨";
   var rightIcon = "✨";
 
   if (type === "diwali") {
-    borderCol = "#ffb703"; shadowCol1 = "#fb8500"; shadowCol2 = "#ffd166";
+    borderCol = "#ffb703"; shadowCol = "#fb8500";
     leftIcon = "🪔"; rightIcon = "🪔";
   } else if (type === "sankranti") {
-    borderCol = "#06d6a0"; shadowCol1 = "#ffd166"; shadowCol2 = "#118ab2";
+    borderCol = "#06d6a0"; shadowCol = "#ffd166";
     leftIcon = "🪁"; rightIcon = "🪁";
   } else if (type === "christmas") {
-    borderCol = "#ff3838"; shadowCol1 = "#2ed573"; shadowCol2 = "#ffffff";
+    borderCol = "#ff3838"; shadowCol = "#2ed573";
     leftIcon = "🎅"; rightIcon = "🦌";
   } else if (type === "holi") {
-    borderCol = "#ff007f"; shadowCol1 = "#00f0ff"; shadowCol2 = "#70e000";
+    borderCol = "#ff007f"; shadowCol = "#00e5ff";
     leftIcon = "🎨"; rightIcon = "🎨";
   } else if (type === "eid") {
-    borderCol = "#2ec4b6"; shadowCol1 = "#20bf6b"; shadowCol2 = "#ffd166";
+    borderCol = "#2ec4b6"; shadowCol = "#ffd166";
     leftIcon = "🌙"; rightIcon = "⭐";
   } else if (type === "tricolor") {
-    borderCol = "#ff9933"; shadowCol1 = "#138808"; shadowCol2 = "#ffffff";
+    borderCol = "#ff9933"; shadowCol = "#138808";
     leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
   } else if (type === "newyear") {
-    borderCol = "#00f0ff"; shadowCol1 = "#7209b7"; shadowCol2 = "#4cc9f0";
+    borderCol = "#00f0ff"; shadowCol = "#7209b7";
     leftIcon = "🎆"; rightIcon = "🎆";
   }
 
   style.textContent = `
-    .neon-fest-container {
-      background: radial-gradient(circle at center, #101726 0%, #060911 100%);
-      border-bottom: 2px solid ${borderCol};
-      box-shadow: 0 0 20px ${borderCol}80, inset 0 0 14px ${shadowCol1}40;
-      padding: 12px 14px;
+    .subtle-fest-header {
+      background: linear-gradient(90deg, rgba(8, 13, 24, 0.95), rgba(16, 24, 40, 0.98), rgba(8, 13, 24, 0.95));
+      border-bottom: 1.5px solid ${borderCol};
+      box-shadow: 0 2px 14px ${borderCol}35;
+      padding: 8px 12px;
       text-align: center;
       position: sticky;
       top: 0;
-      z-index: 1001;
+      z-index: 1002;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
     }
-    .neon-fest-title {
-      font-size: clamp(15px, 3.2vw, 22px);
-      font-weight: 900;
-      letter-spacing: 2px;
+    .subtle-fest-text {
+      font-size: clamp(13px, 2.8vw, 16px);
+      font-weight: 800;
+      letter-spacing: 1.8px;
       color: #ffffff;
       text-transform: uppercase;
-      text-shadow: 0 0 5px #fff, 0 0 10px ${shadowCol1}, 0 0 22px ${shadowCol1}, 0 0 40px ${shadowCol2};
-      animation: neonPulseFest 2s infinite alternate;
+      text-shadow: 0 0 6px #ffffff, 0 0 14px ${shadowCol};
       margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 2;
     }
-    @keyframes neonPulseFest {
-      0% { text-shadow: 0 0 5px #fff, 0 0 10px ${shadowCol1}, 0 0 22px ${shadowCol1}, 0 0 35px ${shadowCol2}; }
-      100% { text-shadow: 0 0 8px #fff, 0 0 15px ${shadowCol2}, 0 0 30px ${shadowCol2}, 0 0 50px ${shadowCol1}; }
-    }
-    #festVisualCanvas {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
+    #festHeaderCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       pointer-events: none;
-      z-index: 9999;
+      z-index: 1;
     }
   `;
   document.head.appendChild(style);
 
   var banner = document.createElement("div");
-  banner.className = "neon-fest-container";
-  banner.innerHTML = `<div class="neon-fest-title">${leftIcon} ${escapeHTML(text)} ${rightIcon}</div>`;
+  banner.className = "subtle-fest-header";
+  banner.innerHTML = `
+    <canvas id="festHeaderCanvas"></canvas>
+    <div class="subtle-fest-text">
+      <span>${leftIcon}</span>
+      <span>${escapeHTML(text)}</span>
+      <span>${rightIcon}</span>
+    </div>
+  `;
   document.body.prepend(banner);
 }
 
-function startAdaptiveVisualEffect(type) {
-  var canvas = document.createElement("canvas");
-  canvas.id = "festVisualCanvas";
-  document.body.appendChild(canvas);
+function startSubtleHeaderSparks(type) {
+  var canvas = document.getElementById("festHeaderCanvas");
+  if (!canvas) return;
 
   var ctx = canvas.getContext("2d");
-  var width = (canvas.width = window.innerWidth);
-  var height = (canvas.height = window.innerHeight);
+  var banner = canvas.parentElement;
+  var width = (canvas.width = banner.offsetWidth);
+  var height = (canvas.height = banner.offsetHeight);
 
   window.addEventListener("resize", function () {
-    width = canvas.width = window.innerWidth;
-    height = canvas.height = window.innerHeight;
+    if (banner) {
+      width = canvas.width = banner.offsetWidth;
+      height = canvas.height = banner.offsetHeight;
+    }
   });
 
-  // ========================================================
-  // 1. DIWALI (CHICHUBUDLU / FOUNTAINS + GROUND CRACKERS)
-  // ========================================================
-  if (type === "diwali") {
-    var sparks = [];
-    var fountains = [
-      { x: width * 0.15, y: height - 10 },
-      { x: width * 0.5, y: height - 10 },
-      { x: width * 0.85, y: height - 10 }
-    ];
+  var sparks = [];
+  var colors = ["#ffd700", "#ffea00", "#ffffff", "#ff8800"];
+  if (type === "christmas") colors = ["#ffffff", "#2ed573", "#ff4757", "#ffd700"];
+  else if (type === "sankranti") colors = ["#00f0ff", "#ffd166", "#06d6a0", "#ff007f"];
+  else if (type === "holi") colors = ["#ff007f", "#00e5ff", "#76ff03", "#ffea00"];
 
-    function FlowerPotSpark(fx, fy) {
-      this.x = fx + (Math.random() - 0.5) * 20;
-      this.y = fy;
-      var angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.7; // Shoot upwards like flowerpot fountain
-      var speed = Math.random() * 9 + 8;
-      this.vx = Math.cos(angle) * speed;
-      this.vy = Math.sin(angle) * speed;
-      this.alpha = 1;
-      this.decay = Math.random() * 0.025 + 0.015;
-      this.size = Math.random() * 2.8 + 1.2;
-      var colors = ["#ffd700", "#ffea00", "#ff6b00", "#ffffff", "#ff0055"];
-      this.color = colors[Math.floor(Math.random() * colors.length)];
-    }
-
-    FlowerPotSpark.prototype.update = function () {
-      this.x += this.vx;
-      this.y += this.vy;
-      this.vy += 0.28; // Gravity pulls sparks down gracefully
-      this.alpha -= this.decay;
-      return this.alpha > 0;
-    };
-
-    FlowerPotSpark.prototype.draw = function () {
-      ctx.save();
-      ctx.globalAlpha = this.alpha;
-      ctx.fillStyle = this.color;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = this.color;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    };
-
-    function animDiwali() {
-      ctx.clearRect(0, 0, width, height);
-
-      // Continuously emit sparks from fountains
-      fountains.forEach(function (f) {
-        for (var i = 0; i < 4; i++) {
-          sparks.push(new FlowerPotSpark(f.x, f.y));
-        }
-      });
-
-      for (var s = sparks.length - 1; s >= 0; s--) {
-        if (!sparks[s].update()) sparks.splice(s, 1);
-        else sparks[s].draw();
-      }
-      requestAnimationFrame(animDiwali);
-    }
-    animDiwali();
+  function MiniSpark(originX) {
+    this.x = originX + (Math.random() - 0.5) * 40;
+    this.y = height * 0.8;
+    this.vx = (Math.random() - 0.5) * 2;
+    this.vy = -(Math.random() * 2.5 + 1);
+    this.alpha = 1;
+    this.decay = Math.random() * 0.03 + 0.02;
+    this.size = Math.random() * 1.8 + 1;
+    this.color = colors[Math.floor(Math.random() * colors.length)];
   }
 
-  // ========================================================
-  // 2. CHRISTMAS (SANTA SLEIGH WITH REINDEER + RICH SNOW SPARKS)
-  // ========================================================
-  else if (type === "christmas") {
-    var snowflakes = [];
-    var santaX = -200;
-    var santaY = height * 0.25;
-    var santaSpeed = 2.4;
+  MiniSpark.prototype.update = function () {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vy += 0.08;
+    this.alpha -= this.decay;
+    return this.alpha > 0;
+  };
 
-    // Rich snowfall & crystal falling effect
-    for (var i = 0; i < 90; i++) {
-      snowflakes.push({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        r: Math.random() * 3 + 1,
-        sy: Math.random() * 2 + 0.8,
-        sw: Math.random() * 0.03,
-        opacity: Math.random() * 0.8 + 0.2
-      });
+  MiniSpark.prototype.draw = function () {
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+    ctx.fillStyle = this.color;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  var santaX = -60;
+  var isChristmas = (type === "christmas");
+
+  function loop() {
+    ctx.clearRect(0, 0, width, height);
+
+    if (Math.random() > 0.4) {
+      sparks.push(new MiniSpark(width * 0.08));
+      sparks.push(new MiniSpark(width * 0.92));
     }
 
-    function animChristmas() {
-      ctx.clearRect(0, 0, width, height);
-
-      // Flying Santa Sleigh
-      santaX += santaSpeed;
-      santaY = (height * 0.2) + Math.sin(santaX * 0.015) * 30; // Smooth wave flying
-      if (santaX > width + 250) {
-        santaX = -260;
-      }
-
+    if (isChristmas) {
+      santaX += 1.2;
+      if (santaX > width + 70) santaX = -70;
       ctx.save();
-      ctx.font = "34px sans-serif";
-      ctx.fillText("🦌 🦌 🛷 🎅", santaX, santaY);
-
-      // Magic dust dropped from the sleigh (sparkling trail)
-      if (Math.random() > 0.3) {
-        snowflakes.push({
-          x: santaX + 30 + (Math.random() * 25),
-          y: santaY + 15,
-          r: Math.random() * 3.5 + 1.2,
-          sy: Math.random() * 2 + 1.5,
-          sw: 0.04,
-          opacity: 0.9,
-          color: "#ffd700" // Golden magic trail particles
-        });
-      }
+      ctx.font = "14px sans-serif";
+      ctx.fillText("🦌🛷🎅", santaX, height * 0.65);
       ctx.restore();
-
-      // Fall / Draw snowflakes & magic dust
-      snowflakes.forEach(function (snow) {
-        snow.y += snow.sy;
-        snow.x += Math.sin(snow.y * snow.sw) * 0.5;
-        if (snow.y > height) {
-          snow.y = -10;
-          snow.x = Math.random() * width;
-        }
-
-        ctx.save();
-        ctx.globalAlpha = snow.opacity;
-        ctx.fillStyle = snow.color || "#ffffff";
-        ctx.shadowBlur = snow.color ? 12 : 6;
-        ctx.shadowColor = snow.color || "#ffffff";
-        ctx.beginPath();
-        ctx.arc(snow.x, snow.y, snow.r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      });
-
-      requestAnimationFrame(animChristmas);
     }
-    animChristmas();
+
+    for (var i = sparks.length - 1; i >= 0; i--) {
+      if (!sparks[i].update()) {
+        sparks.splice(i, 1);
+      } else {
+        sparks[i].draw();
+      }
+    }
+
+    requestAnimationFrame(loop);
   }
 
-  // ========================================================
-  // 3. SANKRANTI (KITES + BHOGI FIRE + FESTIVE CONFETTI)
-  // ========================================================
-  else if (type === "sankranti") {
-    var kiteColors = ["#ff0055", "#00f0ff", "#ffd166", "#06d6a0", "#a855f7"];
-    var kites = [];
-    var particles = []; // Multi-color festive bhogi confetti & sparks
-
-    function FlyingKite() {
-      this.x = Math.random() * width;
-      this.y = height + 40;
-      this.size = Math.random() * 14 + 20;
-      this.speedY = Math.random() * 1.5 + 1.2;
-      this.sway = Math.random() * 0.04 + 0.02;
-      this.swayCount = Math.random() * 10;
-      this.color = kiteColors[Math.floor(Math.random() * kiteColors.length)];
-    }
-
-    FlyingKite.prototype.update = function () {
-      this.y -= this.speedY;
-      this.swayCount += this.sway;
-      this.x += Math.sin(this.swayCount) * 1.5;
-      return this.y > -80;
-    };
-
-    FlyingKite.prototype.draw = function () {
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(Math.sin(this.swayCount) * 0.2);
-
-      ctx.fillStyle = this.color;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = this.color;
-      ctx.beginPath();
-      ctx.moveTo(0, -this.size);
-      ctx.lineTo(this.size * 0.7, 0);
-      ctx.lineTo(0, this.size);
-      ctx.lineTo(-this.size * 0.7, 0);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, this.size);
-      ctx.quadraticCurveTo(Math.sin(this.swayCount) * 15, this.size + 20, 0, this.size + 40);
-      ctx.stroke();
-
-      ctx.restore();
-    };
-
-    // Confetti particles blown from bhogi fire
-    function FestivalConfetti(bx, by) {
-      this.x = bx + (Math.random() - 0.5) * 40;
-      this.y = by;
-      var angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
-      var speed = Math.random() * 7 + 4;
-      this.vx = Math.cos(angle) * speed;
-      this.vy = Math.sin(angle) * speed;
-      this.alpha = 1;
-      this.decay = Math.random() * 0.015 + 0.01;
-      this.size = Math.random() * 3.5 + 1.5;
-      this.color = kiteColors[Math.floor(Math.random() * kiteColors.length)];
-    }
-
-    FestivalConfetti.prototype.update = function () {
-      this.x += this.vx;
-      this.y += this.vy;
-      this.vy += 0.06; // Falls back down like confetti
-      this.vx += Math.sin(this.y * 0.05) * 0.08; // sway sideways
-      this.alpha -= this.decay;
-      return this.alpha > 0;
-    };
-
-    FestivalConfetti.prototype.draw = function () {
-      ctx.save();
-      ctx.globalAlpha = this.alpha;
-      ctx.fillStyle = this.color;
-      ctx.shadowBlur = 6;
-      ctx.shadowColor = this.color;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    };
-
-    // Continuous kites launch
-    setInterval(function () {
-      if (kites.length < 8) kites.push(new FlyingKite());
-    }, 2200);
-    kites.push(new FlyingKite());
-
-    function animKites() {
-      ctx.clearRect(0, 0, width, height);
-
-      // Emit bhogi festive confetti at the bottom middle of screen
-      if (Math.random() > 0.4) {
-        particles.push(new FestivalConfetti(width * 0.5, height - 10));
-        particles.push(new FestivalConfetti(width * 0.2, height - 10));
-        particles.push(new FestivalConfetti(width * 0.8, height - 10));
-      }
-
-      // Kites Draw
-      for (var k = kites.length - 1; k >= 0; k--) {
-        if (!kites[k].update()) kites.splice(k, 1);
-        else kites[k].draw();
-      }
-
-      // Confetti & Sparks Draw
-      for (var p = particles.length - 1; p >= 0; p--) {
-        if (!particles[p].update()) particles.splice(p, 1);
-        else particles[p].draw();
-      }
-
-      requestAnimationFrame(animKites);
-    }
-    animKites();
-  }
-
-  // ========================================================
-  // 4. HOLI (GULAL COLOR POWDER EXPLOSIONS)
-  // ========================================================
-  else if (type === "holi") {
-    var holiColors = ["#ff007f", "#00f0ff", "#76ff03", "#ffea00", "#d500f9", "#ff6d00"];
-    var holiParticles = [];
-
-    function GulalDrop(x, y, color) {
-      this.x = x;
-      this.y = y;
-      this.color = color;
-      var angle = Math.random() * Math.PI * 2;
-      var speed = Math.random() * 7 + 2;
-      this.vx = Math.cos(angle) * speed;
-      this.vy = Math.sin(angle) * speed;
-      this.alpha = 0.95;
-      this.decay = Math.random() * 0.015 + 0.01;
-      this.size = Math.random() * 6 + 3;
-    }
-
-    GulalDrop.prototype.update = function () {
-      this.x += this.vx;
-      this.y += this.vy;
-      this.vy += 0.05;
-      this.vx *= 0.96;
-      this.size *= 0.98;
-      this.alpha -= this.decay;
-      return this.alpha > 0;
-    };
-
-    GulalDrop.prototype.draw = function () {
-      ctx.save();
-      ctx.globalAlpha = this.alpha;
-      ctx.fillStyle = this.color;
-      ctx.shadowBlur = 12;
-      ctx.shadowColor = this.color;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    };
-
-    function triggerGulalBlast() {
-      var bx = Math.random() * (width * 0.8) + width * 0.1;
-      var by = Math.random() * (height * 0.6) + height * 0.15;
-      var col = holiColors[Math.floor(Math.random() * holiColors.length)];
-      for (var i = 0; i < 40; i++) {
-        holiParticles.push(new GulalDrop(bx, by, col));
-      }
-    }
-
-    setInterval(triggerGulalBlast, 1300);
-    triggerGulalBlast();
-
-    function animHoli() {
-      ctx.clearRect(0, 0, width, height);
-      for (var p = holiParticles.length - 1; p >= 0; p--) {
-        if (!holiParticles[p].update()) holiParticles.splice(p, 1);
-        else holiParticles[p].draw();
-      }
-      requestAnimationFrame(animHoli);
-    }
-    animHoli();
-  }
-
-  // ========================================================
-  // 5. NEW YEAR / TRICOLOR / GENERAL (GRAND SKY FIREWORKS)
-  // ========================================================
-  else {
-    var skyPalette = (type === "tricolor") 
-      ? ["#ff9933", "#ffffff", "#128807", "#000080"]
-      : ["#00f0ff", "#7209b7", "#4cc9f0", "#f72585", "#ffffff", "#3a0ca3"];
-    var rockets = [];
-    var rParticles = [];
-
-    function SkyRocket() {
-      this.x = width * (0.15 + Math.random() * 0.7);
-      this.y = height;
-      this.targetY = height * (0.12 + Math.random() * 0.35);
-      this.color = skyPalette[Math.floor(Math.random() * skyPalette.length)];
-      var angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.3;
-      var speed = Math.random() * 3 + 12;
-      this.vx = Math.cos(angle) * speed;
-      this.vy = Math.sin(angle) * speed;
-      this.trail = [];
-    }
-
-    SkyRocket.prototype.update = function () {
-      this.trail.push({ x: this.x, y: this.y });
-      if (this.trail.length > 5) this.trail.shift();
-      this.x += this.vx;
-      this.y += this.vy;
-      this.vy += 0.08;
-
-      if (this.vy >= -1 || this.y <= this.targetY) {
-        var count = Math.floor(Math.random() * 25) + 45;
-        for (var i = 0; i < count; i++) {
-          rParticles.push(new SkyParticle(this.x, this.y, this.color, skyPalette));
-        }
-        return false;
-      }
-      return true;
-    };
-
-    SkyRocket.prototype.draw = function () {
-      ctx.strokeStyle = this.color;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      for (var i = 0; i < this.trail.length; i++) {
-        var p = this.trail[i];
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      ctx.stroke();
-    };
-
-    function SkyParticle(x, y, color, pal) {
-      this.x = x;
-      this.y = y;
-      this.color = Math.random() > 0.4 ? color : pal[Math.floor(Math.random() * pal.length)];
-      var angle = Math.random() * Math.PI * 2;
-      var speed = Math.random() * 5 + 1.2;
-      this.vx = Math.cos(angle) * speed;
-      this.vy = Math.sin(angle) * speed;
-      this.alpha = 1;
-      this.decay = Math.random() * 0.015 + 0.012;
-      this.size = Math.random() * 2.5 + 1.2;
-    }
-
-    SkyParticle.prototype.update = function () {
-      this.x += this.vx;
-      this.y += this.vy;
-      this.vy += 0.06;
-      this.vx *= 0.98;
-      this.alpha -= this.decay;
-      return this.alpha > 0;
-    };
-
-    SkyParticle.prototype.draw = function () {
-      ctx.save();
-      ctx.globalAlpha = this.alpha;
-      ctx.fillStyle = this.color;
-      ctx.shadowBlur = 9;
-      ctx.shadowColor = this.color;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    };
-
-    setInterval(function () {
-      rockets.push(new SkyRocket());
-    }, 1100);
-    rockets.push(new SkyRocket());
-
-    function animSky() {
-      ctx.clearRect(0, 0, width, height);
-      for (var r = rockets.length - 1; r >= 0; r--) {
-        if (!rockets[r].update()) rockets.splice(r, 1);
-        else rockets[r].draw();
-      }
-      for (var p = rParticles.length - 1; p >= 0; p--) {
-        if (!rParticles[p].update()) rParticles.splice(p, 1);
-        else rParticles[p].draw();
-      }
-      requestAnimationFrame(animSky);
-    }
-    animSky();
-  }
+  loop();
 }
 
 function loadMovies() {
