@@ -47,7 +47,6 @@ function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
   var val = String(originalUrl).trim();
   
-  // Must start with http:// or https:// and have no spaces
   if ((!val.startsWith("http://") && !val.startsWith("https://")) || val.includes(" ")) {
     return "";
   }
@@ -69,12 +68,11 @@ function getAdaptivePosterUrl(originalUrl) {
   return val;
 }
 
-// 🔥 Fixed Live IMDb + iTunes Fallback (No CORS errors, exact first-letter routing)
+// 🔥 Fixed Live IMDb + iTunes Fallback (Exact first-letter routing & clean matching)
 function handleMissingPoster(imgElement, movieTitle) {
   if (!imgElement || imgElement.dataset.fallbackTried === "true") return;
   imgElement.dataset.fallbackTried = "true";
 
-  // Clean extra tags from title so IMDb finds the exact movie/series
   var cleanTitle = String(movieTitle || "")
     .replace(/Marvel Studios'?\s*/i, "")
     .replace(/\s*-\s*World Premiere/i, "")
@@ -91,7 +89,6 @@ function handleMissingPoster(imgElement, movieTitle) {
   var firstChar = query.charAt(0);
   var imdbUrl = "https://v3.sg.media-imdb.com/suggestion/" + firstChar + "/" + encodeURIComponent(query) + ".json";
 
-  // Note: No custom headers here so browser CORS preflight never blocks the request!
   fetch(imdbUrl)
     .then(function (res) { return res.json(); })
     .then(function (data) {
@@ -138,7 +135,6 @@ function showTextPlaceholder(imgElement, movieTitle) {
   imgElement.replaceWith(placeholder);
 }
 
-// Keep window.handleMissingPoster global so index.html doesn't override it with old code
 window.handleMissingPoster = handleMissingPoster;
 
 function createExtraSections() {
@@ -302,9 +298,7 @@ async function initNeonFestivalMode() {
     });
     var data = await res.json();
     if (data && data[0] && data[0].value) {
-      if (data[0].value.enabled === false) {
-        return;
-      }
+      if (data[0].value.enabled === false) return;
 
       if (data[0].value.enabled === true) {
         var custName = (data[0].value.name || "").trim();
@@ -344,23 +338,17 @@ function renderSubtleNeonBanner(text, type) {
   var rightIcon = "✨";
 
   if (type === "diwali") {
-    borderCol = "#ffb703"; shadowCol = "#fb8500";
-    leftIcon = "🪔"; rightIcon = "🪔";
+    borderCol = "#ffb703"; shadowCol = "#fb8500"; leftIcon = "🪔"; rightIcon = "🪔";
   } else if (type === "sankranti") {
-    borderCol = "#06d6a0"; shadowCol = "#ffd166";
-    leftIcon = "🪁"; rightIcon = "🪁";
+    borderCol = "#06d6a0"; shadowCol = "#ffd166"; leftIcon = "🪁"; rightIcon = "🪁";
   } else if (type === "christmas") {
-    borderCol = "#ff3838"; shadowCol = "#2ed573";
-    leftIcon = "🎅"; rightIcon = "🦌";
+    borderCol = "#ff3838"; shadowCol = "#2ed573"; leftIcon = "🎅"; rightIcon = "🦌";
   } else if (type === "holi") {
-    borderCol = "#ff007f"; shadowCol = "#00e5ff";
-    leftIcon = "🎨"; rightIcon = "🎨";
+    borderCol = "#ff007f"; shadowCol = "#00e5ff"; leftIcon = "🎨"; rightIcon = "🎨";
   } else if (type === "tricolor") {
-    borderCol = "#ff9933"; shadowCol = "#138808";
-    leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
+    borderCol = "#ff9933"; shadowCol = "#138808"; leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
   } else if (type === "newyear") {
-    borderCol = "#00f0ff"; shadowCol = "#7209b7";
-    leftIcon = "🎆"; rightIcon = "🎆";
+    borderCol = "#00f0ff"; shadowCol = "#7209b7"; leftIcon = "🎆"; rightIcon = "🎆";
   }
 
   style.textContent = `
@@ -393,13 +381,7 @@ function renderSubtleNeonBanner(text, type) {
       z-index: 2;
     }
     #festHeaderCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 1;
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;
     }
   `;
   document.head.appendChild(style);
@@ -668,7 +650,6 @@ function createMovieCard(movie) {
   if (adaptiveSrc) {
     image.src = adaptiveSrc;
   } else {
-    // If poster is missing or invalid in DB, fetch immediately from IMDb/iTunes
     handleMissingPoster(image, movie.title);
   }
 
