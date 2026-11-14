@@ -43,26 +43,33 @@ function getMoviePinLabel(movie) {
   return String(movie.pinLabel || "").trim();
 }
 
+// 🔥 Adaptive & Proxy Wrapper to prevent Telegram/CDN link expiration issues
 function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
+  var val = String(originalUrl).trim();
+  
+  if (!val.startsWith("http://") && !val.startsWith("https://")) {
+    return "";
+  }
+
   var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   var isWifi = false;
   if (conn && conn.type === "wifi" && !conn.saveData) {
     isWifi = true;
   }
-  if (originalUrl.includes("image.tmdb.org/t/p/")) {
+
+  if (val.includes("image.tmdb.org/t/p/")) {
     return isWifi
-      ? originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w500")
-      : originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w185");
+      ? val.replace(/\/t\/p\/[^\/]+/, "/t/p/w500")
+      : val.replace(/\/t\/p\/[^\/]+/, "/t/p/w185");
   }
-  if (originalUrl.includes("telegram.org")) {
-    var width = isWifi ? 400 : 200;
-    return "https://wsrv.nl/?url=" + encodeURIComponent(originalUrl) + "&w=" + width + "&q=65&output=webp";
-  }
-  return originalUrl;
+
+  // Route Telegram or external fragile links through wsrv.nl image proxy to avoid expiration/blank boxes
+  var width = isWifi ? 400 : 200;
+  return "https://wsrv.nl/?url=" + encodeURIComponent(val) + "&w=" + width + "&q=70&output=webp";
 }
 
-// 🔥 Live IMDb Fallback for missing posters
+// 🔥 Live IMDb Fallback for missing or completely broken posters
 function handleMissingPoster(imgElement, movieTitle) {
   if (imgElement.dataset.fallbackTried) return;
   imgElement.dataset.fallbackTried = "true";
@@ -222,10 +229,6 @@ function getHeaders() {
   };
 }
 
-// ========================================================
-// 🌟 EXACT 12 AM TIME-TRIGGERED FESTIVAL ENGINE 🌟
-// ========================================================
-
 function getSmartCalendarFestival() {
   var now = new Date();
   var m = now.getMonth() + 1;
@@ -253,9 +256,7 @@ async function initNeonFestivalMode() {
     });
     var data = await res.json();
     if (data && data[0] && data[0].value) {
-      if (data[0].value.enabled === false) {
-        return;
-      }
+      if (data[0].value.enabled === false) return;
 
       if (data[0].value.enabled === true) {
         var custName = (data[0].value.name || "").trim();
@@ -295,23 +296,17 @@ function renderSubtleNeonBanner(text, type) {
   var rightIcon = "✨";
 
   if (type === "diwali") {
-    borderCol = "#ffb703"; shadowCol = "#fb8500";
-    leftIcon = "🪔"; rightIcon = "🪔";
+    borderCol = "#ffb703"; shadowCol = "#fb8500"; leftIcon = "🪔"; rightIcon = "🪔";
   } else if (type === "sankranti") {
-    borderCol = "#06d6a0"; shadowCol = "#ffd166";
-    leftIcon = "🪁"; rightIcon = "🪁";
+    borderCol = "#06d6a0"; shadowCol = "#ffd166"; leftIcon = "🪁"; rightIcon = "🪁";
   } else if (type === "christmas") {
-    borderCol = "#ff3838"; shadowCol = "#2ed573";
-    leftIcon = "🎅"; rightIcon = "🦌";
+    borderCol = "#ff3838"; shadowCol = "#2ed573"; leftIcon = "🎅"; rightIcon = "🦌";
   } else if (type === "holi") {
-    borderCol = "#ff007f"; shadowCol = "#00e5ff";
-    leftIcon = "🎨"; rightIcon = "🎨";
+    borderCol = "#ff007f"; shadowCol = "#00e5ff"; leftIcon = "🎨"; rightIcon = "🎨";
   } else if (type === "tricolor") {
-    borderCol = "#ff9933"; shadowCol = "#138808";
-    leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
+    borderCol = "#ff9933"; shadowCol = "#138808"; leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
   } else if (type === "newyear") {
-    borderCol = "#00f0ff"; shadowCol = "#7209b7";
-    leftIcon = "🎆"; rightIcon = "🎆";
+    borderCol = "#00f0ff"; shadowCol = "#7209b7"; leftIcon = "🎆"; rightIcon = "🎆";
   }
 
   style.textContent = `
@@ -344,13 +339,7 @@ function renderSubtleNeonBanner(text, type) {
       z-index: 2;
     }
     #festHeaderCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 1;
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;
     }
   `;
   document.head.appendChild(style);
@@ -607,7 +596,7 @@ function createMovieCard(movie) {
   image.loading = "lazy";
   image.decoding = "async";
 
-  // 🔥 Smart URL Validation Check: Filters out bad text captions or file names stored in poster_url
+  // Check if poster is a valid URL and not a raw text caption stored in database
   var hasValidPoster = movie.poster && 
                        (movie.poster.startsWith("http://") || movie.poster.startsWith("https://")) && 
                        !movie.poster.toLowerCase().includes("poster") &&
@@ -616,7 +605,7 @@ function createMovieCard(movie) {
   if (hasValidPoster) {
     image.src = getAdaptivePosterUrl(movie.poster);
   } else {
-    image.src = ""; // Invalid/text link unte empty ga petti direct ga fallback trigger chestham
+    image.src = ""; // Blank source triggers onerror or immediate fallback
   }
 
   image.onerror = function () {
@@ -628,7 +617,7 @@ function createMovieCard(movie) {
   wrapper.appendChild(image);
   card.appendChild(wrapper);
 
-  // If poster URL is invalid or contains text, trigger IMDb fallback immediately
+  // If poster URL is invalid or contains caption text, trigger IMDb fallback immediately
   if (!hasValidPoster && typeof handleMissingPoster === "function") {
     handleMissingPoster(image, movie.title);
   }
