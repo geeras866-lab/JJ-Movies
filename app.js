@@ -4,6 +4,7 @@ var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 
 var movies = [];
 var messages = [];
+var posterCache = {};
 
 var movieGrid = document.getElementById("movieGrid");
 var searchInput = document.getElementById("searchInput");
@@ -46,8 +47,13 @@ function getMoviePinLabel(movie) {
 function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
   var val = String(originalUrl).trim();
-  
-  if ((!val.startsWith("http://") && !val.startsWith("https://")) || val.includes(" ")) {
+
+  // Reject non-URLs, spaces, or expired direct Telegram Bot file links
+  if (
+    (!val.startsWith("http://") && !val.startsWith("https://")) ||
+    val.includes(" ") ||
+    val.includes("api.telegram.org/file/")
+  ) {
     return "";
   }
 
@@ -61,18 +67,11 @@ function getAdaptivePosterUrl(originalUrl) {
       ? val.replace(/\/t\/p\/[^\/]+/, "/t/p/w500")
       : val.replace(/\/t\/p\/[^\/]+/, "/t/p/w185");
   }
-  if (val.includes("telegram.org")) {
-    var width = isWifi ? 400 : 200;
-    return "https://wsrv.nl/?url=" + encodeURIComponent(val) + "&w=" + width + "&q=65&output=webp";
-  }
   return val;
 }
 
-// 🔥 Live IMDb + iTunes Fallback with zero error crashes
-function handleMissingPoster(imgElement, movieTitle) {
-  if (!imgElement || imgElement.dataset.fallbackTried === "true") return;
-  imgElement.dataset.fallbackTried = "true";
-
+// 🔥 4-Layer Bulletproof Poster Resolver (IMDb Proxy -> iTunes -> TVMaze -> Wikipedia)
+async function resolvePosterUrl(movieTitle) {
   var cleanTitle = String(movieTitle || "")
     .replace(/Marvel Studios'?\s*/i, "")
     .replace(/\s*-\s*World Premiere/i, "")
@@ -80,47 +79,112 @@ function handleMissingPoster(imgElement, movieTitle) {
     .replace(/\s*\(\d{4}\)/, "")
     .trim();
 
-  var query = cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-  if (!query) {
-    showTextPlaceholder(imgElement, movieTitle);
-    return;
+  if (!cleanTitle) return null;
+  var cacheKey = cleanTitle.toLowerCase();
+  if (posterCache[cacheKey]) return posterCache[cacheKey];
+
+  // Build search variations: full title first, then base title before ":" or "-"
+  var searchTerms = [cleanTitle];
+  if (cleanTitle.includes(":")) {
+    var baseColon = cleanTitle.split(":")[0].trim();
+    if (baseColon.length > 2) searchTerms.push(baseColon);
+  }
+  if (cleanTitle.includes("-")) {
+    var baseDash = cleanTitle.split("-")[0].trim();
+    if (baseDash.length > 2 && searchTerms.indexOf(baseDash) === -1) {
+      searchTerms.push(baseDash);
+    }
   }
 
-  var firstChar = query.charAt(0);
-  var imdbUrl = "https://v3.sg.media-imdb.com/suggestion/" + firstChar + "/" + encodeURIComponent(query) + ".json";
+  // 1. Try IMDb Suggestion API via CORS Proxy (bypasses browser CORS block)
+  for (var i = 0; i < searchTerms.length; i++) {
+    var term = searchTerms[i];
+    var query = term.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    if (query) {
+      try {
+        var imdbTarget = "https://v3.sg.media-imdb.com/suggestion/" + query.charAt(0) + "/" + query + ".json";
+        var proxyRes = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(imdbTarget));
+        if (proxyRes.ok) {
+          var imdbData = await proxyRes.json();
+          var hits = (imdbData && imdbData.d) ? imdbData.d : [];
+          var matched = hits.find(function (item) { return item.i && item.i.imageUrl; });
+          if (matched && matched.i && matched.i.imageUrl) {
+            var highRes = matched.i.imageUrl.replace(/\._V1_.*\.jpg$/i, "._V1_UX600_.jpg");
+            posterCache[cacheKey] = highRes;
+            return highRes;
+          }
+        }
+      } catch (e) {}
+    }
+  }
 
-  fetch(imdbUrl)
-    .then(function (res) { return res.json(); })
-    .then(function (data) {
-      var hits = (data && data.d) ? data.d : [];
-      var matched = hits.find(function (item) {
-        return item.i && item.i.imageUrl;
-      });
-      if (matched && matched.i && matched.i.imageUrl) {
-        imgElement.src = matched.i.imageUrl.replace(/\._V1_.*\.jpg$/i, "._V1_UX600_.jpg");
-      } else {
-        return fetchItunesPoster(imgElement, cleanTitle, movieTitle);
+  // 2. Try iTunes Search API (both Movies and TV Shows, native CORS support)
+  for (var j = 0; j < searchTerms.length; j++) {
+    try {
+      var itunesUrl = "https://itunes.apple.com/search?term=" + encodeURIComponent(searchTerms[j]) + "&limit=5";
+      var itunesRes = await fetch(itunesUrl);
+      if (itunesRes.ok) {
+        var itunesData = await itunesRes.json();
+        if (itunesData && itunesData.results && itunesData.results.length > 0) {
+          var validHit = itunesData.results.find(function (r) { return r.artworkUrl100; });
+          if (validHit) {
+            var art = validHit.artworkUrl100.replace("100x100bb", "600x900bb");
+            posterCache[cacheKey] = art;
+            return art;
+          }
+        }
       }
-    })
-    .catch(function () {
-      fetchItunesPoster(imgElement, cleanTitle, movieTitle);
-    });
+    } catch (e) {}
+  }
+
+  // 3. Try TVMaze API (for Marvel/DC Series like She-Hulk, Ms. Marvel, Daredevil)
+  for (var k = 0; k < searchTerms.length; k++) {
+    try {
+      var tvRes = await fetch("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(searchTerms[k]));
+      if (tvRes.ok) {
+        var tvData = await tvRes.json();
+        if (tvData && tvData.image && (tvData.image.original || tvData.image.medium)) {
+          var tvImg = tvData.image.original || tvData.image.medium;
+          posterCache[cacheKey] = tvImg;
+          return tvImg;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 4. Try Wikipedia REST Summary API (catches Indian / upcoming / mythology titles)
+  for (var m = 0; m < searchTerms.length; m++) {
+    try {
+      var wikiTitle = searchTerms[m].replace(/\s+/g, "_");
+      var wikiRes = await fetch("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(wikiTitle));
+      if (wikiRes.ok) {
+        var wikiData = await wikiRes.json();
+        if (wikiData && wikiData.thumbnail && wikiData.thumbnail.source) {
+          var wikiImg = wikiData.thumbnail.source;
+          posterCache[cacheKey] = wikiImg;
+          return wikiImg;
+        }
+      }
+    } catch (e) {}
+  }
+
+  return null;
 }
 
-function fetchItunesPoster(imgElement, cleanTitle, originalTitle) {
-  var itunesUrl = "https://itunes.apple.com/search?term=" + encodeURIComponent(cleanTitle) + "&media=movie&limit=1";
-  fetch(itunesUrl)
-    .then(function (res) { return res.json(); })
-    .then(function (data) {
-      if (data && data.results && data.results[0] && data.results[0].artworkUrl100) {
-        imgElement.src = data.results[0].artworkUrl100.replace("100x100bb", "600x900bb");
-      } else {
-        showTextPlaceholder(imgElement, originalTitle);
-      }
-    })
-    .catch(function () {
-      showTextPlaceholder(imgElement, originalTitle);
-    });
+function handleMissingPoster(imgElement, movieTitle) {
+  if (!imgElement || imgElement.dataset.fallbackTried === "true") return;
+  imgElement.dataset.fallbackTried = "true";
+
+  resolvePosterUrl(movieTitle).then(function (foundUrl) {
+    if (foundUrl) {
+      imgElement.onerror = function () {
+        showTextPlaceholder(imgElement, movieTitle);
+      };
+      imgElement.src = foundUrl;
+    } else {
+      showTextPlaceholder(imgElement, movieTitle);
+    }
+  });
 }
 
 function showTextPlaceholder(imgElement, movieTitle) {
@@ -544,12 +608,12 @@ function renderShowcaseCarousel() {
   var carouselHTML = showpiece.map(function (movie, index) {
     var isCurrent = index === 0 ? "active" : "";
     var tagBadge = getMoviePinLabel(movie) || "POPULAR";
-    var posterSrc = getAdaptivePosterUrl(movie.poster) || movie.poster;
+    var posterSrc = getAdaptivePosterUrl(movie.poster);
 
     return `
       <div class="banner-slide ${isCurrent}">
         <div class="banner-backdrop">
-          <img src="${posterSrc}" alt="${escapeHTML(movie.title)}" class="banner-bg-img" onerror="handleMissingPoster(this, '${escapeHTML(movie.title)}')">
+          <img src="${posterSrc}" data-movie-title="${escapeHTML(movie.title)}" alt="${escapeHTML(movie.title)}" class="banner-bg-img">
           <div class="banner-vignette"></div>
         </div>
         <div class="banner-overlay-content">
@@ -570,6 +634,13 @@ function renderShowcaseCarousel() {
   }).join("");
 
   bannerContainer.innerHTML = carouselHTML;
+
+  // Trigger fallback for banner images if src is empty or fails
+  bannerContainer.querySelectorAll(".banner-bg-img").forEach(function (img) {
+    var mTitle = img.getAttribute("data-movie-title");
+    img.onerror = function () { handleMissingPoster(img, mTitle); };
+    if (!img.getAttribute("src")) handleMissingPoster(img, mTitle);
+  });
 
   if (carouselInterval) clearInterval(carouselInterval);
   var currentSlide = 0;
@@ -638,8 +709,7 @@ function createMovieCard(movie) {
   image.loading = "lazy";
   image.decoding = "async";
 
-  var posterUrl = movie.poster ? String(movie.poster).trim() : "";
-  var hasValidHttpUrl = (posterUrl.startsWith("http://") || posterUrl.startsWith("https://")) && !posterUrl.includes(" ");
+  var adaptiveSrc = getAdaptivePosterUrl(movie.poster);
 
   image.onerror = function () {
     handleMissingPoster(image, movie.title);
@@ -648,10 +718,9 @@ function createMovieCard(movie) {
   wrapper.appendChild(image);
   card.appendChild(wrapper);
 
-  if (hasValidHttpUrl) {
-    image.src = getAdaptivePosterUrl(posterUrl);
+  if (adaptiveSrc) {
+    image.src = adaptiveSrc;
   } else {
-    // Supabase లో text caption ఉన్నా లేదా లింక్ లేకపోయినా డైరెక్ట్‌గా IMDb ఫాల్‌బ్యాక్ రన్ అవుతుంది
     handleMissingPoster(image, movie.title);
   }
 
@@ -774,10 +843,12 @@ async function showMovieDetails(movieId) {
     ? movie.trailer 
     : "https://www.youtube.com/results?search_query=" + encodeURIComponent(movie.title + " Telugu trailer");
 
+  var modalPosterSrc = getAdaptivePosterUrl(movie.poster);
+
   modalDetails.innerHTML = `
     ${pinBadgeHTML}
     <div class="movie-header-flex">
-      <img class="modal-mini-poster" src="${getAdaptivePosterUrl(movie.poster)}" alt="${escapeHTML(movie.title)}" onerror="handleMissingPoster(this, '${escapeHTML(movie.title)}')">
+      <img id="modalPosterImg" class="modal-mini-poster" src="${modalPosterSrc}" alt="${escapeHTML(movie.title)}">
       <div class="movie-header-info">
         <h2>${escapeHTML(movie.title)}</h2>
         <div class="movie-meta-chips">
@@ -805,6 +876,12 @@ async function showMovieDetails(movieId) {
       </a>
     </div>
   `;
+
+  var modalImg = document.getElementById("modalPosterImg");
+  if (modalImg) {
+    modalImg.onerror = function () { handleMissingPoster(modalImg, movie.title); };
+    if (!modalPosterSrc) handleMissingPoster(modalImg, movie.title);
+  }
 
   movieModal.hidden = false;
 
