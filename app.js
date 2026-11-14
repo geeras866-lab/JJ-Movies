@@ -48,7 +48,7 @@ function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
   var val = String(originalUrl).trim();
 
-  // Reject non-URLs, spaces, or expired direct Telegram Bot file links
+  // Reject non-URLs, spaces, or expired Telegram Bot API file links
   if (
     (!val.startsWith("http://") && !val.startsWith("https://")) ||
     val.includes(" ") ||
@@ -70,8 +70,69 @@ function getAdaptivePosterUrl(originalUrl) {
   return val;
 }
 
-// 🔥 4-Layer Bulletproof Poster Resolver (IMDb Proxy -> iTunes -> TVMaze -> Wikipedia)
-async function resolvePosterUrl(movieTitle) {
+// 🔥 100% Direct IMDb JSONP Loader (Bypasses CORS completely without third-party proxies!)
+function fetchImdbJsonp(query, movieYear) {
+  return new Promise(function (resolve) {
+    var cleanQ = query.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    if (!cleanQ) return resolve(null);
+
+    // IMDb limits JSONP query length to 20 chars
+    var shortQ = cleanQ.substring(0, 20).replace(/_+$/g, "");
+    var firstChar = shortQ.charAt(0);
+    var cbName = "imdb_cb_" + Math.random().toString(36).substring(2, 10);
+    var script = document.createElement("script");
+    var timer = setTimeout(function () {
+      cleanup();
+      resolve(null);
+    }, 4500);
+
+    function cleanup() {
+      clearTimeout(timer);
+      if (script.parentNode) script.parentNode.removeChild(script);
+      try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
+    }
+
+    window[cbName] = function (data) {
+      cleanup();
+      var hits = (data && data.d) ? data.d : [];
+      // Filter strictly to real movies/TV series (tt...) with posters, never actors/podcasts
+      var validHits = hits.filter(function (item) {
+        return item.id && item.id.indexOf("tt") === 0 && item.i && item.i.imageUrl;
+      });
+
+      if (!validHits.length) return resolve(null);
+
+      var targetYear = parseInt(movieYear, 10);
+      var bestMatch = null;
+
+      // 1. Match exact or +/- 1 year if movieYear is known
+      if (targetYear) {
+        bestMatch = validHits.find(function (item) {
+          return item.y && Math.abs(parseInt(item.y, 10) - targetYear) <= 1;
+        });
+      }
+
+      // 2. Otherwise pick the top official IMDb movie/series match
+      if (!bestMatch) {
+        bestMatch = validHits[0];
+      }
+
+      var highRes = bestMatch.i.imageUrl.replace(/\._V1_.*\.jpg$/i, "._V1_UX600_.jpg");
+      resolve(highRes);
+    };
+
+    script.onerror = function () {
+      cleanup();
+      resolve(null);
+    };
+
+    script.src = "https://v2.sg.media-imdb.com/suggests/" + firstChar + "/" + encodeURIComponent(shortQ) + ".json?callback=" + cbName;
+    document.head.appendChild(script);
+  });
+}
+
+// 🔥 Accurate Official Movie/Series Poster Resolver
+async function resolvePosterUrl(movieTitle, movieYear) {
   var cleanTitle = String(movieTitle || "")
     .replace(/Marvel Studios'?\s*/i, "")
     .replace(/\s*-\s*World Premiere/i, "")
@@ -80,55 +141,46 @@ async function resolvePosterUrl(movieTitle) {
     .trim();
 
   if (!cleanTitle) return null;
-  var cacheKey = cleanTitle.toLowerCase();
+  var cacheKey = (cleanTitle + "_" + (movieYear || "")).toLowerCase();
   if (posterCache[cacheKey]) return posterCache[cacheKey];
 
-  // Build search variations: full title first, then base title before ":" or "-"
   var searchTerms = [cleanTitle];
   if (cleanTitle.includes(":")) {
     var baseColon = cleanTitle.split(":")[0].trim();
     if (baseColon.length > 2) searchTerms.push(baseColon);
   }
-  if (cleanTitle.includes("-")) {
-    var baseDash = cleanTitle.split("-")[0].trim();
-    if (baseDash.length > 2 && searchTerms.indexOf(baseDash) === -1) {
-      searchTerms.push(baseDash);
-    }
-  }
 
-  // 1. Try IMDb Suggestion API via CORS Proxy (bypasses browser CORS block)
+  // 1. Primary: Official IMDb JSONP (Gets exact movie/series poster using Title + Year)
   for (var i = 0; i < searchTerms.length; i++) {
-    var term = searchTerms[i];
-    var query = term.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-    if (query) {
-      try {
-        var imdbTarget = "https://v3.sg.media-imdb.com/suggestion/" + query.charAt(0) + "/" + query + ".json";
-        var proxyRes = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(imdbTarget));
-        if (proxyRes.ok) {
-          var imdbData = await proxyRes.json();
-          var hits = (imdbData && imdbData.d) ? imdbData.d : [];
-          var matched = hits.find(function (item) { return item.i && item.i.imageUrl; });
-          if (matched && matched.i && matched.i.imageUrl) {
-            var highRes = matched.i.imageUrl.replace(/\._V1_.*\.jpg$/i, "._V1_UX600_.jpg");
-            posterCache[cacheKey] = highRes;
-            return highRes;
-          }
-        }
-      } catch (e) {}
+    var imdbPoster = await fetchImdbJsonp(searchTerms[i], movieYear);
+    if (imdbPoster) {
+      posterCache[cacheKey] = imdbPoster;
+      return imdbPoster;
     }
   }
 
-  // 2. Try iTunes Search API (both Movies and TV Shows, native CORS support)
+  // 2. Secondary: iTunes STRICTLY for Feature Movies (blocks audiobooks/podcasts/Pawn Stars)
   for (var j = 0; j < searchTerms.length; j++) {
     try {
-      var itunesUrl = "https://itunes.apple.com/search?term=" + encodeURIComponent(searchTerms[j]) + "&limit=5";
+      var itunesUrl = "https://itunes.apple.com/search?term=" + encodeURIComponent(searchTerms[j]) + "&media=movie&entity=movie&limit=5";
       var itunesRes = await fetch(itunesUrl);
       if (itunesRes.ok) {
         var itunesData = await itunesRes.json();
-        if (itunesData && itunesData.results && itunesData.results.length > 0) {
-          var validHit = itunesData.results.find(function (r) { return r.artworkUrl100; });
-          if (validHit) {
-            var art = validHit.artworkUrl100.replace("100x100bb", "600x900bb");
+        var results = (itunesData && itunesData.results) ? itunesData.results : [];
+        if (results.length > 0) {
+          var targetYear = parseInt(movieYear, 10);
+          var matchedMovie = null;
+          if (targetYear) {
+            matchedMovie = results.find(function (r) {
+              var rYear = r.releaseDate ? parseInt(r.releaseDate.substring(0, 4), 10) : 0;
+              return r.artworkUrl100 && Math.abs(rYear - targetYear) <= 1;
+            });
+          }
+          if (!matchedMovie) {
+            matchedMovie = results.find(function (r) { return r.artworkUrl100; });
+          }
+          if (matchedMovie && matchedMovie.artworkUrl100) {
+            var art = matchedMovie.artworkUrl100.replace("100x100bb", "600x900bb");
             posterCache[cacheKey] = art;
             return art;
           }
@@ -137,7 +189,7 @@ async function resolvePosterUrl(movieTitle) {
     } catch (e) {}
   }
 
-  // 3. Try TVMaze API (for Marvel/DC Series like She-Hulk, Ms. Marvel, Daredevil)
+  // 3. Tertiary: TVMaze API (for Web Series like She-Hulk, Ms. Marvel, Daredevil)
   for (var k = 0; k < searchTerms.length; k++) {
     try {
       var tvRes = await fetch("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(searchTerms[k]));
@@ -152,30 +204,14 @@ async function resolvePosterUrl(movieTitle) {
     } catch (e) {}
   }
 
-  // 4. Try Wikipedia REST Summary API (catches Indian / upcoming / mythology titles)
-  for (var m = 0; m < searchTerms.length; m++) {
-    try {
-      var wikiTitle = searchTerms[m].replace(/\s+/g, "_");
-      var wikiRes = await fetch("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(wikiTitle));
-      if (wikiRes.ok) {
-        var wikiData = await wikiRes.json();
-        if (wikiData && wikiData.thumbnail && wikiData.thumbnail.source) {
-          var wikiImg = wikiData.thumbnail.source;
-          posterCache[cacheKey] = wikiImg;
-          return wikiImg;
-        }
-      }
-    } catch (e) {}
-  }
-
   return null;
 }
 
-function handleMissingPoster(imgElement, movieTitle) {
+function handleMissingPoster(imgElement, movieTitle, movieYear) {
   if (!imgElement || imgElement.dataset.fallbackTried === "true") return;
   imgElement.dataset.fallbackTried = "true";
 
-  resolvePosterUrl(movieTitle).then(function (foundUrl) {
+  resolvePosterUrl(movieTitle, movieYear).then(function (foundUrl) {
     if (foundUrl) {
       imgElement.onerror = function () {
         showTextPlaceholder(imgElement, movieTitle);
@@ -613,7 +649,7 @@ function renderShowcaseCarousel() {
     return `
       <div class="banner-slide ${isCurrent}">
         <div class="banner-backdrop">
-          <img src="${posterSrc}" data-movie-title="${escapeHTML(movie.title)}" alt="${escapeHTML(movie.title)}" class="banner-bg-img">
+          <img src="${posterSrc}" data-movie-title="${escapeHTML(movie.title)}" data-movie-year="${escapeHTML(movie.year || "")}" alt="${escapeHTML(movie.title)}" class="banner-bg-img">
           <div class="banner-vignette"></div>
         </div>
         <div class="banner-overlay-content">
@@ -635,11 +671,11 @@ function renderShowcaseCarousel() {
 
   bannerContainer.innerHTML = carouselHTML;
 
-  // Trigger fallback for banner images if src is empty or fails
   bannerContainer.querySelectorAll(".banner-bg-img").forEach(function (img) {
     var mTitle = img.getAttribute("data-movie-title");
-    img.onerror = function () { handleMissingPoster(img, mTitle); };
-    if (!img.getAttribute("src")) handleMissingPoster(img, mTitle);
+    var mYear = img.getAttribute("data-movie-year");
+    img.onerror = function () { handleMissingPoster(img, mTitle, mYear); };
+    if (!img.getAttribute("src")) handleMissingPoster(img, mTitle, mYear);
   });
 
   if (carouselInterval) clearInterval(carouselInterval);
@@ -712,7 +748,7 @@ function createMovieCard(movie) {
   var adaptiveSrc = getAdaptivePosterUrl(movie.poster);
 
   image.onerror = function () {
-    handleMissingPoster(image, movie.title);
+    handleMissingPoster(image, movie.title, movie.year);
   };
 
   wrapper.appendChild(image);
@@ -721,7 +757,7 @@ function createMovieCard(movie) {
   if (adaptiveSrc) {
     image.src = adaptiveSrc;
   } else {
-    handleMissingPoster(image, movie.title);
+    handleMissingPoster(image, movie.title, movie.year);
   }
 
   var info = document.createElement("div");
@@ -879,8 +915,8 @@ async function showMovieDetails(movieId) {
 
   var modalImg = document.getElementById("modalPosterImg");
   if (modalImg) {
-    modalImg.onerror = function () { handleMissingPoster(modalImg, movie.title); };
-    if (!modalPosterSrc) handleMissingPoster(modalImg, movie.title);
+    modalImg.onerror = function () { handleMissingPoster(modalImg, movie.title, movie.year); };
+    if (!modalPosterSrc) handleMissingPoster(modalImg, movie.title, movie.year);
   }
 
   movieModal.hidden = false;
