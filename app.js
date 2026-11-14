@@ -1,10 +1,9 @@
-var SUPABASE_URL = "https://tswyabgdldbsaopipvug.supabase.co";
+Var SUPABASE_URL = "https://tswyabgdldbsaopipvug.supabase.co";
 var SUPABASE_KEY = "sb_publishable_902itkUPAUe272Q4B4jF0w_OEKDNuxr";
 var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 
 var movies = [];
 var messages = [];
-var posterCache = {};
 
 var movieGrid = document.getElementById("movieGrid");
 var searchInput = document.getElementById("searchInput");
@@ -46,193 +45,22 @@ function getMoviePinLabel(movie) {
 
 function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
-  var val = String(originalUrl).trim();
-
-  // 🛑 CRITICAL FIX: Reject expired/direct Telegram bot file links completely so fallback takes over!
-  if (
-    (!val.startsWith("http://") && !val.startsWith("https://")) ||
-    val.includes(" ") ||
-    val.includes("api.telegram.org") ||
-    val.includes("t.me")
-  ) {
-    return "";
-  }
-
   var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   var isWifi = false;
   if (conn && conn.type === "wifi" && !conn.saveData) {
     isWifi = true;
   }
-  if (val.includes("image.tmdb.org/t/p/")) {
+  if (originalUrl.includes("image.tmdb.org/t/p/")) {
     return isWifi
-      ? val.replace(/\/t\/p\/[^\/]+/, "/t/p/w500")
-      : val.replace(/\/t\/p\/[^\/]+/, "/t/p/w185");
+      ? originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w500")
+      : originalUrl.replace(/\/t\/p\/[^\/]+/, "/t/p/w185");
   }
-  return val;
+  if (originalUrl.includes("telegram.org")) {
+    var width = isWifi ? 400 : 200;
+    return "https://wsrv.nl/?url=" + encodeURIComponent(originalUrl) + "&w=" + width + "&q=65&output=webp";
+  }
+  return originalUrl;
 }
-
-// 🔥 Direct IMDb JSONP Loader
-function fetchImdbJsonp(query, movieYear) {
-  return new Promise(function (resolve) {
-    var cleanQ = query.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-    if (!cleanQ) return resolve(null);
-
-    var shortQ = cleanQ.substring(0, 20).replace(/_+$/g, "");
-    var firstChar = shortQ.charAt(0);
-    var cbName = "imdb_cb_" + Math.random().toString(36).substring(2, 10);
-    var script = document.createElement("script");
-    var timer = setTimeout(function () {
-      cleanup();
-      resolve(null);
-    }, 4500);
-
-    function cleanup() {
-      clearTimeout(timer);
-      if (script.parentNode) script.parentNode.removeChild(script);
-      try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
-    }
-
-    window[cbName] = function (data) {
-      cleanup();
-      var hits = (data && data.d) ? data.d : [];
-      var validHits = hits.filter(function (item) {
-        return item.id && item.id.indexOf("tt") === 0 && item.i && item.i.imageUrl;
-      });
-
-      if (!validHits.length) return resolve(null);
-
-      var targetYear = parseInt(movieYear, 10);
-      var bestMatch = null;
-
-      if (targetYear) {
-        bestMatch = validHits.find(function (item) {
-          return item.y && Math.abs(parseInt(item.y, 10) - targetYear) <= 1;
-        });
-      }
-
-      if (!bestMatch) {
-        bestMatch = validHits[0];
-      }
-
-      var highRes = bestMatch.i.imageUrl.replace(/\._V1_.*\.jpg$/i, "._V1_UX600_.jpg");
-      resolve(highRes);
-    };
-
-    script.onerror = function () {
-      cleanup();
-      resolve(null);
-    };
-
-    script.src = "https://v2.sg.media-imdb.com/suggests/" + firstChar + "/" + encodeURIComponent(shortQ) + ".json?callback=" + cbName;
-    document.head.appendChild(script);
-  });
-}
-
-// 🔥 Accurate Poster Resolver
-async function resolvePosterUrl(movieTitle, movieYear) {
-  var cleanTitle = String(movieTitle || "")
-    .replace(/Marvel Studios'?\s*/i, "")
-    .replace(/\s*-\s*World Premiere/i, "")
-    .replace(/\s*Season\s*\d+/i, "")
-    .replace(/\s*\(\d{4}\)/, "")
-    .trim();
-
-  if (!cleanTitle) return null;
-  var cacheKey = (cleanTitle + "_" + (movieYear || "")).toLowerCase();
-  if (posterCache[cacheKey]) return posterCache[cacheKey];
-
-  var searchTerms = [cleanTitle];
-  if (cleanTitle.includes(":")) {
-    var baseColon = cleanTitle.split(":")[0].trim();
-    if (baseColon.length > 2) searchTerms.push(baseColon);
-  }
-
-  // 1. IMDb JSONP
-  for (var i = 0; i < searchTerms.length; i++) {
-    var imdbPoster = await fetchImdbJsonp(searchTerms[i], movieYear);
-    if (imdbPoster) {
-      posterCache[cacheKey] = imdbPoster;
-      return imdbPoster;
-    }
-  }
-
-  // 2. iTunes Movie Search
-  for (var j = 0; j < searchTerms.length; j++) {
-    try {
-      var itunesUrl = "https://itunes.apple.com/search?term=" + encodeURIComponent(searchTerms[j]) + "&media=movie&entity=movie&limit=5";
-      var itunesRes = await fetch(itunesUrl);
-      if (itunesRes.ok) {
-        var itunesData = await itunesRes.json();
-        var results = (itunesData && itunesData.results) ? itunesData.results : [];
-        if (results.length > 0) {
-          var targetYear = parseInt(movieYear, 10);
-          var matchedMovie = null;
-          if (targetYear) {
-            matchedMovie = results.find(function (r) {
-              var rYear = r.releaseDate ? parseInt(r.releaseDate.substring(0, 4), 10) : 0;
-              return r.artworkUrl100 && Math.abs(rYear - targetYear) <= 1;
-            });
-          }
-          if (!matchedMovie) {
-            matchedMovie = results.find(function (r) { return r.artworkUrl100; });
-          }
-          if (matchedMovie && matchedMovie.artworkUrl100) {
-            var art = matchedMovie.artworkUrl100.replace("100x100bb", "600x900bb");
-            posterCache[cacheKey] = art;
-            return art;
-          }
-        }
-      }
-    } catch (e) {}
-  }
-
-  // 3. TVMaze API (for Web Series)
-  for (var k = 0; k < searchTerms.length; k++) {
-    try {
-      var tvRes = await fetch("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(searchTerms[k]));
-      if (tvRes.ok) {
-        var tvData = await tvRes.json();
-        if (tvData && tvData.image && (tvData.image.original || tvData.image.medium)) {
-          var tvImg = tvData.image.original || tvData.image.medium;
-          posterCache[cacheKey] = tvImg;
-          return tvImg;
-        }
-      }
-    } catch (e) {}
-  }
-
-  return null;
-}
-
-function handleMissingPoster(imgElement, movieTitle, movieYear) {
-  if (!imgElement || imgElement.dataset.fallbackTried === "true") return;
-  imgElement.dataset.fallbackTried = "true";
-
-  resolvePosterUrl(movieTitle, movieYear).then(function (foundUrl) {
-    if (foundUrl) {
-      imgElement.onerror = function () {
-        showTextPlaceholder(imgElement, movieTitle);
-      };
-      imgElement.src = foundUrl;
-    } else {
-      showTextPlaceholder(imgElement, movieTitle);
-    }
-  });
-}
-
-function showTextPlaceholder(imgElement, movieTitle) {
-  if (!imgElement || !imgElement.parentNode) return;
-  if (imgElement.classList.contains("modal-mini-poster") || imgElement.classList.contains("banner-bg-img")) {
-    imgElement.style.display = "none";
-    return;
-  }
-  var placeholder = document.createElement("div");
-  placeholder.className = "poster-placeholder";
-  placeholder.textContent = movieTitle || "Movie";
-  imgElement.replaceWith(placeholder);
-}
-
-window.handleMissingPoster = handleMissingPoster;
 
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
@@ -368,12 +196,22 @@ function getHeaders() {
   };
 }
 
+// ========================================================
+// 🌟 EXACT 12 AM TIME-TRIGGERED FESTIVAL ENGINE 🌟
+// ========================================================
+
 function getSmartCalendarFestival() {
   var now = new Date();
-  var m = now.getMonth() + 1;
-  var d = now.getDate();
-  var h = now.getHours();
+  var m = now.getMonth() + 1; // 1-12
+  var d = now.getDate();      // 1-31
+  var h = now.getHours();     // 0-23 (Exact Time Check)
   var y = now.getFullYear();
+
+  function isFestivalActive(festMonth, festDay) {
+    if (m === festMonth && d === festDay && h >= 0) return true; 
+    if (m === festMonth && d === (festDay + 1) && h <= 23) return true; 
+    return false;
+  }
 
   if ((m === 12 && d >= 31 && h >= 0) || (m === 1 && d <= 1)) return { name: "HAPPY NEW YEAR " + ((m === 12) ? y + 1 : y), type: "newyear" };
   if (m === 1 && d >= 14 && d <= 15) return { name: "HAPPY SANKRANTI", type: "sankranti" };
@@ -395,7 +233,9 @@ async function initNeonFestivalMode() {
     });
     var data = await res.json();
     if (data && data[0] && data[0].value) {
-      if (data[0].value.enabled === false) return;
+      if (data[0].value.enabled === false) {
+        return; // Admin OFF means complete shutdown
+      }
 
       if (data[0].value.enabled === true) {
         var custName = (data[0].value.name || "").trim();
@@ -435,17 +275,23 @@ function renderSubtleNeonBanner(text, type) {
   var rightIcon = "✨";
 
   if (type === "diwali") {
-    borderCol = "#ffb703"; shadowCol = "#fb8500"; leftIcon = "🪔"; rightIcon = "🪔";
+    borderCol = "#ffb703"; shadowCol = "#fb8500";
+    leftIcon = "🪔"; rightIcon = "🪔";
   } else if (type === "sankranti") {
-    borderCol = "#06d6a0"; shadowCol = "#ffd166"; leftIcon = "🪁"; rightIcon = "🪁";
+    borderCol = "#06d6a0"; shadowCol = "#ffd166";
+    leftIcon = "🪁"; rightIcon = "🪁";
   } else if (type === "christmas") {
-    borderCol = "#ff3838"; shadowCol = "#2ed573"; leftIcon = "🎅"; rightIcon = "🦌";
+    borderCol = "#ff3838"; shadowCol = "#2ed573";
+    leftIcon = "🎅"; rightIcon = "🦌";
   } else if (type === "holi") {
-    borderCol = "#ff007f"; shadowCol = "#00e5ff"; leftIcon = "🎨"; rightIcon = "🎨";
+    borderCol = "#ff007f"; shadowCol = "#00e5ff";
+    leftIcon = "🎨"; rightIcon = "🎨";
   } else if (type === "tricolor") {
-    borderCol = "#ff9933"; shadowCol = "#138808"; leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
+    borderCol = "#ff9933"; shadowCol = "#138808";
+    leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
   } else if (type === "newyear") {
-    borderCol = "#00f0ff"; shadowCol = "#7209b7"; leftIcon = "🎆"; rightIcon = "🎆";
+    borderCol = "#00f0ff"; shadowCol = "#7209b7";
+    leftIcon = "🎆"; rightIcon = "🎆";
   }
 
   style.textContent = `
@@ -478,7 +324,13 @@ function renderSubtleNeonBanner(text, type) {
       z-index: 2;
     }
     #festHeaderCanvas {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
     }
   `;
   document.head.appendChild(style);
@@ -641,12 +493,12 @@ function renderShowcaseCarousel() {
   var carouselHTML = showpiece.map(function (movie, index) {
     var isCurrent = index === 0 ? "active" : "";
     var tagBadge = getMoviePinLabel(movie) || "POPULAR";
-    var posterSrc = getAdaptivePosterUrl(movie.poster);
+    var posterSrc = getAdaptivePosterUrl(movie.poster) || movie.poster;
 
     return `
       <div class="banner-slide ${isCurrent}">
         <div class="banner-backdrop">
-          <img src="${posterSrc}" data-movie-title="${escapeHTML(movie.title)}" data-movie-year="${escapeHTML(movie.year || "")}" alt="${escapeHTML(movie.title)}" class="banner-bg-img">
+          <img src="${posterSrc}" alt="${escapeHTML(movie.title)}" class="banner-bg-img" onerror="this.src='${escapeHTML(movie.poster)}'">
           <div class="banner-vignette"></div>
         </div>
         <div class="banner-overlay-content">
@@ -667,13 +519,6 @@ function renderShowcaseCarousel() {
   }).join("");
 
   bannerContainer.innerHTML = carouselHTML;
-
-  bannerContainer.querySelectorAll(".banner-bg-img").forEach(function (img) {
-    var mTitle = img.getAttribute("data-movie-title");
-    var mYear = img.getAttribute("data-movie-year");
-    img.onerror = function () { handleMissingPoster(img, mTitle, mYear); };
-    if (!img.getAttribute("src")) handleMissingPoster(img, mTitle, mYear);
-  });
 
   if (carouselInterval) clearInterval(carouselInterval);
   var currentSlide = 0;
@@ -736,27 +581,28 @@ function createMovieCard(movie) {
   wrapper.appendChild(badgeLeft);
   wrapper.appendChild(badgeRight);
 
-  var image = document.createElement("img");
-  image.className = "poster";
-  image.alt = movie.title + " poster";
-  image.loading = "lazy";
-  image.decoding = "async";
-
-  var adaptiveSrc = getAdaptivePosterUrl(movie.poster);
-
-  image.onerror = function () {
-    handleMissingPoster(image, movie.title, movie.year);
-  };
-
-  wrapper.appendChild(image);
-  card.appendChild(wrapper);
-
-  // If adaptiveSrc is empty (due to expired telegram link), immediately trigger fallback
-  if (adaptiveSrc) {
-    image.src = adaptiveSrc;
+  if (movie.poster) {
+    var image = document.createElement("img");
+    image.className = "poster";
+    image.src = getAdaptivePosterUrl(movie.poster);
+    image.alt = movie.title + " poster";
+    image.loading = "lazy";
+    image.decoding = "async";
+    image.onerror = function () {
+      var placeholder = document.createElement("div");
+      placeholder.className = "poster-placeholder";
+      placeholder.textContent = movie.title;
+      image.replaceWith(placeholder);
+    };
+    wrapper.appendChild(image);
   } else {
-    handleMissingPoster(image, movie.title, movie.year);
+    var placeholder = document.createElement("div");
+    placeholder.className = "poster-placeholder";
+    placeholder.textContent = movie.title;
+    wrapper.appendChild(placeholder);
   }
+
+  card.appendChild(wrapper);
 
   var info = document.createElement("div");
   info.className = "movie-info";
@@ -877,12 +723,10 @@ async function showMovieDetails(movieId) {
     ? movie.trailer 
     : "https://www.youtube.com/results?search_query=" + encodeURIComponent(movie.title + " Telugu trailer");
 
-  var modalPosterSrc = getAdaptivePosterUrl(movie.poster);
-
   modalDetails.innerHTML = `
     ${pinBadgeHTML}
     <div class="movie-header-flex">
-      <img id="modalPosterImg" class="modal-mini-poster" src="${modalPosterSrc}" alt="${escapeHTML(movie.title)}">
+      <img class="modal-mini-poster" src="${getAdaptivePosterUrl(movie.poster)}" alt="${escapeHTML(movie.title)}" onerror="this.style.display='none'">
       <div class="movie-header-info">
         <h2>${escapeHTML(movie.title)}</h2>
         <div class="movie-meta-chips">
@@ -910,12 +754,6 @@ async function showMovieDetails(movieId) {
       </a>
     </div>
   `;
-
-  var modalImg = document.getElementById("modalPosterImg");
-  if (modalImg) {
-    modalImg.onerror = function () { handleMissingPoster(modalImg, movie.title, movie.year); };
-    if (!modalPosterSrc) handleMissingPoster(modalImg, movie.title, movie.year);
-  }
 
   movieModal.hidden = false;
 
@@ -1046,3 +884,5 @@ document.addEventListener("keydown", function (event) {
 createExtraSections();
 loadMovies();
 initNeonFestivalMode();
+
+App.js full code ivvu
