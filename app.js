@@ -43,12 +43,12 @@ function getMoviePinLabel(movie) {
   return String(movie.pinLabel || "").trim();
 }
 
-// 🔥 Adaptive & Proxy Wrapper to prevent Telegram/CDN link expiration issues
 function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
   var val = String(originalUrl).trim();
   
-  if (!val.startsWith("http://") && !val.startsWith("https://")) {
+  // Must start with http:// or https:// and have no spaces
+  if ((!val.startsWith("http://") && !val.startsWith("https://")) || val.includes(" ")) {
     return "";
   }
 
@@ -57,43 +57,89 @@ function getAdaptivePosterUrl(originalUrl) {
   if (conn && conn.type === "wifi" && !conn.saveData) {
     isWifi = true;
   }
-
   if (val.includes("image.tmdb.org/t/p/")) {
     return isWifi
       ? val.replace(/\/t\/p\/[^\/]+/, "/t/p/w500")
       : val.replace(/\/t\/p\/[^\/]+/, "/t/p/w185");
   }
-
-  // Route Telegram or external fragile links through wsrv.nl image proxy to avoid expiration/blank boxes
-  var width = isWifi ? 400 : 200;
-  return "https://wsrv.nl/?url=" + encodeURIComponent(val) + "&w=" + width + "&q=70&output=webp";
+  if (val.includes("telegram.org")) {
+    var width = isWifi ? 400 : 200;
+    return "https://wsrv.nl/?url=" + encodeURIComponent(val) + "&w=" + width + "&q=65&output=webp";
+  }
+  return val;
 }
 
-// 🔥 Live IMDb Fallback for missing or completely broken posters
+// 🔥 Fixed Live IMDb + iTunes Fallback (No CORS errors, exact first-letter routing)
 function handleMissingPoster(imgElement, movieTitle) {
-  if (imgElement.dataset.fallbackTried) return;
+  if (!imgElement || imgElement.dataset.fallbackTried === "true") return;
   imgElement.dataset.fallbackTried = "true";
 
-  var cleanTitle = movieTitle.replace(/Season \d+/, "").trim().toLowerCase();
-  
-  fetch("https://v3.sg.media-imdb.com/suggestion/x/" + encodeURIComponent(cleanTitle) + ".json", {
-    headers: { "User-Agent": "Mozilla/5.0" }
-  })
-  .then(function(res) { return res.json(); })
-  .then(function(data) {
-    var hits = data && data.d ? data.d : [];
-    var matched = hits.find(function(item) {
-      return item.id && item.id.indexOf("tt") === 0 && item.i && item.i.imageUrl;
+  // Clean extra tags from title so IMDb finds the exact movie/series
+  var cleanTitle = String(movieTitle || "")
+    .replace(/Marvel Studios'?\s*/i, "")
+    .replace(/\s*-\s*World Premiere/i, "")
+    .replace(/\s*Season\s*\d+/i, "")
+    .replace(/\s*\(\d{4}\)/, "")
+    .trim();
+
+  var query = cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (!query) {
+    showTextPlaceholder(imgElement, movieTitle);
+    return;
+  }
+
+  var firstChar = query.charAt(0);
+  var imdbUrl = "https://v3.sg.media-imdb.com/suggestion/" + firstChar + "/" + encodeURIComponent(query) + ".json";
+
+  // Note: No custom headers here so browser CORS preflight never blocks the request!
+  fetch(imdbUrl)
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      var hits = (data && data.d) ? data.d : [];
+      var matched = hits.find(function (item) {
+        return item.i && item.i.imageUrl;
+      });
+      if (matched && matched.i && matched.i.imageUrl) {
+        imgElement.src = matched.i.imageUrl.replace(/\._V1_.*\.jpg$/i, "._V1_UX600_.jpg");
+      } else {
+        return fetchItunesPoster(imgElement, cleanTitle, movieTitle);
+      }
+    })
+    .catch(function () {
+      fetchItunesPoster(imgElement, cleanTitle, movieTitle);
     });
-    if (matched && matched.i && matched.i.imageUrl) {
-      var highResUrl = matched.i.imageUrl.replace(/\._V1_.*\.jpg$/i, "._V1_UX700_.jpg");
-      imgElement.src = highResUrl;
-    }
-  })
-  .catch(function(err) {
-    console.error("Dynamic IMDb poster load failed:", err);
-  });
 }
+
+function fetchItunesPoster(imgElement, cleanTitle, originalTitle) {
+  var itunesUrl = "https://itunes.apple.com/search?term=" + encodeURIComponent(cleanTitle) + "&media=movie&limit=1";
+  fetch(itunesUrl)
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (data && data.results && data.results[0] && data.results[0].artworkUrl100) {
+        imgElement.src = data.results[0].artworkUrl100.replace("100x100bb", "600x900bb");
+      } else {
+        showTextPlaceholder(imgElement, originalTitle);
+      }
+    })
+    .catch(function () {
+      showTextPlaceholder(imgElement, originalTitle);
+    });
+}
+
+function showTextPlaceholder(imgElement, movieTitle) {
+  if (!imgElement || !imgElement.parentNode) return;
+  if (imgElement.classList.contains("modal-mini-poster") || imgElement.classList.contains("banner-bg-img")) {
+    imgElement.style.display = "none";
+    return;
+  }
+  var placeholder = document.createElement("div");
+  placeholder.className = "poster-placeholder";
+  placeholder.textContent = movieTitle || "Movie";
+  imgElement.replaceWith(placeholder);
+}
+
+// Keep window.handleMissingPoster global so index.html doesn't override it with old code
+window.handleMissingPoster = handleMissingPoster;
 
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
@@ -256,7 +302,9 @@ async function initNeonFestivalMode() {
     });
     var data = await res.json();
     if (data && data[0] && data[0].value) {
-      if (data[0].value.enabled === false) return;
+      if (data[0].value.enabled === false) {
+        return;
+      }
 
       if (data[0].value.enabled === true) {
         var custName = (data[0].value.name || "").trim();
@@ -296,17 +344,23 @@ function renderSubtleNeonBanner(text, type) {
   var rightIcon = "✨";
 
   if (type === "diwali") {
-    borderCol = "#ffb703"; shadowCol = "#fb8500"; leftIcon = "🪔"; rightIcon = "🪔";
+    borderCol = "#ffb703"; shadowCol = "#fb8500";
+    leftIcon = "🪔"; rightIcon = "🪔";
   } else if (type === "sankranti") {
-    borderCol = "#06d6a0"; shadowCol = "#ffd166"; leftIcon = "🪁"; rightIcon = "🪁";
+    borderCol = "#06d6a0"; shadowCol = "#ffd166";
+    leftIcon = "🪁"; rightIcon = "🪁";
   } else if (type === "christmas") {
-    borderCol = "#ff3838"; shadowCol = "#2ed573"; leftIcon = "🎅"; rightIcon = "🦌";
+    borderCol = "#ff3838"; shadowCol = "#2ed573";
+    leftIcon = "🎅"; rightIcon = "🦌";
   } else if (type === "holi") {
-    borderCol = "#ff007f"; shadowCol = "#00e5ff"; leftIcon = "🎨"; rightIcon = "🎨";
+    borderCol = "#ff007f"; shadowCol = "#00e5ff";
+    leftIcon = "🎨"; rightIcon = "🎨";
   } else if (type === "tricolor") {
-    borderCol = "#ff9933"; shadowCol = "#138808"; leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
+    borderCol = "#ff9933"; shadowCol = "#138808";
+    leftIcon = "🇮🇳"; rightIcon = "🇮🇳";
   } else if (type === "newyear") {
-    borderCol = "#00f0ff"; shadowCol = "#7209b7"; leftIcon = "🎆"; rightIcon = "🎆";
+    borderCol = "#00f0ff"; shadowCol = "#7209b7";
+    leftIcon = "🎆"; rightIcon = "🎆";
   }
 
   style.textContent = `
@@ -339,7 +393,13 @@ function renderSubtleNeonBanner(text, type) {
       z-index: 2;
     }
     #festHeaderCanvas {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
     }
   `;
   document.head.appendChild(style);
@@ -596,29 +656,19 @@ function createMovieCard(movie) {
   image.loading = "lazy";
   image.decoding = "async";
 
-  // Check if poster is a valid URL and not a raw text caption stored in database
-  var hasValidPoster = movie.poster && 
-                       (movie.poster.startsWith("http://") || movie.poster.startsWith("https://")) && 
-                       !movie.poster.toLowerCase().includes("poster") &&
-                       !movie.poster.toLowerCase().includes("world premiere");
-
-  if (hasValidPoster) {
-    image.src = getAdaptivePosterUrl(movie.poster);
-  } else {
-    image.src = ""; // Blank source triggers onerror or immediate fallback
-  }
+  var adaptiveSrc = getAdaptivePosterUrl(movie.poster);
 
   image.onerror = function () {
-    if (typeof handleMissingPoster === "function") {
-      handleMissingPoster(image, movie.title);
-    }
+    handleMissingPoster(image, movie.title);
   };
 
   wrapper.appendChild(image);
   card.appendChild(wrapper);
 
-  // If poster URL is invalid or contains caption text, trigger IMDb fallback immediately
-  if (!hasValidPoster && typeof handleMissingPoster === "function") {
+  if (adaptiveSrc) {
+    image.src = adaptiveSrc;
+  } else {
+    // If poster is missing or invalid in DB, fetch immediately from IMDb/iTunes
     handleMissingPoster(image, movie.title);
   }
 
