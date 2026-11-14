@@ -601,39 +601,37 @@ function createMovieCard(movie) {
   wrapper.appendChild(badgeLeft);
   wrapper.appendChild(badgeRight);
 
-  if (movie.poster) {
-    var image = document.createElement("img");
-    image.className = "poster";
-    image.src = getAdaptivePosterUrl(movie.poster);
-    image.alt = movie.title + " poster";
-    image.loading = "lazy";
-    image.decoding = "async";
-    
-    // 🔥 Integrated IMDb Dynamic Fallback on Image Load Failure
-    image.onerror = function () {
-      handleMissingPoster(image, movie.title);
-    };
+  var image = document.createElement("img");
+  image.className = "poster";
+  image.alt = movie.title + " poster";
+  image.loading = "lazy";
+  image.decoding = "async";
 
-    wrapper.appendChild(image);
+  // 🔥 Smart URL Validation Check: Filters out bad text captions or file names stored in poster_url
+  var hasValidPoster = movie.poster && 
+                       (movie.poster.startsWith("http://") || movie.poster.startsWith("https://")) && 
+                       !movie.poster.toLowerCase().includes("poster") &&
+                       !movie.poster.toLowerCase().includes("world premiere");
+
+  if (hasValidPoster) {
+    image.src = getAdaptivePosterUrl(movie.poster);
   } else {
-    // If poster field is completely empty in DB, create an image element and trigger fallback instantly!
-    var image = document.createElement("img");
-    image.className = "poster";
-    image.src = "";
-    image.alt = movie.title + " poster";
-    image.loading = "lazy";
-    image.decoding = "async";
-    
-    image.onerror = function () {
-      handleMissingPoster(image, movie.title);
-    };
-    
-    wrapper.appendChild(image);
-    // Trigger immediately since src is empty
-    handleMissingPoster(image, movie.title);
+    image.src = ""; // Invalid/text link unte empty ga petti direct ga fallback trigger chestham
   }
 
+  image.onerror = function () {
+    if (typeof handleMissingPoster === "function") {
+      handleMissingPoster(image, movie.title);
+    }
+  };
+
+  wrapper.appendChild(image);
   card.appendChild(wrapper);
+
+  // If poster URL is invalid or contains text, trigger IMDb fallback immediately
+  if (!hasValidPoster && typeof handleMissingPoster === "function") {
+    handleMissingPoster(image, movie.title);
+  }
 
   var info = document.createElement("div");
   info.className = "movie-info";
@@ -867,7 +865,7 @@ function loadMessages() {
         if (!actionArea) return;
         var link = activeSlide ? activeSlide.getAttribute("data-link") : "";
         if (link) {
-          actionArea.html = `<a class="jj-ticker-btn" href="${safeURL(link)}" target="_blank" rel="noopener noreferrer">Open ➜</a>`;
+          actionArea.innerHTML = `<a class="jj-ticker-btn" href="${safeURL(link)}" target="_blank" rel="noopener noreferrer">Open ➜</a>`;
           actionArea.style.display = "block";
         } else {
           actionArea.innerHTML = "";
