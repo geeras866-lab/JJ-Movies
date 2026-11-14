@@ -68,7 +68,7 @@ function getAdaptivePosterUrl(originalUrl) {
   return val;
 }
 
-// 🔥 Fixed Live IMDb + iTunes Fallback (Exact first-letter routing & clean matching)
+// 🔥 Live IMDb + iTunes Fallback with zero error crashes
 function handleMissingPoster(imgElement, movieTitle) {
   if (!imgElement || imgElement.dataset.fallbackTried === "true") return;
   imgElement.dataset.fallbackTried = "true";
@@ -638,7 +638,8 @@ function createMovieCard(movie) {
   image.loading = "lazy";
   image.decoding = "async";
 
-  var adaptiveSrc = getAdaptivePosterUrl(movie.poster);
+  var posterUrl = movie.poster ? String(movie.poster).trim() : "";
+  var hasValidHttpUrl = (posterUrl.startsWith("http://") || posterUrl.startsWith("https://")) && !posterUrl.includes(" ");
 
   image.onerror = function () {
     handleMissingPoster(image, movie.title);
@@ -647,9 +648,10 @@ function createMovieCard(movie) {
   wrapper.appendChild(image);
   card.appendChild(wrapper);
 
-  if (adaptiveSrc) {
-    image.src = adaptiveSrc;
+  if (hasValidHttpUrl) {
+    image.src = getAdaptivePosterUrl(posterUrl);
   } else {
+    // Supabase లో text caption ఉన్నా లేదా లింక్ లేకపోయినా డైరెక్ట్‌గా IMDb ఫాల్‌బ్యాక్ రన్ అవుతుంది
     handleMissingPoster(image, movie.title);
   }
 
