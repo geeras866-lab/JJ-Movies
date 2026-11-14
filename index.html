@@ -153,6 +153,32 @@
         genreSelect.dispatchEvent(new Event('change'));
       }
     }
+
+    // 🔥 Live IMDb Fallback for missing posters
+    function handleMissingPoster(imgElement, movieTitle) {
+      if (imgElement.dataset.fallbackTried) return;
+      imgElement.dataset.fallbackTried = "true";
+
+      var cleanTitle = movieTitle.replace(/Season \d+/, "").trim().toLowerCase();
+      
+      fetch('https://v3.sg.media-imdb.com/suggestion/x/' + encodeURIComponent(cleanTitle) + '.json', {
+        headers: { "User-Agent": "Mozilla/5.0" }
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        var hits = data && data.d ? data.d : [];
+        var matched = hits.find(function(item) {
+          return item.id && item.id.indexOf("tt") === 0 && item.i && item.i.imageUrl;
+        });
+        if (matched && matched.i && matched.i.imageUrl) {
+          var highResUrl = matched.i.imageUrl.replace(/\._V1_.*\.jpg$/i, "._V1_UX700_.jpg");
+          imgElement.src = highResUrl;
+        }
+      })
+      .catch(function(err) {
+        console.error("Dynamic IMDb poster load failed:", err);
+      });
+    }
   </script>
 
   <!-- Cloudflare Web Analytics -->
