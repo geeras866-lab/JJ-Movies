@@ -62,6 +62,32 @@ function getAdaptivePosterUrl(originalUrl) {
   return originalUrl;
 }
 
+// 🔥 Live IMDb Fallback for missing posters
+function handleMissingPoster(imgElement, movieTitle) {
+  if (imgElement.dataset.fallbackTried) return;
+  imgElement.dataset.fallbackTried = "true";
+
+  var cleanTitle = movieTitle.replace(/Season \d+/, "").trim().toLowerCase();
+  
+  fetch("https://v3.sg.media-imdb.com/suggestion/x/" + encodeURIComponent(cleanTitle) + ".json", {
+    headers: { "User-Agent": "Mozilla/5.0" }
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    var hits = data && data.d ? data.d : [];
+    var matched = hits.find(function(item) {
+      return item.id && item.id.indexOf("tt") === 0 && item.i && item.i.imageUrl;
+    });
+    if (matched && matched.i && matched.i.imageUrl) {
+      var highResUrl = matched.i.imageUrl.replace(/\._V1_.*\.jpg$/i, "._V1_UX700_.jpg");
+      imgElement.src = highResUrl;
+    }
+  })
+  .catch(function(err) {
+    console.error("Dynamic IMDb poster load failed:", err);
+  });
+}
+
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
     var style = document.createElement("style");
@@ -202,16 +228,10 @@ function getHeaders() {
 
 function getSmartCalendarFestival() {
   var now = new Date();
-  var m = now.getMonth() + 1; // 1-12
-  var d = now.getDate();      // 1-31
-  var h = now.getHours();     // 0-23 (Exact Time Check)
+  var m = now.getMonth() + 1;
+  var d = now.getDate();
+  var h = now.getHours();
   var y = now.getFullYear();
-
-  function isFestivalActive(festMonth, festDay) {
-    if (m === festMonth && d === festDay && h >= 0) return true; 
-    if (m === festMonth && d === (festDay + 1) && h <= 23) return true; 
-    return false;
-  }
 
   if ((m === 12 && d >= 31 && h >= 0) || (m === 1 && d <= 1)) return { name: "HAPPY NEW YEAR " + ((m === 12) ? y + 1 : y), type: "newyear" };
   if (m === 1 && d >= 14 && d <= 15) return { name: "HAPPY SANKRANTI", type: "sankranti" };
@@ -234,7 +254,7 @@ async function initNeonFestivalMode() {
     var data = await res.json();
     if (data && data[0] && data[0].value) {
       if (data[0].value.enabled === false) {
-        return; // Admin OFF means complete shutdown
+        return;
       }
 
       if (data[0].value.enabled === true) {
@@ -498,7 +518,7 @@ function renderShowcaseCarousel() {
     return `
       <div class="banner-slide ${isCurrent}">
         <div class="banner-backdrop">
-          <img src="${posterSrc}" alt="${escapeHTML(movie.title)}" class="banner-bg-img" onerror="this.src='${escapeHTML(movie.poster)}'">
+          <img src="${posterSrc}" alt="${escapeHTML(movie.title)}" class="banner-bg-img" onerror="handleMissingPoster(this, '${escapeHTML(movie.title)}')">
           <div class="banner-vignette"></div>
         </div>
         <div class="banner-overlay-content">
@@ -588,18 +608,29 @@ function createMovieCard(movie) {
     image.alt = movie.title + " poster";
     image.loading = "lazy";
     image.decoding = "async";
+    
+    // 🔥 Integrated IMDb Dynamic Fallback on Image Load Failure
     image.onerror = function () {
-      var placeholder = document.createElement("div");
-      placeholder.className = "poster-placeholder";
-      placeholder.textContent = movie.title;
-      image.replaceWith(placeholder);
+      handleMissingPoster(image, movie.title);
     };
+
     wrapper.appendChild(image);
   } else {
-    var placeholder = document.createElement("div");
-    placeholder.className = "poster-placeholder";
-    placeholder.textContent = movie.title;
-    wrapper.appendChild(placeholder);
+    // If poster field is completely empty in DB, create an image element and trigger fallback instantly!
+    var image = document.createElement("img");
+    image.className = "poster";
+    image.src = "";
+    image.alt = movie.title + " poster";
+    image.loading = "lazy";
+    image.decoding = "async";
+    
+    image.onerror = function () {
+      handleMissingPoster(image, movie.title);
+    };
+    
+    wrapper.appendChild(image);
+    // Trigger immediately since src is empty
+    handleMissingPoster(image, movie.title);
   }
 
   card.appendChild(wrapper);
@@ -726,7 +757,7 @@ async function showMovieDetails(movieId) {
   modalDetails.innerHTML = `
     ${pinBadgeHTML}
     <div class="movie-header-flex">
-      <img class="modal-mini-poster" src="${getAdaptivePosterUrl(movie.poster)}" alt="${escapeHTML(movie.title)}" onerror="this.style.display='none'">
+      <img class="modal-mini-poster" src="${getAdaptivePosterUrl(movie.poster)}" alt="${escapeHTML(movie.title)}" onerror="handleMissingPoster(this, '${escapeHTML(movie.title)}')">
       <div class="movie-header-info">
         <h2>${escapeHTML(movie.title)}</h2>
         <div class="movie-meta-chips">
@@ -836,7 +867,7 @@ function loadMessages() {
         if (!actionArea) return;
         var link = activeSlide ? activeSlide.getAttribute("data-link") : "";
         if (link) {
-          actionArea.innerHTML = `<a class="jj-ticker-btn" href="${safeURL(link)}" target="_blank" rel="noopener noreferrer">Open ➜</a>`;
+          actionArea.html = `<a class="jj-ticker-btn" href="${safeURL(link)}" target="_blank" rel="noopener noreferrer">Open ➜</a>`;
           actionArea.style.display = "block";
         } else {
           actionArea.innerHTML = "";
