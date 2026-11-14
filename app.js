@@ -3,7 +3,7 @@ var SUPABASE_KEY = "sb_publishable_902itkUPAUe272Q4B4jF0w_OEKDNuxr";
 var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 
 // 👉 themoviedb.org -> Settings -> API -> "API Key (v3 auth)" ikkada paste cheyyandi
-var TMDB_API_KEY = "";
+var TMDB_API_KEY = "200b7daf6101f22010cdd5eccea4a119";
 
 var movies = [];
 var messages = [];
