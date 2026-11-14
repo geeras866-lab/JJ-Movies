@@ -885,4 +885,4 @@ createExtraSections();
 loadMovies();
 initNeonFestivalMode();
 
-App.js full code ivvu
+App.js edi
