@@ -2,7 +2,7 @@ var SUPABASE_URL = "https://tswyabgdldbsaopipvug.supabase.co";
 var SUPABASE_KEY = "sb_publishable_902itkUPAUe272Q4B4jF0w_OEKDNuxr";
 var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 
-// 👉 themoviedb.org -> Settings -> API -> "API Key (v3 auth)" ikkada paste cheyyandi (optional)
+// 👉 themoviedb.org -> Settings -> API -> "API Key (v3 auth)" ikkada paste cheyyandi
 var TMDB_API_KEY = "";
 
 var movies = [];
@@ -19,6 +19,7 @@ var movieModal = document.getElementById("movieModal");
 var modalDetails = document.getElementById("modalDetails");
 
 var carouselInterval = null;
+var inlineSearch = "";
 
 function escapeHTML(value) {
   return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
@@ -74,6 +75,23 @@ function getAdaptivePosterUrl(originalUrl) {
   return val;
 }
 
+// ---------- Strict poster matching helpers ----------
+var posterMatchLog = {};
+
+function normTitle(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function yearClose(a, b, tol) {
+  var x = parseInt(a, 10), y = parseInt(b, 10);
+  if (!x || !y) return false;
+  return Math.abs(x - y) <= tol;
+}
+
 // IMDb suggestion search (unofficial, no key)
 async function imdbSearch(q) {
   var key = String(q || "").toLowerCase().replace(/[^a-z0-9 ]/g, "").trim().replace(/\s+/g, "_");
@@ -85,28 +103,8 @@ async function imdbSearch(q) {
   return j.d || [];
 }
 
-// 🛠 ONE-TIME: Console lo generatePosterSQL() ani run cheyyandi.
-async function generatePosterSQL() {
-  var sql = [], missing = [];
-  for (var i = 0; i < movies.length; i++) {
-    var m = movies[i];
-    var url = await resolvePosterUrl(m.title, m.year);
-    if (url) {
-      sql.push("update movies set poster_url = '" + url.replace(/'/g, "''") + "' where id = '" + String(m.id).replace(/'/g, "''") + "';");
-    } else {
-      missing.push(m.title);
-    }
-    await new Promise(function (r) { setTimeout(r, 300); });
-  }
-  var out = sql.join("\n");
-  console.log(out);
-  console.log("DORAKANIVI (" + missing.length + "):", missing);
-  try { copy(out); } catch (e) {}
-  return { sql: out, missing: missing };
-}
-window.generatePosterSQL = generatePosterSQL;
-
-// 🔥 Poster finder: IMDb -> TMDB -> Wikipedia -> TVMaze
+// 🔥 Poster finder (STRICT): peru exact match + year match unte matrame poster istundi.
+// Match ayyaledante null -> card lo title placeholder chupistundi (thappu poster raadu).
 async function resolvePosterUrl(movieTitle, movieYear) {
   var cleanTitle = String(movieTitle || "")
     .replace(/Marvel Studios'?\s*/i, "")
@@ -119,55 +117,61 @@ async function resolvePosterUrl(movieTitle, movieYear) {
   var cacheKey = (cleanTitle + "_" + (movieYear || "")).toLowerCase();
   if (posterCache[cacheKey]) return posterCache[cacheKey];
 
-  var searchTerms = [cleanTitle];
-  if (cleanTitle.includes(":")) {
-    var baseColon = cleanTitle.split(":")[0].trim();
-    if (baseColon.length > 2) searchTerms.push(baseColon);
+  // candidates: { term, tol }  (tol = year tolerance)
+  var candidates = [{ term: cleanTitle, tol: 1 }];
+  if (movieYear && cleanTitle.indexOf(":") > 0) {
+    var beforeColon = cleanTitle.split(":")[0].trim();
+    if (beforeColon.length > 2) candidates.push({ term: beforeColon, tol: 0 });
   }
 
-  // 0. IMDb suggestion endpoint
-  for (var s = 0; s < searchTerms.length; s++) {
+  // 1. IMDb (exact title + year)
+  for (var s = 0; s < candidates.length; s++) {
     try {
-      var imdbList = (await imdbSearch(searchTerms[s])).filter(function (x) {
-        return x.id && x.id.indexOf("tt") === 0 && x.i && x.i.imageUrl;
+      var cand = candidates[s];
+      var list = await imdbSearch(cand.term);
+      var wanted = normTitle(cand.term);
+      var hit = list.find(function (x) {
+        if (!x.id || x.id.indexOf("tt") !== 0) return false;
+        if (!x.i || !x.i.imageUrl) return false;
+        if (!/feature|tv|video/i.test(String(x.q || ""))) return false;
+        if (normTitle(x.l) !== wanted) return false;
+        if (movieYear) return yearClose(x.y, movieYear, cand.tol);
+        return true;
       });
-      var imdbHit = null;
-      if (movieYear) {
-        imdbHit = imdbList.find(function (x) { return String(x.y) === String(movieYear); });
-      }
-      if (!imdbHit) imdbHit = imdbList[0];
-      if (imdbHit) {
-        var imdbImg = imdbHit.i.imageUrl.replace(/\._V1_.*\.jpg$/i, "._V1_SX600.jpg");
-        posterCache[cacheKey] = imdbImg;
-        return imdbImg;
+      if (hit) {
+        var img = hit.i.imageUrl.replace(/\._V1_.*\.jpg$/i, "._V1_SX600.jpg");
+        posterCache[cacheKey] = img;
+        posterMatchLog[cacheKey] = { src: "IMDb", matched: hit.l, year: hit.y, id: hit.id };
+        return img;
       }
     } catch (e) {}
   }
 
-  // 1. TMDB search (optional, key unte)
+  // 2. TMDB (optional, key unte) - kuda strict
   if (TMDB_API_KEY) {
-    for (var t = 0; t < searchTerms.length; t++) {
+    for (var t = 0; t < candidates.length; t++) {
       try {
+        var c2 = candidates[t];
         var tmdbRes = await fetch(
           "https://api.themoviedb.org/3/search/multi?api_key=" + encodeURIComponent(TMDB_API_KEY) +
-          "&query=" + encodeURIComponent(searchTerms[t])
+          "&query=" + encodeURIComponent(c2.term)
         );
         if (tmdbRes.ok) {
           var tmdbData = await tmdbRes.json();
-          var results = (tmdbData.results || []).filter(function (r) {
-            return r.poster_path && (r.media_type === "movie" || r.media_type === "tv");
+          var wantedT = normTitle(c2.term);
+          var best = (tmdbData.results || []).find(function (r) {
+            if (!r.poster_path) return false;
+            if (r.media_type !== "movie" && r.media_type !== "tv") return false;
+            var nm = r.title || r.name || r.original_title || r.original_name;
+            if (normTitle(nm) !== wantedT) return false;
+            var d = r.release_date || r.first_air_date || "";
+            if (movieYear) return yearClose(d.slice(0, 4), movieYear, c2.tol);
+            return true;
           });
-          var best = null;
-          if (movieYear) {
-            best = results.find(function (r) {
-              var d = r.release_date || r.first_air_date || "";
-              return d.indexOf(String(movieYear)) === 0;
-            });
-          }
-          if (!best) best = results[0];
           if (best) {
             var tmdbImg = "https://image.tmdb.org/t/p/w500" + best.poster_path;
             posterCache[cacheKey] = tmdbImg;
+            posterMatchLog[cacheKey] = { src: "TMDB", matched: best.title || best.name, year: (best.release_date || best.first_air_date || "").slice(0, 4) };
             return tmdbImg;
           }
         }
@@ -175,52 +179,55 @@ async function resolvePosterUrl(movieTitle, movieYear) {
     }
   }
 
-  // 2. Wikipedia fallback
-  var wikiQueries = [];
-  if (movieYear) wikiQueries.push(cleanTitle + " " + movieYear + " film");
-  wikiQueries.push(cleanTitle + " film");
-  wikiQueries.push(cleanTitle + " Telugu film");
-
-  for (var w = 0; w < wikiQueries.length; w++) {
-    try {
-      var wUrl = "https://en.wikipedia.org/w/api.php?action=query&generator=search" +
-        "&gsrsearch=" + encodeURIComponent(wikiQueries[w]) +
-        "&gsrlimit=5&prop=pageimages&piprop=thumbnail&pithumbsize=500" +
-        "&format=json&origin=*";
-      var wRes = await fetch(wUrl);
-      if (wRes.ok) {
-        var wData = await wRes.json();
-        var pages = wData.query && wData.query.pages ? Object.values(wData.query.pages) : [];
-        pages.sort(function (a, b) { return a.index - b.index; });
-        var wHit = pages.find(function (p) { return p.thumbnail && p.thumbnail.source; });
-        if (wHit) {
-          posterCache[cacheKey] = wHit.thumbnail.source;
-          return wHit.thumbnail.source;
-        }
+  // 3. TVMaze (series only) - exact name + year
+  try {
+    var tvRes = await fetch("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(cleanTitle));
+    if (tvRes.ok) {
+      var tv = await tvRes.json();
+      var tvYear = (tv.premiered || "").slice(0, 4);
+      var okName = normTitle(tv.name) === normTitle(cleanTitle);
+      var okYear = !movieYear || yearClose(tvYear, movieYear, 1);
+      if (okName && okYear && tv.image && (tv.image.original || tv.image.medium)) {
+        var tvImg = tv.image.original || tv.image.medium;
+        posterCache[cacheKey] = tvImg;
+        posterMatchLog[cacheKey] = { src: "TVMaze", matched: tv.name, year: tvYear };
+        return tvImg;
       }
-    } catch (e) {}
-  }
-
-  // 3. TVMaze fallback (series)
-  for (var k = 0; k < searchTerms.length; k++) {
-    try {
-      var tvRes = await fetch("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(searchTerms[k]));
-      if (tvRes.ok) {
-        var tvData = await tvRes.json();
-        if (tvData && tvData.image && (tvData.image.original || tvData.image.medium)) {
-          var tvImg = tvData.image.original || tvData.image.medium;
-          posterCache[cacheKey] = tvImg;
-          return tvImg;
-        }
-      }
-    } catch (e) {}
-  }
+    }
+  } catch (e) {}
 
   return null;
 }
 
+// 🛠 ONE-TIME: Console lo  generatePosterSQL()  ani run cheyyandi.
+// Matched title tho table chupistundi -> check chesi tarvata SQL run cheyyandi.
+async function generatePosterSQL() {
+  var sql = [], missing = [], rows = [];
+  for (var i = 0; i < movies.length; i++) {
+    var m = movies[i];
+    var url = await resolvePosterUrl(m.title, m.year);
+    if (url) {
+      var cleanKey = (String(m.title).replace(/\s*\(\d{4}\)/, "").trim() + "_" + (m.year || "")).toLowerCase();
+      var info = posterMatchLog[cleanKey] || {};
+      rows.push({ "Mee movie": m.title, "Mee year": m.year, "Match dorikindi": info.matched, "Match year": info.year, "Source": info.src });
+      sql.push("update movies set poster_url = '" + url.replace(/'/g, "''") + "' where id = '" + String(m.id).replace(/'/g, "''") + "';");
+    } else {
+      missing.push(m.title);
+    }
+    await new Promise(function (r) { setTimeout(r, 300); });
+  }
+  var out = sql.join("\n");
+  console.table(rows);
+  console.log(out);
+  console.log("DORAKANIVI - manual ga poster pettali (" + missing.length + "):", missing);
+  try { copy(out); } catch (e) {}
+  return { sql: out, missing: missing };
+}
+window.generatePosterSQL = generatePosterSQL;
+
 function handleMissingPoster(imgElement, movieTitle, movieYear) {
   if (!imgElement || imgElement.dataset.fallbackTried === "true") {
+    // Already tried once and failed again -> placeholder
     if (imgElement && imgElement.dataset.fallbackTried === "true" && imgElement.dataset.final === "true") {
       showTextPlaceholder(imgElement, movieTitle);
     }
@@ -731,7 +738,13 @@ function matchesFilters(movie) {
   var movieCategory = (movie.category || "").toLowerCase().trim();
   var matchesCategory = selectedCategory === "all" || movieCategory === selectedCategory;
   var matchesYear = year === "all" || String(movie.year) === year;
-  return matchesCategory && matchesYear;
+  var matchesText = true;
+  if (inlineSearch) {
+    matchesText = (movie.title || "").toLowerCase().includes(inlineSearch) ||
+      (movie.description || "").toLowerCase().includes(inlineSearch) ||
+      (movie.category || "").toLowerCase().includes(inlineSearch);
+  }
+  return matchesCategory && matchesYear && matchesText;
 }
 
 function createMovieCard(movie) {
@@ -840,10 +853,14 @@ function handleLiveSearch() {
   var countEl = document.getElementById("searchResultCount");
   var titleEl = document.getElementById("searchResultsTitle");
 
+  // Results section HTML lo lekapothe, main grid ne filter chestundi
   if (!resultsSection || !searchGrid || !mainWrapper) {
+    inlineSearch = search;
+    if (clearBtn) clearBtn.style.display = search ? "block" : "none";
     renderMovies();
     return;
   }
+  inlineSearch = "";
 
   if (clearBtn) clearBtn.style.display = search ? "block" : "none";
 
@@ -866,6 +883,7 @@ function handleLiveSearch() {
 
   searchGrid.innerHTML = "";
   if (countEl) countEl.textContent = matches.length + (matches.length === 1 ? " movie" : " movies");
+  // textContent ki escapeHTML avasaram ledu
   if (titleEl) titleEl.textContent = 'Results for "' + search + '"';
 
   if (matches.length === 0) {
@@ -1052,6 +1070,52 @@ function closeMovieModal() {
   movieModal.hidden = true;
 }
 
+// ✅ FIXED: searchInput.getElementById(...) tholaginchanu
+// 🔍 HTML lo search bar lekapothe, automatic ga create chestundi
+function ensureSearchBar() {
+  if (document.getElementById("searchInput")) {
+    searchInput = document.getElementById("searchInput");
+    return;
+  }
+  if (!document.getElementById("jjSearchStyles")) {
+    var st = document.createElement("style");
+    st.id = "jjSearchStyles";
+    st.textContent = `
+      .jj-search-wrap { max-width:1200px; margin:14px auto 6px; padding:0 12px; }
+      .jj-search-box { position:relative; display:flex; align-items:center; }
+      .jj-search-box input {
+        width:100%; background:#0d1526; border:1px solid rgba(255,255,255,0.12);
+        color:#f1f5f9; font-size:14px; padding:12px 40px 12px 40px; border-radius:10px; outline:none;
+      }
+      .jj-search-box input:focus { border-color:#ff2450; }
+      .jj-search-icon { position:absolute; left:14px; font-size:14px; opacity:.7; pointer-events:none; }
+      .jj-search-clear {
+        position:absolute; right:10px; background:none; border:none; color:#94a3b8;
+        font-size:16px; cursor:pointer; display:none; padding:4px 6px;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+  var wrap = document.createElement("section");
+  wrap.className = "jj-search-wrap";
+  wrap.innerHTML =
+    '<div class="jj-search-box">' +
+    '<span class="jj-search-icon">🔍</span>' +
+    '<input id="searchInput" type="search" placeholder="Search movies..." autocomplete="off">' +
+    '<button id="clearSearchBtn" class="jj-search-clear" type="button" aria-label="Clear">✕</button>' +
+    '</div>';
+  var anchor = document.getElementById("collection") || (movieGrid && movieGrid.parentNode);
+  if (anchor && anchor.parentNode) {
+    anchor.parentNode.insertBefore(wrap, anchor);
+  } else {
+    document.body.insertBefore(wrap, document.body.firstChild);
+  }
+  searchInput = document.getElementById("searchInput");
+  var cb = document.getElementById("clearSearchBtn");
+  if (cb) cb.addEventListener("click", clearLiveSearch);
+}
+
+ensureSearchBar();
 if (searchInput) searchInput.addEventListener("input", handleLiveSearch);
 if (genreFilter) genreFilter.addEventListener("change", renderMovies);
 if (yearFilter) yearFilter.addEventListener("change", renderMovies);
