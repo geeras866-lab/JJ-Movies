@@ -48,11 +48,12 @@ function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
   var val = String(originalUrl).trim();
 
-  // Reject non-URLs, spaces, or expired Telegram Bot API file links
+  // 🛑 CRITICAL FIX: Reject expired/direct Telegram bot file links completely so fallback takes over!
   if (
     (!val.startsWith("http://") && !val.startsWith("https://")) ||
     val.includes(" ") ||
-    val.includes("api.telegram.org/file/")
+    val.includes("api.telegram.org") ||
+    val.includes("t.me")
   ) {
     return "";
   }
@@ -70,13 +71,12 @@ function getAdaptivePosterUrl(originalUrl) {
   return val;
 }
 
-// 🔥 100% Direct IMDb JSONP Loader (Bypasses CORS completely without third-party proxies!)
+// 🔥 Direct IMDb JSONP Loader
 function fetchImdbJsonp(query, movieYear) {
   return new Promise(function (resolve) {
     var cleanQ = query.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
     if (!cleanQ) return resolve(null);
 
-    // IMDb limits JSONP query length to 20 chars
     var shortQ = cleanQ.substring(0, 20).replace(/_+$/g, "");
     var firstChar = shortQ.charAt(0);
     var cbName = "imdb_cb_" + Math.random().toString(36).substring(2, 10);
@@ -95,7 +95,6 @@ function fetchImdbJsonp(query, movieYear) {
     window[cbName] = function (data) {
       cleanup();
       var hits = (data && data.d) ? data.d : [];
-      // Filter strictly to real movies/TV series (tt...) with posters, never actors/podcasts
       var validHits = hits.filter(function (item) {
         return item.id && item.id.indexOf("tt") === 0 && item.i && item.i.imageUrl;
       });
@@ -105,14 +104,12 @@ function fetchImdbJsonp(query, movieYear) {
       var targetYear = parseInt(movieYear, 10);
       var bestMatch = null;
 
-      // 1. Match exact or +/- 1 year if movieYear is known
       if (targetYear) {
         bestMatch = validHits.find(function (item) {
           return item.y && Math.abs(parseInt(item.y, 10) - targetYear) <= 1;
         });
       }
 
-      // 2. Otherwise pick the top official IMDb movie/series match
       if (!bestMatch) {
         bestMatch = validHits[0];
       }
@@ -131,7 +128,7 @@ function fetchImdbJsonp(query, movieYear) {
   });
 }
 
-// 🔥 Accurate Official Movie/Series Poster Resolver
+// 🔥 Accurate Poster Resolver
 async function resolvePosterUrl(movieTitle, movieYear) {
   var cleanTitle = String(movieTitle || "")
     .replace(/Marvel Studios'?\s*/i, "")
@@ -150,7 +147,7 @@ async function resolvePosterUrl(movieTitle, movieYear) {
     if (baseColon.length > 2) searchTerms.push(baseColon);
   }
 
-  // 1. Primary: Official IMDb JSONP (Gets exact movie/series poster using Title + Year)
+  // 1. IMDb JSONP
   for (var i = 0; i < searchTerms.length; i++) {
     var imdbPoster = await fetchImdbJsonp(searchTerms[i], movieYear);
     if (imdbPoster) {
@@ -159,7 +156,7 @@ async function resolvePosterUrl(movieTitle, movieYear) {
     }
   }
 
-  // 2. Secondary: iTunes STRICTLY for Feature Movies (blocks audiobooks/podcasts/Pawn Stars)
+  // 2. iTunes Movie Search
   for (var j = 0; j < searchTerms.length; j++) {
     try {
       var itunesUrl = "https://itunes.apple.com/search?term=" + encodeURIComponent(searchTerms[j]) + "&media=movie&entity=movie&limit=5";
@@ -189,7 +186,7 @@ async function resolvePosterUrl(movieTitle, movieYear) {
     } catch (e) {}
   }
 
-  // 3. Tertiary: TVMaze API (for Web Series like She-Hulk, Ms. Marvel, Daredevil)
+  // 3. TVMaze API (for Web Series)
   for (var k = 0; k < searchTerms.length; k++) {
     try {
       var tvRes = await fetch("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(searchTerms[k]));
@@ -754,6 +751,7 @@ function createMovieCard(movie) {
   wrapper.appendChild(image);
   card.appendChild(wrapper);
 
+  // If adaptiveSrc is empty (due to expired telegram link), immediately trigger fallback
   if (adaptiveSrc) {
     image.src = adaptiveSrc;
   } else {
