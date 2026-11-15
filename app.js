@@ -330,6 +330,19 @@ function wakePlayerControls() {
   }
 }
 
+// 🔥 Chrome Intent Launcher (Hides Android Status Bar 100% without rebuilding APK)
+function openNoStatusBarFullscreen() {
+  if (!currentActiveStreamUrl) return;
+  var clean = currentActiveStreamUrl.replace(/^https?:\/\//i, "");
+  var scheme = currentActiveStreamUrl.startsWith("https") ? "https" : "http";
+  var isAndroid = /Android/i.test(navigator.userAgent);
+  if (isAndroid) {
+    window.location.href = "intent://" + clean + "#Intent;scheme=" + scheme + ";package=com.android.chrome;end";
+  } else {
+    window.open(currentActiveStreamUrl, "_blank");
+  }
+}
+
 function ensureInAppPlayerModal() {
   var modal = document.getElementById("inAppVideoModal");
   if (!modal) {
@@ -346,6 +359,7 @@ function ensureInAppPlayerModal() {
           </div>
           <div class="jj-player-header-actions">
             <button type="button" id="jjFullscreenBtn" class="jj-player-fs-btn" onclick="togglePlayerFullscreen()">⛶ Rotate Fullscreen</button>
+            <button type="button" id="jjHideStatusBtn" class="jj-player-status-btn" onclick="openNoStatusBarFullscreen()" title="Hide Status Bar">🔥 Hide Status Bar</button>
             <button type="button" class="jj-player-close" onclick="closeInAppPlayer()" aria-label="Close">&times;</button>
           </div>
         </div>
@@ -370,8 +384,16 @@ function ensureInAppPlayerModal() {
       fsBtn.textContent = "⛶ Rotate Fullscreen";
       fsBtn.onclick = togglePlayerFullscreen;
 
+      var statusBtn = document.createElement("button");
+      statusBtn.type = "button";
+      statusBtn.id = "jjHideStatusBtn";
+      statusBtn.className = "jj-player-status-btn";
+      statusBtn.textContent = "🔥 Hide Status Bar";
+      statusBtn.onclick = openNoStatusBarFullscreen;
+
       closeBtn.parentNode.insertBefore(actionsWrap, closeBtn);
       actionsWrap.appendChild(fsBtn);
+      actionsWrap.appendChild(statusBtn);
       actionsWrap.appendChild(closeBtn);
     }
   }
@@ -394,6 +416,7 @@ async function enterTrueFullscreen() {
   if (btn) btn.textContent = "✕ Exit Fullscreen";
   syncLandscapeDimensions();
 
+  // Request on documentElement so Android WebView hides top status bar if supported
   var rootEl = document.documentElement;
   try {
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
@@ -623,6 +646,7 @@ window.openServerSelection = openServerSelection;
 window.playMovieStream = playMovieStream;
 window.closeInAppPlayer = closeInAppPlayer;
 window.togglePlayerFullscreen = togglePlayerFullscreen;
+window.openNoStatusBarFullscreen = openNoStatusBarFullscreen;
 
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
@@ -826,6 +850,17 @@ function createExtraSections() {
         white-space: nowrap;
         box-shadow: 0 2px 8px rgba(255, 36, 80, 0.35);
       }
+      .jj-player-status-btn {
+        background: #1e293b;
+        border: 1px solid #38bdf8;
+        color: #38bdf8;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 6px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
       .jj-vlc-badge {
         background: #ff6b00;
         color: #fff;
@@ -912,18 +947,14 @@ function createExtraSections() {
       .jj-player-modal-box:fullscreen,
       .jj-player-modal-box:-webkit-full-screen,
       .jj-player-modal-box.jj-landscape-fs {
-        position: fixed !important;
-        inset: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        max-width: none !important;
-        max-height: none !important;
         margin: 0 !important;
         padding: 0 !important;
         border-radius: 0 !important;
         border: none !important;
         background: #000 !important;
         z-index: 999999 !important;
+        max-width: none !important;
+        max-height: none !important;
       }
 
       .jj-player-modal-box:fullscreen .jj-player-stage,
@@ -938,12 +969,6 @@ function createExtraSections() {
         z-index: 10 !important;
       }
 
-      .jj-player-modal-box:fullscreen .jj-server-bar,
-      .jj-player-modal-box:-webkit-full-screen .jj-server-bar,
-      .jj-player-modal-box.jj-landscape-fs .jj-server-bar {
-        display: none !important;
-      }
-
       .jj-player-modal-box:fullscreen .jj-player-header,
       .jj-player-modal-box:-webkit-full-screen .jj-player-header,
       .jj-player-modal-box.jj-landscape-fs .jj-player-header {
@@ -955,6 +980,12 @@ function createExtraSections() {
         padding: 10px 18px !important;
         background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, transparent 100%) !important;
         z-index: 30 !important;
+      }
+
+      .jj-player-modal-box:fullscreen .jj-server-bar,
+      .jj-player-modal-box:-webkit-full-screen .jj-server-bar,
+      .jj-player-modal-box.jj-landscape-fs .jj-server-bar {
+        display: none !important;
       }
 
       .jj-player-modal-box.jj-controls-idle .jj-player-header,
