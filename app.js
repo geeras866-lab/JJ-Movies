@@ -251,7 +251,7 @@ function showTextPlaceholder(imgElement, movieTitle) {
 
 window.handleMissingPoster = handleMissingPoster;
 
-// ---------- 🎬 IN-APP PLAYER & GUARANTEED LANDSCAPE ROTATION ENGINE ----------
+// ---------- 🎬 IN-APP PLAYER & BACK BUTTON INTERCEPTION ENGINE ----------
 function isDirectVideoFile(url) {
   if (!url) return false;
   return /\.(mp4|mkv|webm|m3u8)(\?.*)?$/i.test(url);
@@ -273,7 +273,6 @@ function loadHls(cb) {
   document.head.appendChild(s);
 }
 
-// Compute exact pixel dimensions so rotated portrait mode NEVER stretches vertically
 function syncLandscapeDimensions() {
   var modal = document.getElementById("inAppVideoModal");
   var box = modal ? modal.querySelector(".jj-player-modal-box") : null;
@@ -293,7 +292,6 @@ function syncLandscapeDimensions() {
   var vh = window.innerHeight || document.documentElement.clientHeight;
 
   if (vh > vw) {
-    // Phone / WebView is in Portrait -> Force exact 90deg Landscape with pixel-perfect 16:9 box
     box.style.position = "fixed";
     box.style.top = "50%";
     box.style.left = "50%";
@@ -301,7 +299,6 @@ function syncLandscapeDimensions() {
     box.style.height = vw + "px";
     box.style.transform = "translate(-50%, -50%) rotate(90deg)";
   } else {
-    // Phone physically rotated to Landscape -> Fill 100% naturally
     box.style.position = "fixed";
     box.style.top = "0";
     box.style.left = "0";
@@ -316,7 +313,6 @@ window.addEventListener("orientationchange", function () {
   setTimeout(syncLandscapeDimensions, 150);
 });
 
-// Auto-hide top bar after 2.2 seconds in Fullscreen so 0% black bar blocks the movie
 function wakePlayerControls() {
   var modal = document.getElementById("inAppVideoModal");
   var box = modal ? modal.querySelector(".jj-player-modal-box") : null;
@@ -329,7 +325,7 @@ function wakePlayerControls() {
   if (isFs) {
     playerUiTimer = setTimeout(function () {
       box.classList.add("jj-controls-idle");
-    }, 2200);
+    }, 2500);
   }
 }
 
@@ -385,7 +381,6 @@ function ensureInAppPlayerModal() {
   }
 }
 
-// 🔥 Activate Guaranteed Landscape Fullscreen (Works in Chrome + Android APK WebView)
 async function enterTrueFullscreen() {
   var modal = document.getElementById("inAppVideoModal");
   var box = modal ? modal.querySelector(".jj-player-modal-box") : null;
@@ -454,9 +449,6 @@ function togglePlayerFullscreen() {
   }
 }
 
-// 🔥 IF USER CLICKS THE ↖↘ ARROWS INSIDE THE EMBED IFRAME:
-// If the iframe itself enters fullscreen in portrait mode, it stretches vertically!
-// We immediately transfer fullscreen from the iframe to our rotated Landscape Box!
 function handleNativeFullscreenChange() {
   var modal = document.getElementById("inAppVideoModal");
   var box = modal ? modal.querySelector(".jj-player-modal-box") : null;
@@ -466,16 +458,12 @@ function handleNativeFullscreenChange() {
   if (!box) return;
 
   if (fsEl) {
-    // Try hardware landscape lock first
     if (screen.orientation && screen.orientation.lock) {
       screen.orientation.lock("landscape").catch(function () {});
     }
-
-    // If the iframe itself went fullscreen, apply landscape rotation directly to the iframe too!
     if (fsEl.tagName === "IFRAME") {
       fsEl.classList.add("jj-iframe-direct-landscape");
     }
-
     box.classList.add("jj-landscape-fs");
     if (btn) btn.textContent = "✕ Exit Fullscreen";
     syncLandscapeDimensions();
@@ -495,6 +483,15 @@ function handleNativeFullscreenChange() {
 document.addEventListener("fullscreenchange", handleNativeFullscreenChange);
 document.addEventListener("webkitfullscreenchange", handleNativeFullscreenChange);
 
+// 🔥 HARDWARE BACK BUTTON INTERCEPTION HANDLER
+function handlePlayerBackPopState(event) {
+  var modal = document.getElementById("inAppVideoModal");
+  if (modal && modal.style.display === "flex") {
+    event.preventDefault();
+    closeInAppPlayer();
+  }
+}
+
 function openMoviePlayerById(movieId) {
   var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
   if (!movie) return;
@@ -509,6 +506,12 @@ function openServerSelection(title, s1, s2) {
 
   if (titleElem) titleElem.textContent = title || "Playing Movie";
   modal.style.display = "flex";
+
+  // Push history state so hardware back button closes player instead of exiting app
+  try {
+    history.pushState({ jjPlayerOpen: true }, "", window.location.href);
+    window.addEventListener("popstate", handlePlayerBackPopState);
+  } catch (e) {}
 
   serverContainer.innerHTML = "";
   var servers = [];
@@ -583,7 +586,6 @@ function playMovieStream(rawUrl) {
     iframe.style.border = "0";
     stage.appendChild(iframe);
 
-    // Floating bottom-right button synced with the ↖↘ arrows inside the player
     var arrowSyncBtn = document.createElement("button");
     arrowSyncBtn.type = "button";
     arrowSyncBtn.className = "jj-corner-arrow-btn";
@@ -607,6 +609,8 @@ function closeInAppPlayer() {
 
   if (stage) stage.innerHTML = "";
   if (modal) modal.style.display = "none";
+
+  window.removeEventListener("popstate", handlePlayerBackPopState);
 }
 
 window.openMoviePlayerById = openMoviePlayerById;
@@ -720,7 +724,6 @@ function createExtraSections() {
       }
       .btn-modal-trailer:hover { background: #ff2450; color: #ffffff; }
 
-      /* 🔥 BIG PROMINENT WATCH ONLINE BANNER ABOVE DOWNLOAD FILES */
       .jj-watch-online-hero-wrap {
         margin: 14px 0 12px 0;
         padding: 12px 14px;
@@ -879,7 +882,6 @@ function createExtraSections() {
         position: relative;
       }
 
-      /* Bottom-right corner button over the embed player's ↖↘ arrows */
       .jj-corner-arrow-btn {
         position: absolute;
         bottom: 6px;
@@ -902,7 +904,6 @@ function createExtraSections() {
         background: #ff2450;
       }
 
-      /* 🔥 GUARANTEED LANDSCAPE FULLSCREEN (ZERO STRETCHING) */
       .jj-player-modal-box:fullscreen,
       .jj-player-modal-box:-webkit-full-screen,
       .jj-player-modal-box.jj-landscape-fs {
@@ -916,7 +917,6 @@ function createExtraSections() {
         max-height: none !important;
       }
 
-      /* Stage fills 100% of the rotated landscape container */
       .jj-player-modal-box:fullscreen .jj-player-stage,
       .jj-player-modal-box:-webkit-full-screen .jj-player-stage,
       .jj-player-modal-box.jj-landscape-fs .jj-player-stage {
@@ -929,20 +929,6 @@ function createExtraSections() {
         z-index: 10 !important;
       }
 
-      /* If the iframe itself went fullscreen via internal arrows while phone is in portrait */
-      @media (orientation: portrait) {
-        iframe.jj-iframe-direct-landscape:fullscreen,
-        iframe.jj-iframe-direct-landscape:-webkit-full-screen {
-          position: fixed !important;
-          top: 50% !important;
-          left: 50% !important;
-          width: 100vh !important;
-          height: 100vw !important;
-          transform: translate(-50%, -50%) rotate(90deg) !important;
-        }
-      }
-
-      /* Floating Overlay Header (Fades out after 2.2s) */
       .jj-player-modal-box:fullscreen .jj-player-header,
       .jj-player-modal-box:-webkit-full-screen .jj-player-header,
       .jj-player-modal-box.jj-landscape-fs .jj-player-header {
@@ -956,14 +942,12 @@ function createExtraSections() {
         z-index: 30 !important;
       }
 
-      /* Hide Server Bar in Fullscreen */
       .jj-player-modal-box:fullscreen .jj-server-bar,
       .jj-player-modal-box:-webkit-full-screen .jj-server-bar,
       .jj-player-modal-box.jj-landscape-fs .jj-server-bar {
         display: none !important;
       }
 
-      /* Auto-hide Header & Corner Button when watching */
       .jj-player-modal-box.jj-controls-idle .jj-player-header,
       .jj-player-modal-box.jj-controls-idle .jj-corner-arrow-btn {
         opacity: 0 !important;
@@ -1538,7 +1522,6 @@ async function showMovieDetails(movieId) {
   var modalPosterSrc = getAdaptivePosterUrl(movie.poster);
   var hasStream = Boolean(movie.stream1 || movie.stream2);
 
-  // 🔥 BIG FULL-WIDTH WATCH ONLINE BANNER BUTTON RIGHT ABOVE DOWNLOAD FILES
   var bigWatchOnlineSectionHTML = hasStream
     ? `
       <div class="jj-watch-online-hero-wrap">
