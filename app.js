@@ -382,7 +382,9 @@ function playMovieStream(rawUrl) {
     iframe.id = "vlcInAppIframe";
     iframe.src = url;
     iframe.allowFullscreen = true;
-    iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media");
+    iframe.setAttribute("webkitallowfullscreen", "true");
+    iframe.setAttribute("mozallowfullscreen", "true");
+    iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media; screen-wake-lock");
     iframe.style.width = "100%";
     iframe.style.height = "100%";
     iframe.style.border = "0";
