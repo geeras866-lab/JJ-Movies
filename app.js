@@ -1,9 +1,10 @@
 var SUPABASE_URL = "https://tswyabgdldbsaopipvug.supabase.co";
 var SUPABASE_KEY = "sb_publishable_902itkUPAUe272Q4B4jF0w_OEKDNuxr";
 var TELEGRAM_BOT_USERNAME = "jj_files_bot";
-
-// 👉 themoviedb.org -> Settings -> API -> "API Key (v3 auth)" ikkada paste cheyyandi
 var TMDB_API_KEY = "200b7daf6101f22010cdd5eccea4a119";
+
+// Build workflow auto-injects window.JJ_BUILD_VERSION inside APK
+var CURRENT_APK_VERSION = window.JJ_BUILD_VERSION || "1.0.0";
 
 var movies = [];
 var posterCache = {};
@@ -261,8 +262,10 @@ function isDirectVideoFile(url) {
 function normalizeStreamUrl(url) {
   var u = safeURL(url);
   if (!u || isDirectVideoFile(u)) return u;
-  var m = u.match(/^(https?:\/\/[^\/]+)\/(?:d|v|e)\/([A-Za-z0-9]+)(?:\/.*)?$/i);
-  if (m) return m[1] + "/e/" + m[2];
+  // Preserve query params for embeds like PlayDrive (?c=1), Filemoon, Byse.sx
+  if (u.indexOf("/e/") !== -1) return u;
+  var m = u.match(/^(https?:\/\/[^\/]+)\/(?:d|v)\/([A-Za-z0-9]+)(\?.*)?$/i);
+  if (m) return m[1] + "/e/" + m[2] + (m[3] || "");
   return u.replace(/streamlare\.com\/(v|d)\//, "streamlare.com/e/");
 }
 
@@ -330,7 +333,6 @@ function wakePlayerControls() {
   }
 }
 
-// 🔥 Chrome Intent Launcher (Hides Android Status Bar 100% without rebuilding APK)
 function openNoStatusBarFullscreen() {
   if (!currentActiveStreamUrl) return;
   var clean = currentActiveStreamUrl.replace(/^https?:\/\//i, "");
@@ -416,7 +418,6 @@ async function enterTrueFullscreen() {
   if (btn) btn.textContent = "✕ Exit Fullscreen";
   syncLandscapeDimensions();
 
-  // Request on documentElement so Android WebView hides top status bar if supported
   var rootEl = document.documentElement;
   try {
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
@@ -512,13 +513,26 @@ function handleNativeFullscreenChange() {
 document.addEventListener("fullscreenchange", handleNativeFullscreenChange);
 document.addEventListener("webkitfullscreenchange", handleNativeFullscreenChange);
 
-function handlePlayerBackPopState(event) {
-  var modal = document.getElementById("inAppVideoModal");
-  if (modal && modal.style.display === "flex") {
-    event.preventDefault();
-    closeInAppPlayer();
+// Unified Back-Button handler so pressing Back closes Fullscreen -> Player -> Movie Modal without exiting App
+window.addEventListener("popstate", function () {
+  var vModal = document.getElementById("inAppVideoModal");
+  var box = vModal ? vModal.querySelector(".jj-player-modal-box") : null;
+
+  if (vModal && vModal.style.display === "flex") {
+    var isFs = document.fullscreenElement || document.webkitFullscreenElement || (box && box.classList.contains("jj-landscape-fs"));
+    if (isFs) {
+      exitTrueFullscreen();
+      try { history.pushState({ jjPlayerOpen: true }, "", window.location.href); } catch (e) {}
+      return;
+    }
+    closeInAppPlayer(true);
+    return;
   }
-}
+
+  if (movieModal && !movieModal.hidden) {
+    movieModal.hidden = true;
+  }
+});
 
 function openMoviePlayerById(movieId) {
   var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
@@ -537,7 +551,6 @@ function openServerSelection(title, s1, s2) {
 
   try {
     history.pushState({ jjPlayerOpen: true }, "", window.location.href);
-    window.addEventListener("popstate", handlePlayerBackPopState);
   } catch (e) {}
 
   serverContainer.innerHTML = "";
@@ -629,7 +642,7 @@ function playMovieStream(rawUrl) {
   wakePlayerControls();
 }
 
-function closeInAppPlayer() {
+function closeInAppPlayer(fromPopState) {
   var modal = document.getElementById("inAppVideoModal");
   var stage = document.getElementById("jjPlayerStage");
 
@@ -638,7 +651,9 @@ function closeInAppPlayer() {
   if (stage) stage.innerHTML = "";
   if (modal) modal.style.display = "none";
 
-  window.removeEventListener("popstate", handlePlayerBackPopState);
+  if (!fromPopState && history.state && history.state.jjPlayerOpen) {
+    try { history.back(); } catch (e) {}
+  }
 }
 
 window.openMoviePlayerById = openMoviePlayerById;
@@ -998,14 +1013,6 @@ function createExtraSections() {
   }
 
   var collection = document.getElementById("collection");
-  if (collection && !document.getElementById("jjPinnedSection")) {
-    var pinned = document.createElement("section");
-    pinned.id = "jjPinnedSection";
-    pinned.className = "jj-feature-section";
-    pinned.innerHTML = '<h2 id="jjPinnedHeading" style="color:#94a3b8; font-size:13px; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; font-weight:700;">📌 Featured Movies</h2><div id="jjPinnedGrid" class="movie-grid"></div>';
-    collection.parentNode.insertBefore(pinned, collection);
-  }
-
   if (collection && !document.getElementById("jjUpdatesSection")) {
     var updates = document.createElement("section");
     updates.id = "jjUpdatesSection";
@@ -1614,7 +1621,13 @@ async function showMovieDetails(movieId) {
     if (!modalPosterSrc) handleMissingPoster(modalImg, movie.title, movie.year);
   }
 
+  var wasHidden = movieModal.hidden;
   movieModal.hidden = false;
+  if (wasHidden) {
+    try {
+      history.pushState({ jjModalOpen: true }, "", window.location.href);
+    } catch (e) {}
+  }
 
   var shareAnchor = document.getElementById("btnShareModalWhatsApp");
   if (shareAnchor) {
@@ -1726,7 +1739,12 @@ function loadMessages() {
 }
 
 function closeMovieModal() {
-  movieModal.hidden = true;
+  if (!movieModal.hidden) {
+    movieModal.hidden = true;
+    if (history.state && history.state.jjModalOpen) {
+      try { history.back(); } catch (e) {}
+    }
+  }
 }
 
 function ensureSearchBar() {
@@ -1772,6 +1790,83 @@ function ensureSearchBar() {
   if (cb) cb.addEventListener("click", clearLiveSearch);
 }
 
+// ---------- 📲 APK VERSION CHECKER & UPDATE POPUP ----------
+function isRunningInsideApk() {
+  var ua = navigator.userAgent || "";
+  var isCap = Boolean(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  var isWv = /wv|Android.*Version\/[0-9.]+/i.test(ua);
+  return isCap || isWv || window.location.protocol === "capacitor:" || window.location.hostname === "localhost";
+}
+
+function isVersionOlder(currentVer, latestVer) {
+  var c = String(currentVer || "1.0.0").split(".").map(Number);
+  var l = String(latestVer || "1.0.0").split(".").map(Number);
+  for (var i = 0; i < Math.max(c.length, l.length); i++) {
+    var cv = c[i] || 0;
+    var lv = l[i] || 0;
+    if (cv < lv) return true;
+    if (cv > lv) return false;
+  }
+  return false;
+}
+
+async function checkApkUpdate() {
+  if (!isRunningInsideApk()) return;
+
+  try {
+    var res = await fetch(SUPABASE_URL + "/rest/v1/site_settings?key=eq.app_version_config&select=value", {
+      headers: getHeaders()
+    });
+    var data = await res.json();
+    if (!data || !data[0] || !data[0].value) return;
+
+    var cfg = data[0].value;
+    var latestVersion = cfg.version || "1.0.0";
+
+    if (isVersionOlder(CURRENT_APK_VERSION, latestVersion)) {
+      showAppUpdateModal(latestVersion, cfg.apk_url || "./jj-movies.apk", cfg.notes, cfg.force === true);
+    }
+  } catch (err) {
+    console.warn("App update check skipped:", err);
+  }
+}
+
+function showAppUpdateModal(latestVer, apkUrl, notes, isForce) {
+  if (document.getElementById("jjAppUpdateModal")) return;
+
+  var modal = document.createElement("div");
+  modal.id = "jjAppUpdateModal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(4,8,16,0.92);backdrop-filter:blur(10px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:18px;";
+
+  modal.innerHTML = `
+    <div style="background:#0d1527;border:1.5px solid #ff2450;border-radius:18px;max-width:380px;width:100%;padding:24px 20px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.9);">
+      <div style="font-size:40px;margin-bottom:8px;">🚀</div>
+      <h2 style="margin:0 0 6px;color:#fff;font-size:20px;">New Update Available!</h2>
+      <p style="margin:0 0 14px;color:#38bdf8;font-size:12px;font-weight:bold;">
+        Old Version: v${escapeHTML(CURRENT_APK_VERSION)}  ➜  New Version: v${escapeHTML(latestVer)}
+      </p>
+      <div style="background:#131c31;border-radius:10px;padding:12px;margin-bottom:18px;text-align:left;color:#cbd5e1;font-size:13px;line-height:1.5;">
+        <strong style="color:#fff;display:block;margin-bottom:4px;">✨ What's New:</strong>
+        ${escapeHTML(notes || "Kotha version vachindi! Daya chesi app ni update cheskondi.")}
+      </div>
+      <a href="${escapeHTML(apkUrl)}" target="_blank" rel="noopener noreferrer"
+         style="display:block;width:100%;padding:13px;background:linear-gradient(135deg,#ff2450,#ff6b00);color:#fff;text-decoration:none;font-weight:800;font-size:14px;border-radius:10px;box-shadow:0 6px 20px rgba(255,36,80,0.4);">
+        ⬇ UPDATE APP NOW
+      </a>
+      ${!isForce ? `<button id="jjUpdateLaterBtn" type="button" style="margin-top:12px;background:transparent;border:none;color:#94a3b8;font-size:12px;cursor:pointer;padding:6px;">Later</button>` : `<p style="margin:12px 0 0;color:#f87171;font-size:11px;font-weight:bold;">⚠️ Old APK panicheyadu, daya chesi update cheyandi.</p>`}
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  var laterBtn = document.getElementById("jjUpdateLaterBtn");
+  if (laterBtn) {
+    laterBtn.onclick = function () {
+      modal.remove();
+    };
+  }
+}
+
 ensureSearchBar();
 if (searchInput) searchInput.addEventListener("input", handleLiveSearch);
 if (genreFilter) genreFilter.addEventListener("change", renderMovies);
@@ -1796,3 +1891,4 @@ document.addEventListener("keydown", function (event) {
 createExtraSections();
 loadMovies();
 initNeonFestivalMode();
+checkApkUpdate();
