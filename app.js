@@ -52,7 +52,6 @@ function getAdaptivePosterUrl(originalUrl) {
   if (!originalUrl) return "";
   var val = String(originalUrl).trim();
 
-  // Expired Telegram links ni block chesi fallback ki pampistundi
   if (
     (!val.startsWith("http://") && !val.startsWith("https://")) ||
     val.includes(" ") ||
@@ -92,7 +91,6 @@ function yearClose(a, b, tol) {
   return Math.abs(x - y) <= tol;
 }
 
-// IMDb suggestion search (unofficial, no key)
 async function imdbSearch(q) {
   var key = String(q || "").toLowerCase().replace(/[^a-z0-9 ]/g, "").trim().replace(/\s+/g, "_");
   if (!key) return [];
@@ -103,7 +101,6 @@ async function imdbSearch(q) {
   return j.d || [];
 }
 
-// 🔥 Poster finder (STRICT): peru exact match + year match unte matrame poster istundi.
 async function resolvePosterUrl(movieTitle, movieYear) {
   var cleanTitle = String(movieTitle || "")
     .replace(/Marvel Studios'?\s*/i, "")
@@ -122,7 +119,6 @@ async function resolvePosterUrl(movieTitle, movieYear) {
     if (beforeColon.length > 2) candidates.push({ term: beforeColon, tol: 0 });
   }
 
-  // 1. IMDb (exact title + year)
   for (var s = 0; s < candidates.length; s++) {
     try {
       var cand = candidates[s];
@@ -145,7 +141,6 @@ async function resolvePosterUrl(movieTitle, movieYear) {
     } catch (e) {}
   }
 
-  // 2. TMDB
   if (TMDB_API_KEY) {
     for (var t = 0; t < candidates.length; t++) {
       try {
@@ -177,7 +172,6 @@ async function resolvePosterUrl(movieTitle, movieYear) {
     }
   }
 
-  // 3. TVMaze
   try {
     var tvRes = await fetch("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(cleanTitle));
     if (tvRes.ok) {
@@ -197,7 +191,6 @@ async function resolvePosterUrl(movieTitle, movieYear) {
   return null;
 }
 
-// 🛠 ONE-TIME: Console lo generatePosterSQL() ani run cheyyandi.
 async function generatePosterSQL() {
   var sql = [], missing = [], rows = [];
   for (var i = 0; i < movies.length; i++) {
@@ -258,7 +251,7 @@ function showTextPlaceholder(imgElement, movieTitle) {
 
 window.handleMissingPoster = handleMissingPoster;
 
-// ---------- 🎬 IN-APP CHROME-STYLE / MULTI-SERVER STREAMING HELPERS ----------
+// ---------- 🎬 IN-APP PLAYER & GUARANTEED LANDSCAPE ROTATION ENGINE ----------
 function isDirectVideoFile(url) {
   if (!url) return false;
   return /\.(mp4|mkv|webm|m3u8)(\?.*)?$/i.test(url);
@@ -280,7 +273,50 @@ function loadHls(cb) {
   document.head.appendChild(s);
 }
 
-// Auto-hide top bar after 3 seconds in fullscreen so 100% video is visible
+// Compute exact pixel dimensions so rotated portrait mode NEVER stretches vertically
+function syncLandscapeDimensions() {
+  var modal = document.getElementById("inAppVideoModal");
+  var box = modal ? modal.querySelector(".jj-player-modal-box") : null;
+  if (!box) return;
+
+  var isFs = box.classList.contains("jj-landscape-fs") || Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+  if (!isFs) {
+    box.style.width = "";
+    box.style.height = "";
+    box.style.transform = "";
+    box.style.top = "";
+    box.style.left = "";
+    return;
+  }
+
+  var vw = window.innerWidth || document.documentElement.clientWidth;
+  var vh = window.innerHeight || document.documentElement.clientHeight;
+
+  if (vh > vw) {
+    // Phone / WebView is in Portrait -> Force exact 90deg Landscape with pixel-perfect 16:9 box
+    box.style.position = "fixed";
+    box.style.top = "50%";
+    box.style.left = "50%";
+    box.style.width = vh + "px";
+    box.style.height = vw + "px";
+    box.style.transform = "translate(-50%, -50%) rotate(90deg)";
+  } else {
+    // Phone physically rotated to Landscape -> Fill 100% naturally
+    box.style.position = "fixed";
+    box.style.top = "0";
+    box.style.left = "0";
+    box.style.width = vw + "px";
+    box.style.height = vh + "px";
+    box.style.transform = "none";
+  }
+}
+
+window.addEventListener("resize", syncLandscapeDimensions);
+window.addEventListener("orientationchange", function () {
+  setTimeout(syncLandscapeDimensions, 150);
+});
+
+// Auto-hide top bar after 2.2 seconds in Fullscreen so 0% black bar blocks the movie
 function wakePlayerControls() {
   var modal = document.getElementById("inAppVideoModal");
   var box = modal ? modal.querySelector(".jj-player-modal-box") : null;
@@ -293,7 +329,7 @@ function wakePlayerControls() {
   if (isFs) {
     playerUiTimer = setTimeout(function () {
       box.classList.add("jj-controls-idle");
-    }, 3000);
+    }, 2200);
   }
 }
 
@@ -312,7 +348,7 @@ function ensureInAppPlayerModal() {
             <h3 id="modalMovieTitle" class="jj-player-title">Playing Movie</h3>
           </div>
           <div class="jj-player-header-actions">
-            <button type="button" id="jjFullscreenBtn" class="jj-player-fs-btn" onclick="togglePlayerFullscreen()">⛶ Fullscreen</button>
+            <button type="button" id="jjFullscreenBtn" class="jj-player-fs-btn" onclick="togglePlayerFullscreen()">⛶ Rotate Fullscreen</button>
             <button type="button" class="jj-player-close" onclick="closeInAppPlayer()" aria-label="Close">&times;</button>
           </div>
         </div>
@@ -333,7 +369,7 @@ function ensureInAppPlayerModal() {
       fsBtn.type = "button";
       fsBtn.id = "jjFullscreenBtn";
       fsBtn.className = "jj-player-fs-btn";
-      fsBtn.textContent = "⛶ Fullscreen";
+      fsBtn.textContent = "⛶ Rotate Fullscreen";
       fsBtn.onclick = togglePlayerFullscreen;
       closeBtn.parentNode.insertBefore(actionsWrap, closeBtn);
       actionsWrap.appendChild(fsBtn);
@@ -349,53 +385,34 @@ function ensureInAppPlayerModal() {
   }
 }
 
-// 🔥 True Hardware Fullscreen + Landscape Orientation Lock (Hides Status Bar Time/Battery)
+// 🔥 Activate Guaranteed Landscape Fullscreen (Works in Chrome + Android APK WebView)
 async function enterTrueFullscreen() {
   var modal = document.getElementById("inAppVideoModal");
   var box = modal ? modal.querySelector(".jj-player-modal-box") : null;
-  var video = document.getElementById("vlcInAppPlayer");
   var btn = document.getElementById("jjFullscreenBtn");
   if (!box) return;
 
-  var enteredNativeFs = false;
+  box.classList.add("jj-landscape-fs");
+  if (btn) btn.textContent = "✕ Exit Fullscreen";
+  syncLandscapeDimensions();
 
-  // 1. Request Browser / WebView Immersive Fullscreen with Status Bar Hidden
   try {
-    if (box.requestFullscreen) {
-      await box.requestFullscreen({ navigationUI: "hide" });
-      enteredNativeFs = true;
-    } else if (box.webkitRequestFullscreen) {
-      box.webkitRequestFullscreen();
-      enteredNativeFs = true;
-    } else if (document.documentElement.requestFullscreen) {
-      await document.documentElement.requestFullscreen({ navigationUI: "hide" });
-      enteredNativeFs = true;
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      if (box.requestFullscreen) {
+        await box.requestFullscreen({ navigationUI: "hide" });
+      } else if (box.webkitRequestFullscreen) {
+        box.webkitRequestFullscreen();
+      }
     }
   } catch (e) {}
 
-  // 2. If container fullscreen was blocked (e.g. iOS / strict WebView) and playing a <video>, use native video fullscreen
-  if (!enteredNativeFs && video) {
-    try {
-      if (video.requestFullscreen) {
-        await video.requestFullscreen({ navigationUI: "hide" });
-        enteredNativeFs = true;
-      } else if (video.webkitEnterFullscreen) {
-        video.webkitEnterFullscreen();
-        enteredNativeFs = true;
-      }
-    } catch (e) {}
-  }
-
-  // 3. Lock Screen Orientation to Landscape (Rotates phone screen automatically)
   if (screen.orientation && screen.orientation.lock) {
     try {
       await screen.orientation.lock("landscape");
     } catch (e) {}
   }
 
-  // 4. Apply Fullscreen UI Class (Edge-to-Edge 100% Video + Auto-Hide Header)
-  box.classList.add("jj-landscape-fs");
-  if (btn) btn.textContent = "✕ Exit Fullscreen";
+  setTimeout(syncLandscapeDimensions, 100);
   wakePlayerControls();
 }
 
@@ -408,6 +425,7 @@ async function exitTrueFullscreen() {
   if (box) {
     box.classList.remove("jj-landscape-fs", "jj-controls-idle");
   }
+  syncLandscapeDimensions();
 
   if (document.fullscreenElement || document.webkitFullscreenElement) {
     try {
@@ -420,7 +438,7 @@ async function exitTrueFullscreen() {
     try { screen.orientation.unlock(); } catch (e) {}
   }
 
-  if (btn) btn.textContent = "⛶ Fullscreen";
+  if (btn) btn.textContent = "⛶ Rotate Fullscreen";
 }
 
 function togglePlayerFullscreen() {
@@ -436,20 +454,46 @@ function togglePlayerFullscreen() {
   }
 }
 
-document.addEventListener("fullscreenchange", function () {
-  var btn = document.getElementById("jjFullscreenBtn");
+// 🔥 IF USER CLICKS THE ↖↘ ARROWS INSIDE THE EMBED IFRAME:
+// If the iframe itself enters fullscreen in portrait mode, it stretches vertically!
+// We immediately transfer fullscreen from the iframe to our rotated Landscape Box!
+function handleNativeFullscreenChange() {
   var modal = document.getElementById("inAppVideoModal");
   var box = modal ? modal.querySelector(".jj-player-modal-box") : null;
-  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-    if (box) box.classList.remove("jj-landscape-fs", "jj-controls-idle");
-    if (btn) btn.textContent = "⛶ Fullscreen";
+  var btn = document.getElementById("jjFullscreenBtn");
+  var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+
+  if (!box) return;
+
+  if (fsEl) {
+    // Try hardware landscape lock first
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock("landscape").catch(function () {});
+    }
+
+    // If the iframe itself went fullscreen, apply landscape rotation directly to the iframe too!
+    if (fsEl.tagName === "IFRAME") {
+      fsEl.classList.add("jj-iframe-direct-landscape");
+    }
+
+    box.classList.add("jj-landscape-fs");
+    if (btn) btn.textContent = "✕ Exit Fullscreen";
+    syncLandscapeDimensions();
+    wakePlayerControls();
+  } else {
+    var ifr = document.getElementById("vlcInAppIframe");
+    if (ifr) ifr.classList.remove("jj-iframe-direct-landscape");
+    box.classList.remove("jj-landscape-fs", "jj-controls-idle");
+    if (btn) btn.textContent = "⛶ Rotate Fullscreen";
+    syncLandscapeDimensions();
     if (screen.orientation && screen.orientation.unlock) {
       try { screen.orientation.unlock(); } catch (e) {}
     }
-  } else {
-    wakePlayerControls();
   }
-});
+}
+
+document.addEventListener("fullscreenchange", handleNativeFullscreenChange);
+document.addEventListener("webkitfullscreenchange", handleNativeFullscreenChange);
 
 function openMoviePlayerById(movieId) {
   var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
@@ -499,7 +543,7 @@ function playMovieStream(rawUrl) {
   if (isDirectVideoFile(url)) {
     var video = document.createElement("video");
     video.id = "vlcInAppPlayer";
-    video.controls = true; // Full Native Chrome Video Controls (Seek, Volume, PiP, Speed, Fullscreen)
+    video.controls = true;
     video.autoplay = true;
     video.playsInline = true;
     video.setAttribute("controlsList", "nodownload");
@@ -507,13 +551,6 @@ function playMovieStream(rawUrl) {
     video.style.height = "100%";
     video.style.background = "#000";
     video.style.objectFit = "contain";
-
-    // Lock to landscape automatically if user clicks Chrome's built-in bottom-right fullscreen icon
-    video.addEventListener("fullscreenchange", function () {
-      if (document.fullscreenElement === video && screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock("landscape").catch(function () {});
-      }
-    });
 
     video.addEventListener("error", function () {
       stage.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;font-size:13px;">Video play avvatledu. MP4 (H.264 + AAC) leda Server 2 use cheyyandi.</div>';
@@ -545,6 +582,18 @@ function playMovieStream(rawUrl) {
     iframe.style.height = "100%";
     iframe.style.border = "0";
     stage.appendChild(iframe);
+
+    // Floating bottom-right button synced with the ↖↘ arrows inside the player
+    var arrowSyncBtn = document.createElement("button");
+    arrowSyncBtn.type = "button";
+    arrowSyncBtn.className = "jj-corner-arrow-btn";
+    arrowSyncBtn.innerHTML = "⛶";
+    arrowSyncBtn.title = "Fullscreen Landscape";
+    arrowSyncBtn.onclick = function (e) {
+      e.stopPropagation();
+      togglePlayerFullscreen();
+    };
+    stage.appendChild(arrowSyncBtn);
   }
 
   wakePlayerControls();
@@ -651,7 +700,7 @@ function createExtraSections() {
         flex-wrap: wrap;
         align-items: center;
         gap: 8px;
-        margin: 10px 0 6px 0;
+        margin: 8px 0 4px 0;
       }
       .btn-modal-trailer {
         display: inline-flex;
@@ -663,35 +712,60 @@ function createExtraSections() {
         text-decoration: none;
         font-size: 11px;
         font-weight: 700;
-        padding: 5px 11px;
+        padding: 5px 12px;
         border-radius: 6px;
         transition: 0.2s;
         width: fit-content;
         cursor: pointer;
       }
       .btn-modal-trailer:hover { background: #ff2450; color: #ffffff; }
-      .btn-modal-watch-online {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        background: linear-gradient(135deg, #ff2450, #ff6b00);
-        border: none;
-        color: #ffffff !important;
-        font-size: 11px;
-        font-weight: 800;
-        padding: 6px 13px;
-        border-radius: 6px;
-        cursor: pointer;
-        box-shadow: 0 3px 10px rgba(255, 36, 80, 0.35);
-        transition: 0.2s;
+
+      /* 🔥 BIG PROMINENT WATCH ONLINE BANNER ABOVE DOWNLOAD FILES */
+      .jj-watch-online-hero-wrap {
+        margin: 14px 0 12px 0;
+        padding: 12px 14px;
+        background: linear-gradient(135deg, rgba(255, 36, 80, 0.16) 0%, rgba(255, 107, 0, 0.14) 100%);
+        border: 1.5px solid rgba(255, 65, 102, 0.55);
+        border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(255, 36, 80, 0.2);
       }
-      .btn-modal-watch-online:hover { transform: translateY(-1px); opacity: 0.95; }
+      .btn-big-watch-online {
+        width: 100%;
+        padding: 14px 18px;
+        background: linear-gradient(135deg, #ff2450 0%, #ff6b00 100%);
+        color: #ffffff !important;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 900;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        cursor: pointer;
+        box-shadow: 0 6px 20px rgba(255, 36, 80, 0.45);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .btn-big-watch-online:hover,
+      .btn-big-watch-online:active {
+        transform: translateY(-2px) scale(1.01);
+        box-shadow: 0 10px 26px rgba(255, 36, 80, 0.65);
+      }
+      .jj-watch-subtext {
+        text-align: center;
+        font-size: 11px;
+        color: #cbd5e1;
+        margin-top: 7px;
+        font-weight: 600;
+      }
 
       /* In-App Player Modal Styles */
       .jj-player-modal-overlay {
         position: fixed;
         top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(4, 8, 16, 0.94);
+        background: rgba(4, 8, 16, 0.96);
         backdrop-filter: blur(8px);
         z-index: 10000;
         justify-content: center;
@@ -717,7 +791,7 @@ function createExtraSections() {
         justify-content: space-between;
         gap: 10px;
         margin-bottom: 10px;
-        transition: opacity 0.35s ease, transform 0.35s ease;
+        transition: opacity 0.3s ease;
       }
       .jj-player-title-wrap {
         display: flex;
@@ -779,7 +853,6 @@ function createExtraSections() {
         flex-wrap: wrap;
         gap: 8px;
         margin-bottom: 10px;
-        transition: opacity 0.35s ease;
       }
       .jj-server-btn {
         background: #162238;
@@ -806,55 +879,44 @@ function createExtraSections() {
         position: relative;
       }
 
-      /* 🔥 TRUE EDGE-TO-EDGE FULLSCREEN (NO FAKE 90-DEG CSS ROTATION, FLOATING AUTO-HIDE HEADER) */
+      /* Bottom-right corner button over the embed player's ↖↘ arrows */
+      .jj-corner-arrow-btn {
+        position: absolute;
+        bottom: 6px;
+        right: 6px;
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        color: #ffffff;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 25;
+        backdrop-filter: blur(4px);
+      }
+      .jj-corner-arrow-btn:active {
+        background: #ff2450;
+      }
+
+      /* 🔥 GUARANTEED LANDSCAPE FULLSCREEN (ZERO STRETCHING) */
       .jj-player-modal-box:fullscreen,
       .jj-player-modal-box:-webkit-full-screen,
       .jj-player-modal-box.jj-landscape-fs {
-        position: fixed !important;
-        inset: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        height: 100dvh !important;
-        max-width: 100vw !important;
-        max-height: 100dvh !important;
         margin: 0 !important;
         padding: 0 !important;
         border-radius: 0 !important;
         border: none !important;
         background: #000 !important;
-        transform: none !important;
         z-index: 999999 !important;
+        max-width: none !important;
+        max-height: none !important;
       }
 
-      /* Floating Overlay Header in Fullscreen */
-      .jj-player-modal-box:fullscreen .jj-player-header,
-      .jj-player-modal-box:-webkit-full-screen .jj-player-header,
-      .jj-player-modal-box.jj-landscape-fs .jj-player-header {
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        margin: 0 !important;
-        padding: 12px 18px !important;
-        background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 70%, transparent 100%) !important;
-        z-index: 25 !important;
-      }
-
-      /* Hide Server Bar in Fullscreen for Clean View */
-      .jj-player-modal-box:fullscreen .jj-server-bar,
-      .jj-player-modal-box:-webkit-full-screen .jj-server-bar,
-      .jj-player-modal-box.jj-landscape-fs .jj-server-bar {
-        display: none !important;
-      }
-
-      /* Auto-hide Header after 3 seconds of inactivity */
-      .jj-player-modal-box.jj-controls-idle .jj-player-header {
-        opacity: 0 !important;
-        pointer-events: none !important;
-        transform: translateY(-20px) !important;
-      }
-
-      /* Video Stage fills 100% of screen in Fullscreen */
+      /* Stage fills 100% of the rotated landscape container */
       .jj-player-modal-box:fullscreen .jj-player-stage,
       .jj-player-modal-box:-webkit-full-screen .jj-player-stage,
       .jj-player-modal-box.jj-landscape-fs .jj-player-stage {
@@ -865,6 +927,47 @@ function createExtraSections() {
         aspect-ratio: auto !important;
         border-radius: 0 !important;
         z-index: 10 !important;
+      }
+
+      /* If the iframe itself went fullscreen via internal arrows while phone is in portrait */
+      @media (orientation: portrait) {
+        iframe.jj-iframe-direct-landscape:fullscreen,
+        iframe.jj-iframe-direct-landscape:-webkit-full-screen {
+          position: fixed !important;
+          top: 50% !important;
+          left: 50% !important;
+          width: 100vh !important;
+          height: 100vw !important;
+          transform: translate(-50%, -50%) rotate(90deg) !important;
+        }
+      }
+
+      /* Floating Overlay Header (Fades out after 2.2s) */
+      .jj-player-modal-box:fullscreen .jj-player-header,
+      .jj-player-modal-box:-webkit-full-screen .jj-player-header,
+      .jj-player-modal-box.jj-landscape-fs .jj-player-header {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        margin: 0 !important;
+        padding: 10px 18px !important;
+        background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, transparent 100%) !important;
+        z-index: 30 !important;
+      }
+
+      /* Hide Server Bar in Fullscreen */
+      .jj-player-modal-box:fullscreen .jj-server-bar,
+      .jj-player-modal-box:-webkit-full-screen .jj-server-bar,
+      .jj-player-modal-box.jj-landscape-fs .jj-server-bar {
+        display: none !important;
+      }
+
+      /* Auto-hide Header & Corner Button when watching */
+      .jj-player-modal-box.jj-controls-idle .jj-player-header,
+      .jj-player-modal-box.jj-controls-idle .jj-corner-arrow-btn {
+        opacity: 0 !important;
+        pointer-events: none !important;
       }
     `;
     document.head.appendChild(style);
@@ -1435,8 +1538,16 @@ async function showMovieDetails(movieId) {
   var modalPosterSrc = getAdaptivePosterUrl(movie.poster);
   var hasStream = Boolean(movie.stream1 || movie.stream2);
 
-  var watchOnlineBtnHTML = hasStream
-    ? `<button type="button" onclick="openMoviePlayerById('${escapeHTML(movie.id)}')" class="btn-modal-watch-online">▶ Watch Online</button>`
+  // 🔥 BIG FULL-WIDTH WATCH ONLINE BANNER BUTTON RIGHT ABOVE DOWNLOAD FILES
+  var bigWatchOnlineSectionHTML = hasStream
+    ? `
+      <div class="jj-watch-online-hero-wrap">
+        <button type="button" onclick="openMoviePlayerById('${escapeHTML(movie.id)}')" class="btn-big-watch-online">
+          <span>▶</span> WATCH ONLINE (INSTANT HD PLAYER)
+        </button>
+        <div class="jj-watch-subtext">⚡ Direct In-App Streaming • No Download Required</div>
+      </div>
+    `
     : "";
 
   modalDetails.innerHTML = `
@@ -1452,13 +1563,13 @@ async function showMovieDetails(movieId) {
         </div>
         <p class="movie-desc-text" style="margin-top:6px;">${escapeHTML(movie.description || "No description available.")}</p>
         <div class="modal-action-buttons-row">
-          ${watchOnlineBtnHTML}
           <a href="${escapeHTML(trailerLink)}" target="_blank" rel="noopener noreferrer" class="btn-modal-trailer">
             ▶ Watch Trailer
           </a>
         </div>
       </div>
     </div>
+    ${bigWatchOnlineSectionHTML}
     <div class="prints-header-bar">
       <span>Available Quality Prints</span>
       <span class="status-dot-active">● Ready to Download</span>
