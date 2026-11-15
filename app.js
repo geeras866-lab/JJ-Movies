@@ -6,7 +6,6 @@ var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 var TMDB_API_KEY = "200b7daf6101f22010cdd5eccea4a119";
 
 var movies = [];
-var messages = [];
 var posterCache = {};
 
 var movieGrid = document.getElementById("movieGrid");
@@ -265,24 +264,19 @@ function isDirectVideoFile(url) {
 }
 
 function normalizeStreamUrl(url) {
-  if (!url) return "";
   var u = safeURL(url);
-  
-  // Streamlare normal/direct link ni embed link ga marchadaniki
-  if (u.includes("streamlare.com/v/")) {
-    u = u.replace("streamlare.com/v/", "streamlare.com/e/");
-  } else if (u.includes("streamlare.com/d/")) {
-    u = u.replace("streamlare.com/d/", "streamlare.com/e/");
-  }
+  if (!u || isDirectVideoFile(u)) return u;
+  var m = u.match(/^(https?:\/\/[^\/]+)\/(?:d|v|e)\/([A-Za-z0-9]+)(?:\/.*)?$/i);
+  if (m) return m[1] + "/e/" + m[2];
+  return u.replace(/streamlare\.com\/(v|d)\//, "streamlare.com/e/");
+}
 
-  // Filemoon / Byse: /d/ (direct/download page) ni /e/ (embed player) ga automatic ga marchuthundi
-  if (u.includes("/d/")) {
-    u = u.replace("/d/", "/e/");
-  } else if (u.includes("/v/")) {
-    u = u.replace("/v/", "/e/");
-  }
-
-  return u;
+function loadHls(cb) {
+  if (window.Hls) return cb();
+  var s = document.createElement("script");
+  s.src = "https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js";
+  s.onload = cb;
+  document.head.appendChild(s);
 }
 
 function ensureInAppPlayerModal() {
@@ -364,18 +358,31 @@ function playMovieStream(rawUrl) {
     video.style.width = "100%";
     video.style.height = "100%";
     video.style.background = "#000";
-    video.src = url;
+
+    video.addEventListener("error", function () {
+      stage.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;font-size:13px;">Video play avvatledu. MP4 (H.264 + AAC) use cheyyandi.</div>';
+    });
+
+    if (/\.m3u8(\?.*)?$/i.test(url) && !video.canPlayType("application/vnd.apple.mpegurl")) {
+      loadHls(function () {
+        if (window.Hls && Hls.isSupported()) {
+          var h = new Hls();
+          h.loadSource(url);
+          h.attachMedia(video);
+        }
+      });
+    } else {
+      video.src = url;
+    }
+
     stage.appendChild(video);
     video.play().catch(function () {});
   } else {
-    // 🔥 FIXED: Added referrerpolicy="no-referrer-when-downgrade" and advanced sandbox to bypass 404 block
     var iframe = document.createElement("iframe");
     iframe.id = "vlcInAppIframe";
     iframe.src = url;
     iframe.allowFullscreen = true;
-    iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write");
-    iframe.setAttribute("referrerpolicy", "no-referrer-when-downgrade");
-    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms allow-presentation allow-popups allow-modals");
+    iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media");
     iframe.style.width = "100%";
     iframe.style.height = "100%";
     iframe.style.border = "0";
@@ -900,6 +907,10 @@ function loadMovies() {
       setupYears();
       renderMovies();
       renderShowcaseCarousel();
+
+      var qid = new URLSearchParams(window.location.search).get("movie");
+      if (qid) showMovieDetails(qid);
+
       loadMessages();
     })
     .catch(function (error) {
