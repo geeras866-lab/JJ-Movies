@@ -277,13 +277,34 @@ function loadHls(cb) {
   document.head.appendChild(s);
 }
 
+// ---------- FULLSCREEN ROTATION FIX (real Android orientation lock) ----------
+function lockLandscape() {
+  try {
+    var P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenOrientation;
+    if (P) { P.lock({ orientation: "landscape" }); return; }
+  } catch (e) {}
+  if (screen.orientation && screen.orientation.lock) {
+    screen.orientation.lock("landscape").catch(function () {});
+  }
+}
+
+function unlockOrientation() {
+  try {
+    var P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenOrientation;
+    if (P) { P.unlock(); return; }
+  } catch (e) {}
+  if (screen.orientation && screen.orientation.unlock) {
+    try { screen.orientation.unlock(); } catch (e) {}
+  }
+}
+
 function syncLandscapeDimensions() {
   var modal = document.getElementById("inAppVideoModal");
   var box = modal ? modal.querySelector(".jj-player-modal-box") : null;
   if (!box) return;
 
-  var isFs = box.classList.contains("jj-landscape-fs") || Boolean(document.fullscreenElement || document.webkitFullscreenElement);
-  if (!isFs) {
+  if (!box.classList.contains("jj-landscape-fs")) {
+    box.style.position = "";
     box.style.width = "";
     box.style.height = "";
     box.style.transform = "";
@@ -292,24 +313,12 @@ function syncLandscapeDimensions() {
     return;
   }
 
-  var vw = window.innerWidth || document.documentElement.clientWidth;
-  var vh = window.innerHeight || document.documentElement.clientHeight;
-
-  if (vh > vw) {
-    box.style.position = "fixed";
-    box.style.top = "50%";
-    box.style.left = "50%";
-    box.style.width = vh + "px";
-    box.style.height = vw + "px";
-    box.style.transform = "translate(-50%, -50%) rotate(90deg)";
-  } else {
-    box.style.position = "fixed";
-    box.style.top = "0";
-    box.style.left = "0";
-    box.style.width = vw + "px";
-    box.style.height = vh + "px";
-    box.style.transform = "none";
-  }
+  box.style.position = "fixed";
+  box.style.top = "0";
+  box.style.left = "0";
+  box.style.width = "100vw";
+  box.style.height = "100vh";
+  box.style.transform = "none";
 }
 
 window.addEventListener("resize", syncLandscapeDimensions);
@@ -418,26 +427,16 @@ async function enterTrueFullscreen() {
   if (btn) btn.textContent = "✕ Exit Fullscreen";
   syncLandscapeDimensions();
 
-  var rootEl = document.documentElement;
   try {
+    var rootEl = document.documentElement;
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-      if (rootEl.requestFullscreen) {
-        await rootEl.requestFullscreen({ navigationUI: "hide" });
-      } else if (rootEl.webkitRequestFullscreen) {
-        rootEl.webkitRequestFullscreen();
-      } else if (box.requestFullscreen) {
-        await box.requestFullscreen({ navigationUI: "hide" });
-      }
+      if (rootEl.requestFullscreen) await rootEl.requestFullscreen({ navigationUI: "hide" });
+      else if (rootEl.webkitRequestFullscreen) rootEl.webkitRequestFullscreen();
     }
   } catch (e) {}
 
-  if (screen.orientation && screen.orientation.lock) {
-    try {
-      await screen.orientation.lock("landscape");
-    } catch (e) {}
-  }
-
-  setTimeout(syncLandscapeDimensions, 100);
+  lockLandscape();
+  setTimeout(syncLandscapeDimensions, 150);
   wakePlayerControls();
 }
 
@@ -447,9 +446,7 @@ async function exitTrueFullscreen() {
   var btn = document.getElementById("jjFullscreenBtn");
 
   clearTimeout(playerUiTimer);
-  if (box) {
-    box.classList.remove("jj-landscape-fs", "jj-controls-idle");
-  }
+  if (box) box.classList.remove("jj-landscape-fs", "jj-controls-idle");
   syncLandscapeDimensions();
 
   if (document.fullscreenElement || document.webkitFullscreenElement) {
@@ -459,10 +456,7 @@ async function exitTrueFullscreen() {
     } catch (e) {}
   }
 
-  if (screen.orientation && screen.orientation.unlock) {
-    try { screen.orientation.unlock(); } catch (e) {}
-  }
-
+  unlockOrientation();
   if (btn) btn.textContent = "⛶ Rotate Fullscreen";
 }
 
@@ -488,9 +482,7 @@ function handleNativeFullscreenChange() {
   if (!box) return;
 
   if (fsEl) {
-    if (screen.orientation && screen.orientation.lock) {
-      screen.orientation.lock("landscape").catch(function () {});
-    }
+    lockLandscape();
     if (fsEl.tagName === "IFRAME") {
       fsEl.classList.add("jj-iframe-direct-landscape");
     }
@@ -504,9 +496,7 @@ function handleNativeFullscreenChange() {
     box.classList.remove("jj-landscape-fs", "jj-controls-idle");
     if (btn) btn.textContent = "⛶ Rotate Fullscreen";
     syncLandscapeDimensions();
-    if (screen.orientation && screen.orientation.unlock) {
-      try { screen.orientation.unlock(); } catch (e) {}
-    }
+    unlockOrientation();
   }
 }
 
@@ -1431,6 +1421,14 @@ function createMovieCard(movie) {
 
   var adaptiveSrc = getAdaptivePosterUrl(movie.poster);
 
+  // Landscape images: show full image instead of cropping
+  image.onload = function () {
+    if (image.naturalWidth > image.naturalHeight) {
+      image.style.objectFit = "contain";
+      image.style.background = "#000";
+    }
+  };
+
   image.onerror = function () {
     handleMissingPoster(image, movie.title, movie.year);
   };
@@ -1790,7 +1788,7 @@ function ensureSearchBar() {
   if (cb) cb.addEventListener("click", clearLiveSearch);
 }
 
-// ---------- 📲 APK VERSION CHECKER & UPDATE POPUP ----------
+// ---------- 📲 APK VERSION CHECKER & UPDATE POPUP (DISABLED) ----------
 function isRunningInsideApk() {
   var ua = navigator.userAgent || "";
   var isCap = Boolean(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -1891,4 +1889,4 @@ document.addEventListener("keydown", function (event) {
 createExtraSections();
 loadMovies();
 initNeonFestivalMode();
-checkApkUpdate();
+// checkApkUpdate();  // update popup disabled
