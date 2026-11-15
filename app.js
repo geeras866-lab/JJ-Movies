@@ -20,6 +20,7 @@ var modalDetails = document.getElementById("modalDetails");
 var carouselInterval = null;
 var inlineSearch = "";
 var playerUiTimer = null;
+var currentActiveStreamUrl = "";
 
 function escapeHTML(value) {
   return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
@@ -329,6 +330,19 @@ function wakePlayerControls() {
   }
 }
 
+// 🔥 Chrome Intent Launcher (Hides Android Status Bar 100% without rebuilding APK)
+function openNoStatusBarFullscreen() {
+  if (!currentActiveStreamUrl) return;
+  var clean = currentActiveStreamUrl.replace(/^https?:\/\//i, "");
+  var scheme = currentActiveStreamUrl.startsWith("https") ? "https" : "http";
+  var isAndroid = /Android/i.test(navigator.userAgent);
+  if (isAndroid) {
+    window.location.href = "intent://" + clean + "#Intent;scheme=" + scheme + ";package=com.android.chrome;end";
+  } else {
+    window.open(currentActiveStreamUrl, "_blank");
+  }
+}
+
 function ensureInAppPlayerModal() {
   var modal = document.getElementById("inAppVideoModal");
   if (!modal) {
@@ -345,6 +359,7 @@ function ensureInAppPlayerModal() {
           </div>
           <div class="jj-player-header-actions">
             <button type="button" id="jjFullscreenBtn" class="jj-player-fs-btn" onclick="togglePlayerFullscreen()">⛶ Rotate Fullscreen</button>
+            <button type="button" id="jjHideStatusBtn" class="jj-player-status-btn" onclick="openNoStatusBarFullscreen()" title="Hide Status Bar">🔥 Hide Status Bar</button>
             <button type="button" class="jj-player-close" onclick="closeInAppPlayer()" aria-label="Close">&times;</button>
           </div>
         </div>
@@ -361,14 +376,24 @@ function ensureInAppPlayerModal() {
     if (closeBtn && closeBtn.parentNode) {
       var actionsWrap = document.createElement("div");
       actionsWrap.className = "jj-player-header-actions";
+
       var fsBtn = document.createElement("button");
       fsBtn.type = "button";
       fsBtn.id = "jjFullscreenBtn";
       fsBtn.className = "jj-player-fs-btn";
       fsBtn.textContent = "⛶ Rotate Fullscreen";
       fsBtn.onclick = togglePlayerFullscreen;
+
+      var statusBtn = document.createElement("button");
+      statusBtn.type = "button";
+      statusBtn.id = "jjHideStatusBtn";
+      statusBtn.className = "jj-player-status-btn";
+      statusBtn.textContent = "🔥 Hide Status Bar";
+      statusBtn.onclick = openNoStatusBarFullscreen;
+
       closeBtn.parentNode.insertBefore(actionsWrap, closeBtn);
       actionsWrap.appendChild(fsBtn);
+      actionsWrap.appendChild(statusBtn);
       actionsWrap.appendChild(closeBtn);
     }
   }
@@ -391,12 +416,16 @@ async function enterTrueFullscreen() {
   if (btn) btn.textContent = "✕ Exit Fullscreen";
   syncLandscapeDimensions();
 
+  // Request on documentElement so Android WebView hides top status bar if supported
+  var rootEl = document.documentElement;
   try {
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-      if (box.requestFullscreen) {
+      if (rootEl.requestFullscreen) {
+        await rootEl.requestFullscreen({ navigationUI: "hide" });
+      } else if (rootEl.webkitRequestFullscreen) {
+        rootEl.webkitRequestFullscreen();
+      } else if (box.requestFullscreen) {
         await box.requestFullscreen({ navigationUI: "hide" });
-      } else if (box.webkitRequestFullscreen) {
-        box.webkitRequestFullscreen();
       }
     }
   } catch (e) {}
@@ -483,7 +512,6 @@ function handleNativeFullscreenChange() {
 document.addEventListener("fullscreenchange", handleNativeFullscreenChange);
 document.addEventListener("webkitfullscreenchange", handleNativeFullscreenChange);
 
-// 🔥 HARDWARE BACK BUTTON INTERCEPTION HANDLER
 function handlePlayerBackPopState(event) {
   var modal = document.getElementById("inAppVideoModal");
   if (modal && modal.style.display === "flex") {
@@ -507,7 +535,6 @@ function openServerSelection(title, s1, s2) {
   if (titleElem) titleElem.textContent = title || "Playing Movie";
   modal.style.display = "flex";
 
-  // Push history state so hardware back button closes player instead of exiting app
   try {
     history.pushState({ jjPlayerOpen: true }, "", window.location.href);
     window.addEventListener("popstate", handlePlayerBackPopState);
@@ -541,6 +568,7 @@ function playMovieStream(rawUrl) {
   var stage = document.getElementById("jjPlayerStage");
   if (!stage) return;
   var url = normalizeStreamUrl(rawUrl);
+  currentActiveStreamUrl = url;
   stage.innerHTML = "";
 
   if (isDirectVideoFile(url)) {
@@ -618,6 +646,7 @@ window.openServerSelection = openServerSelection;
 window.playMovieStream = playMovieStream;
 window.closeInAppPlayer = closeInAppPlayer;
 window.togglePlayerFullscreen = togglePlayerFullscreen;
+window.openNoStatusBarFullscreen = openNoStatusBarFullscreen;
 
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
@@ -806,7 +835,7 @@ function createExtraSections() {
       .jj-player-header-actions {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         flex-shrink: 0;
       }
       .jj-player-fs-btn {
@@ -815,11 +844,22 @@ function createExtraSections() {
         color: #fff;
         font-size: 11px;
         font-weight: 800;
-        padding: 6px 12px;
+        padding: 6px 10px;
         border-radius: 6px;
         cursor: pointer;
         white-space: nowrap;
         box-shadow: 0 2px 8px rgba(255, 36, 80, 0.35);
+      }
+      .jj-player-status-btn {
+        background: #1e293b;
+        border: 1px solid #38bdf8;
+        color: #38bdf8;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 6px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        white-space: nowrap;
       }
       .jj-vlc-badge {
         background: #ff6b00;
