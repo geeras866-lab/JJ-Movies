@@ -52,7 +52,7 @@ jobs:
         run: |
           VER_NAME="${{ github.event.inputs.app_version || '1.0.0' }}"
           VER_CODE="${{ github.event.inputs.version_code || '1' }}"
-          
+
           sed -i "s/versionCode 1/versionCode ${VER_CODE}/g" android/app/build.gradle
           sed -i "s/versionName \"1.0\"/versionName \"${VER_NAME}\"/g" android/app/build.gradle
 
@@ -92,6 +92,18 @@ jobs:
 
       - name: 🔄 Sync Web Code to Android
         run: npx cap sync android
+
+      - name: 🩹 Remove old Kotlin jdk7/jdk8 duplicate
+        run: |
+          cat >> android/build.gradle << 'EOF'
+
+          allprojects {
+              configurations.all {
+                  exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7"
+                  exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
+              }
+          }
+          EOF
 
       - name: 🔨 Build APK with Gradle
         working-directory: ./android
