@@ -200,7 +200,6 @@ async function resolvePosterUrl(movieTitle, movieYear) {
 }
 
 // 🛠 ONE-TIME: Console lo  generatePosterSQL()  ani run cheyyandi.
-// Matched title tho table chupistundi -> check chesi tarvata SQL run cheyyandi.
 async function generatePosterSQL() {
   var sql = [], missing = [], rows = [];
   for (var i = 0; i < movies.length; i++) {
@@ -227,7 +226,6 @@ window.generatePosterSQL = generatePosterSQL;
 
 function handleMissingPoster(imgElement, movieTitle, movieYear) {
   if (!imgElement || imgElement.dataset.fallbackTried === "true") {
-    // Already tried once and failed again -> placeholder
     if (imgElement && imgElement.dataset.fallbackTried === "true" && imgElement.dataset.final === "true") {
       showTextPlaceholder(imgElement, movieTitle);
     }
@@ -271,11 +269,9 @@ function isDirectVideoFile(url) {
 function normalizeStreamUrl(url) {
   if (!url) return "";
   var u = safeURL(url);
-  // Streamlare normal link ni embed link ga marchadaniki
   if (u.includes("streamlare.com/v/")) {
     u = u.replace("streamlare.com/v/", "streamlare.com/e/");
   }
-  // Filemoon normal link ni embed link ga marchadaniki
   if (u.includes("filemoon.sx/d/")) {
     u = u.replace("filemoon.sx/d/", "filemoon.sx/e/");
   }
@@ -365,13 +361,13 @@ function playMovieStream(rawUrl) {
     stage.appendChild(video);
     video.play().catch(function () {});
   } else {
-    // Streamlare / Filemoon embed player with strict sandbox to block popups & external ad redirects
+    // 🔥 FIXED: allow-fullscreen & proper sandbox for mobile full screen working
     var iframe = document.createElement("iframe");
     iframe.id = "vlcInAppIframe";
     iframe.src = url;
     iframe.allowFullscreen = true;
-    iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture");
-    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms allow-presentation");
+    iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media");
+    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms allow-presentation allow-popups");
     iframe.style.width = "100%";
     iframe.style.height = "100%";
     iframe.style.border = "0";
@@ -476,7 +472,7 @@ function createExtraSections() {
         flex-wrap: wrap;
         align-items: center;
         gap: 8px;
-        margin: 4px 0 6px 0;
+        margin: 10px 0 6px 0;
       }
       .btn-modal-trailer {
         display: inline-flex;
@@ -1107,7 +1103,6 @@ function handleLiveSearch() {
   var countEl = document.getElementById("searchResultCount");
   var titleEl = document.getElementById("searchResultsTitle");
 
-  // Results section HTML lo lekapothe, main grid ne filter chestundi
   if (!resultsSection || !searchGrid || !mainWrapper) {
     inlineSearch = search;
     if (clearBtn) clearBtn.style.display = search ? "block" : "none";
@@ -1186,13 +1181,13 @@ async function showMovieDetails(movieId) {
           ${movie.runtime ? `<span>• ${escapeHTML(movie.runtime)}</span>` : ""}
           ${movie.category ? `<span class="genre-badge">• ${escapeHTML(movie.category)}</span>` : ""}
         </div>
+        <p class="movie-desc-text" style="margin-top:6px;">${escapeHTML(movie.description || "No description available.")}</p>
         <div class="modal-action-buttons-row">
           ${watchOnlineBtnHTML}
           <a href="${escapeHTML(trailerLink)}" target="_blank" rel="noopener noreferrer" class="btn-modal-trailer">
             ▶ Watch Trailer
           </a>
         </div>
-        <p class="movie-desc-text" style="margin-top:6px;">${escapeHTML(movie.description || "No description available.")}</p>
       </div>
     </div>
     <div class="prints-header-bar">
@@ -1331,8 +1326,6 @@ function closeMovieModal() {
   movieModal.hidden = true;
 }
 
-// ✅ FIXED: searchInput.getElementById(...) tholaginchanu
-// 🔍 HTML lo search bar lekapothe, automatic ga create chestundi
 function ensureSearchBar() {
   if (document.getElementById("searchInput")) {
     searchInput = document.getElementById("searchInput");
