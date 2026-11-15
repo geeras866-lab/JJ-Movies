@@ -418,25 +418,21 @@ async function enterTrueFullscreen() {
 
   // Request on documentElement so Android WebView hides top status bar if supported
   var rootEl = document.documentElement;
-  // Non-blocking: WebView lo promise hang ayina layout rotate avtundi
   try {
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
       if (rootEl.requestFullscreen) {
-        var fsP = rootEl.requestFullscreen({ navigationUI: "hide" });
-        if (fsP && fsP.catch) fsP.catch(function () {});
+        await rootEl.requestFullscreen({ navigationUI: "hide" });
       } else if (rootEl.webkitRequestFullscreen) {
         rootEl.webkitRequestFullscreen();
       } else if (box.requestFullscreen) {
-        var fsP2 = box.requestFullscreen({ navigationUI: "hide" });
-        if (fsP2 && fsP2.catch) fsP2.catch(function () {});
+        await box.requestFullscreen({ navigationUI: "hide" });
       }
     }
   } catch (e) {}
 
   if (screen.orientation && screen.orientation.lock) {
     try {
-      var lockP = screen.orientation.lock("landscape");
-      if (lockP && lockP.catch) lockP.catch(function () {});
+      await screen.orientation.lock("landscape");
     } catch (e) {}
   }
 
@@ -609,21 +605,14 @@ function playMovieStream(rawUrl) {
     var iframe = document.createElement("iframe");
     iframe.id = "vlcInAppIframe";
     iframe.src = url;
-    // Host player fullscreen disable (lekapothe iframe separate ga fullscreen ayyi cover strip kanapadadu)
-    iframe.allowFullscreen = false;
-    iframe.setAttribute("allow", "autoplay; picture-in-picture; encrypted-media; screen-wake-lock");
+    iframe.allowFullscreen = true;
+    iframe.setAttribute("webkitallowfullscreen", "true");
+    iframe.setAttribute("mozallowfullscreen", "true");
+    iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media; screen-wake-lock; gyroscope; accelerometer");
     iframe.style.width = "100%";
     iframe.style.height = "100%";
     iframe.style.border = "0";
     stage.appendChild(iframe);
-
-    // 🙈 Cover strip: hides host player's bottom bar (time / -10 / +10)
-    // Height change cheyali ante CSS lo .jj-cover-strip { height: ... } marchandi
-    var coverStrip = document.createElement("div");
-    coverStrip.className = "jj-cover-strip";
-    coverStrip.addEventListener("touchstart", wakePlayerControls, { passive: true });
-    coverStrip.addEventListener("click", wakePlayerControls);
-    stage.appendChild(coverStrip);
 
     var arrowSyncBtn = document.createElement("button");
     arrowSyncBtn.type = "button";
@@ -634,11 +623,6 @@ function playMovieStream(rawUrl) {
       e.stopPropagation();
       togglePlayerFullscreen();
     };
-    arrowSyncBtn.addEventListener("touchend", function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      togglePlayerFullscreen();
-    });
     stage.appendChild(arrowSyncBtn);
   }
 
@@ -938,38 +922,22 @@ function createExtraSections() {
         position: relative;
       }
 
-      /* 🙈 Cover strip over iframe's bottom bar (time / -10 / +10) */
-      .jj-cover-strip {
-        position: absolute;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        height: 44px;
-        background: #000;
-        z-index: 20;
-        pointer-events: auto;
-      }
-      .jj-player-modal-box.jj-landscape-fs .jj-cover-strip {
-        height: 80px;
-      }
-
       .jj-corner-arrow-btn {
         position: absolute;
         bottom: 6px;
         right: 6px;
-        width: 48px;
-        height: 48px;
-        border-radius: 10px;
-        background: rgba(0, 0, 0, 0.75);
-        border: 1px solid rgba(255, 255, 255, 0.4);
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.28);
         color: #ffffff;
-        font-size: 24px;
-        touch-action: manipulation;
+        font-size: 20px;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        z-index: 40;
+        z-index: 25;
         backdrop-filter: blur(4px);
       }
       .jj-corner-arrow-btn:active {
