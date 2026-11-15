@@ -104,7 +104,6 @@ async function imdbSearch(q) {
 }
 
 // 🔥 Poster finder (STRICT): peru exact match + year match unte matrame poster istundi.
-// Match ayyaledante null -> card lo title placeholder chupistundi (thappu poster raadu).
 async function resolvePosterUrl(movieTitle, movieYear) {
   var cleanTitle = String(movieTitle || "")
     .replace(/Marvel Studios'?\s*/i, "")
@@ -117,7 +116,6 @@ async function resolvePosterUrl(movieTitle, movieYear) {
   var cacheKey = (cleanTitle + "_" + (movieYear || "")).toLowerCase();
   if (posterCache[cacheKey]) return posterCache[cacheKey];
 
-  // candidates: { term, tol }  (tol = year tolerance)
   var candidates = [{ term: cleanTitle, tol: 1 }];
   if (movieYear && cleanTitle.indexOf(":") > 0) {
     var beforeColon = cleanTitle.split(":")[0].trim();
@@ -147,7 +145,7 @@ async function resolvePosterUrl(movieTitle, movieYear) {
     } catch (e) {}
   }
 
-  // 2. TMDB (optional, key unte) - kuda strict
+  // 2. TMDB
   if (TMDB_API_KEY) {
     for (var t = 0; t < candidates.length; t++) {
       try {
@@ -179,7 +177,7 @@ async function resolvePosterUrl(movieTitle, movieYear) {
     }
   }
 
-  // 3. TVMaze (series only) - exact name + year
+  // 3. TVMaze
   try {
     var tvRes = await fetch("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(cleanTitle));
     if (tvRes.ok) {
@@ -199,7 +197,7 @@ async function resolvePosterUrl(movieTitle, movieYear) {
   return null;
 }
 
-// 🛠 ONE-TIME: Console lo  generatePosterSQL()  ani run cheyyandi.
+// 🛠 ONE-TIME: Console lo generatePosterSQL() ani run cheyyandi.
 async function generatePosterSQL() {
   var sql = [], missing = [], rows = [];
   for (var i = 0; i < movies.length; i++) {
@@ -269,12 +267,21 @@ function isDirectVideoFile(url) {
 function normalizeStreamUrl(url) {
   if (!url) return "";
   var u = safeURL(url);
+  
+  // Streamlare normal/direct link ni embed link ga marchadaniki
   if (u.includes("streamlare.com/v/")) {
     u = u.replace("streamlare.com/v/", "streamlare.com/e/");
+  } else if (u.includes("streamlare.com/d/")) {
+    u = u.replace("streamlare.com/d/", "streamlare.com/e/");
   }
-  if (u.includes("filemoon.sx/d/")) {
-    u = u.replace("filemoon.sx/d/", "filemoon.sx/e/");
+
+  // Filemoon / Byse: /d/ (direct/download page) ni /e/ (embed player) ga automatic ga marchuthundi
+  if (u.includes("/d/")) {
+    u = u.replace("/d/", "/e/");
+  } else if (u.includes("/v/")) {
+    u = u.replace("/v/", "/e/");
   }
+
   return u;
 }
 
