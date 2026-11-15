@@ -262,6 +262,135 @@ function showTextPlaceholder(imgElement, movieTitle) {
 
 window.handleMissingPoster = handleMissingPoster;
 
+// ---------- 🎬 IN-APP VLC / MULTI-SERVER STREAMING HELPERS ----------
+function isDirectVideoFile(url) {
+  if (!url) return false;
+  return /\.(mp4|mkv|webm|m3u8)(\?.*)?$/i.test(url);
+}
+
+function normalizeStreamUrl(url) {
+  if (!url) return "";
+  var u = safeURL(url);
+  // Streamlare normal link ni embed link ga marchadaniki
+  if (u.includes("streamlare.com/v/")) {
+    u = u.replace("streamlare.com/v/", "streamlare.com/e/");
+  }
+  // Filemoon normal link ni embed link ga marchadaniki
+  if (u.includes("filemoon.sx/d/")) {
+    u = u.replace("filemoon.sx/d/", "filemoon.sx/e/");
+  }
+  return u;
+}
+
+function ensureInAppPlayerModal() {
+  if (document.getElementById("inAppVideoModal")) return;
+  var modal = document.createElement("div");
+  modal.id = "inAppVideoModal";
+  modal.className = "jj-player-modal-overlay";
+  modal.style.display = "none";
+  modal.innerHTML = `
+    <div class="jj-player-modal-box">
+      <div class="jj-player-header">
+        <div class="jj-player-title-wrap">
+          <span class="jj-vlc-badge">▶ IN-APP PLAYER</span>
+          <h3 id="modalMovieTitle" class="jj-player-title">Playing Movie</h3>
+        </div>
+        <button type="button" class="jj-player-close" onclick="closeInAppPlayer()" aria-label="Close">&times;</button>
+      </div>
+      <div id="serverSwitchContainer" class="jj-server-bar"></div>
+      <div id="jjPlayerStage" class="jj-player-stage"></div>
+    </div>
+  `;
+  modal.addEventListener("click", function (e) {
+    if (e.target === modal) closeInAppPlayer();
+  });
+  document.body.appendChild(modal);
+}
+
+function openMoviePlayerById(movieId) {
+  var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
+  if (!movie) return;
+  openServerSelection(movie.title, movie.stream1, movie.stream2);
+}
+
+function openServerSelection(title, s1, s2) {
+  ensureInAppPlayerModal();
+  var modal = document.getElementById("inAppVideoModal");
+  var titleElem = document.getElementById("modalMovieTitle");
+  var serverContainer = document.getElementById("serverSwitchContainer");
+
+  if (titleElem) titleElem.textContent = title || "Playing Movie";
+  modal.style.display = "flex";
+
+  serverContainer.innerHTML = "";
+  var servers = [];
+  if (s1) servers.push({ name: "⚡ Server 1", url: s1 });
+  if (s2) servers.push({ name: "🚀 Server 2", url: s2 });
+
+  servers.forEach(function (srv, idx) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "jj-server-btn" + (idx === 0 ? " active" : "");
+    btn.textContent = srv.name;
+    btn.addEventListener("click", function () {
+      var allBtns = serverContainer.querySelectorAll(".jj-server-btn");
+      allBtns.forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      playMovieStream(srv.url);
+    });
+    serverContainer.appendChild(btn);
+  });
+
+  if (servers.length > 0) {
+    playMovieStream(servers[0].url);
+  }
+}
+
+function playMovieStream(rawUrl) {
+  var stage = document.getElementById("jjPlayerStage");
+  if (!stage) return;
+  var url = normalizeStreamUrl(rawUrl);
+  stage.innerHTML = "";
+
+  if (isDirectVideoFile(url)) {
+    var video = document.createElement("video");
+    video.id = "vlcInAppPlayer";
+    video.controls = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.style.width = "100%";
+    video.style.height = "100%";
+    video.style.background = "#000";
+    video.src = url;
+    stage.appendChild(video);
+    video.play().catch(function () {});
+  } else {
+    // Streamlare / Filemoon embed player with strict sandbox to block popups & external ad redirects
+    var iframe = document.createElement("iframe");
+    iframe.id = "vlcInAppIframe";
+    iframe.src = url;
+    iframe.allowFullscreen = true;
+    iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture");
+    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms allow-presentation");
+    iframe.style.width = "100%";
+    iframe.style.height = "100%";
+    iframe.style.border = "0";
+    stage.appendChild(iframe);
+  }
+}
+
+function closeInAppPlayer() {
+  var modal = document.getElementById("inAppVideoModal");
+  var stage = document.getElementById("jjPlayerStage");
+  if (stage) stage.innerHTML = "";
+  if (modal) modal.style.display = "none";
+}
+
+window.openMoviePlayerById = openMoviePlayerById;
+window.openServerSelection = openServerSelection;
+window.playMovieStream = playMovieStream;
+window.closeInAppPlayer = closeInAppPlayer;
+
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
     var style = document.createElement("style");
@@ -342,6 +471,13 @@ function createExtraSections() {
       .jj-ticker-btn:hover { background: #ff2450; border-color: #ff2450; color: #ffffff; }
       .jj-pin-badge { color:#ff7293; font-size:12px; font-weight:bold; overflow-wrap:anywhere; }
       #modalVersionContainer { min-height: 80px; }
+      .modal-action-buttons-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 4px 0 6px 0;
+      }
       .btn-modal-trailer {
         display: inline-flex;
         align-items: center;
@@ -352,13 +488,123 @@ function createExtraSections() {
         text-decoration: none;
         font-size: 11px;
         font-weight: 700;
-        padding: 4px 10px;
+        padding: 5px 11px;
         border-radius: 6px;
-        margin: 4px 0 6px 0;
         transition: 0.2s;
         width: fit-content;
+        cursor: pointer;
       }
       .btn-modal-trailer:hover { background: #ff2450; color: #ffffff; }
+      .btn-modal-watch-online {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: linear-gradient(135deg, #ff2450, #ff6b00);
+        border: none;
+        color: #ffffff !important;
+        font-size: 11px;
+        font-weight: 800;
+        padding: 6px 13px;
+        border-radius: 6px;
+        cursor: pointer;
+        box-shadow: 0 3px 10px rgba(255, 36, 80, 0.35);
+        transition: 0.2s;
+      }
+      .btn-modal-watch-online:hover { transform: translateY(-1px); opacity: 0.95; }
+
+      /* In-App Player Modal Styles */
+      .jj-player-modal-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(4, 8, 16, 0.94);
+        backdrop-filter: blur(6px);
+        z-index: 10000;
+        justify-content: center;
+        align-items: center;
+        padding: 12px;
+      }
+      .jj-player-modal-box {
+        width: 100%;
+        max-width: 900px;
+        background: #0d1526;
+        border: 1px solid rgba(255, 36, 80, 0.3);
+        border-radius: 12px;
+        padding: 14px;
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.85);
+      }
+      .jj-player-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .jj-player-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .jj-vlc-badge {
+        background: #ff6b00;
+        color: #fff;
+        font-size: 9px;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 4px;
+        flex-shrink: 0;
+      }
+      .jj-player-title {
+        color: #f8fafc;
+        font-size: 15px;
+        font-weight: 700;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .jj-player-close {
+        background: rgba(255, 255, 255, 0.08);
+        border: none;
+        color: #fff;
+        font-size: 22px;
+        line-height: 1;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .jj-player-close:hover { background: #ff2450; }
+      .jj-server-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .jj-server-btn {
+        background: #162238;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: #cbd5e1;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 6px 14px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .jj-server-btn.active, .jj-server-btn:hover {
+        background: #ff2450;
+        border-color: #ff2450;
+        color: #ffffff;
+      }
+      .jj-player-stage {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        position: relative;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -387,6 +633,8 @@ function createExtraSections() {
     `;
     collection.parentNode.insertBefore(updates, collection);
   }
+
+  ensureInAppPlayerModal();
 }
 
 function getHeaders() {
@@ -625,6 +873,8 @@ function loadMovies() {
     .then(function (data) {
       movies = data.map(function (item) {
         var rawTrailer = item.trailer_url || item.trailer || item.trailer_link || item.video_url || item.youtube_link || item.trailerUrl || "";
+        var rawStream1 = item.stream_url_1 || item.stream_url || item.stream1 || "";
+        var rawStream2 = item.stream_url_2 || item.stream2 || "";
         return {
           id: item.id,
           title: item.title || "Untitled",
@@ -637,6 +887,8 @@ function loadMovies() {
           pinned: item.is_pinned === true,
           pinLabel: String(item.pin_label || "").trim(),
           trailer: safeURL(rawTrailer),
+          stream1: safeURL(rawStream1),
+          stream2: safeURL(rawStream2),
           versions: []
         };
       });
@@ -670,6 +922,7 @@ function renderShowcaseCarousel() {
     var isCurrent = index === 0 ? "active" : "";
     var tagBadge = getMoviePinLabel(movie) || "POPULAR";
     var posterSrc = getAdaptivePosterUrl(movie.poster);
+    var hasStream = Boolean(movie.stream1 || movie.stream2);
 
     return `
       <div class="banner-slide ${isCurrent}">
@@ -687,6 +940,7 @@ function renderShowcaseCarousel() {
           <p class="banner-desc">${escapeHTML(movie.description || "Grab complete downloads and quality prints instantly on Telegram bot.")}</p>
           <div class="banner-action-row">
             <button onclick="showMovieDetails('${escapeHTML(movie.id)}')" class="btn-banner-primary">⚡ View Movie Details</button>
+            ${hasStream ? `<button onclick="openMoviePlayerById('${escapeHTML(movie.id)}')" class="btn-banner-secondary">▶ Watch Online</button>` : ""}
             ${movie.trailer ? `<a href="${escapeHTML(movie.trailer)}" target="_blank" rel="noopener noreferrer" class="btn-banner-secondary">▶ Trailer</a>` : ""}
           </div>
         </div>
@@ -808,7 +1062,7 @@ function createMovieCard(movie) {
   var button = document.createElement("button");
   button.className = "details-button";
   button.type = "button";
-  button.textContent = "⚡ Get Downloads";
+  button.textContent = (movie.stream1 || movie.stream2) ? "▶ Watch / Downloads" : "⚡ Get Downloads";
   button.addEventListener("click", function () {
     showMovieDetails(movie.id);
   });
@@ -883,7 +1137,6 @@ function handleLiveSearch() {
 
   searchGrid.innerHTML = "";
   if (countEl) countEl.textContent = matches.length + (matches.length === 1 ? " movie" : " movies");
-  // textContent ki escapeHTML avasaram ledu
   if (titleEl) titleEl.textContent = 'Results for "' + search + '"';
 
   if (matches.length === 0) {
@@ -916,6 +1169,11 @@ async function showMovieDetails(movieId) {
     : "https://www.youtube.com/results?search_query=" + encodeURIComponent(movie.title + " Telugu trailer");
 
   var modalPosterSrc = getAdaptivePosterUrl(movie.poster);
+  var hasStream = Boolean(movie.stream1 || movie.stream2);
+
+  var watchOnlineBtnHTML = hasStream
+    ? `<button type="button" onclick="openMoviePlayerById('${escapeHTML(movie.id)}')" class="btn-modal-watch-online">▶ Watch Online</button>`
+    : "";
 
   modalDetails.innerHTML = `
     ${pinBadgeHTML}
@@ -928,9 +1186,12 @@ async function showMovieDetails(movieId) {
           ${movie.runtime ? `<span>• ${escapeHTML(movie.runtime)}</span>` : ""}
           ${movie.category ? `<span class="genre-badge">• ${escapeHTML(movie.category)}</span>` : ""}
         </div>
-        <a href="${escapeHTML(trailerLink)}" target="_blank" rel="noopener noreferrer" class="btn-modal-trailer">
-          ▶ Watch Trailer
-        </a>
+        <div class="modal-action-buttons-row">
+          ${watchOnlineBtnHTML}
+          <a href="${escapeHTML(trailerLink)}" target="_blank" rel="noopener noreferrer" class="btn-modal-trailer">
+            ▶ Watch Trailer
+          </a>
+        </div>
         <p class="movie-desc-text" style="margin-top:6px;">${escapeHTML(movie.description || "No description available.")}</p>
       </div>
     </div>
@@ -1130,7 +1391,10 @@ if (movieModal) {
 }
 
 document.addEventListener("keydown", function (event) {
-  if (event.key === "Escape") closeMovieModal();
+  if (event.key === "Escape") {
+    closeInAppPlayer();
+    closeMovieModal();
+  }
 });
 
 createExtraSections();
