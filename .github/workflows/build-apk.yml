@@ -43,7 +43,7 @@ jobs:
           sed -i "1s/^/window.JJ_BUILD_VERSION = '${VER}';\n/" www/app.js
 
           npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/app
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/app @capacitor/screen-orientation
 
           npx cap init "JJ Movies" "com.jjmovies.app" --web-dir www
           npx cap add android
