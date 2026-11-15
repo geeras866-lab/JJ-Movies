@@ -368,13 +368,14 @@ function playMovieStream(rawUrl) {
     stage.appendChild(video);
     video.play().catch(function () {});
   } else {
-    // 🔥 FIXED: allow-fullscreen & proper sandbox for mobile full screen working
+    // 🔥 FIXED: Added referrerpolicy="no-referrer-when-downgrade" and advanced sandbox to bypass 404 block
     var iframe = document.createElement("iframe");
     iframe.id = "vlcInAppIframe";
     iframe.src = url;
     iframe.allowFullscreen = true;
-    iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media");
-    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms allow-presentation allow-popups");
+    iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write");
+    iframe.setAttribute("referrerpolicy", "no-referrer-when-downgrade");
+    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms allow-presentation allow-popups allow-modals");
     iframe.style.width = "100%";
     iframe.style.height = "100%";
     iframe.style.border = "0";
