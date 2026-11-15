@@ -31,6 +31,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 #posterPreview{display:block;max-width:180px;max-height:260px;object-fit:contain;border-radius:8px;margin:12px 0;border:1px solid #35405a}
 .upload-box{background:#090d18;border:1px solid #35405a;border-radius:9px;padding:14px;margin:8px 0 14px}
 .pin-label-box{background:#090d18;border:1px solid #35405a;border-radius:9px;padding:14px;margin:10px 0 16px}
+.stream-box{background:#090d18;border:1px solid #ff3867;border-radius:9px;padding:14px;margin:10px 0 16px}
 .checkline{display:flex;gap:9px;align-items:center;margin:14px 0}
 .checkline input{width:auto!important;margin:0!important}
 #suggestionsBox{background:#090d18;border:1px solid #35405a;border-radius:7px;max-height:180px;overflow-y:auto;margin-top:-8px;margin-bottom:14px;display:none}
@@ -129,6 +130,18 @@ hr{border-color:#303a50;margin:24px 0}
         <label for="trailerUrl">Trailer URL</label>
         <input id="trailerUrl" type="url">
 
+        <!-- 🎬 OPTIONAL IN-APP STREAMING LINKS -->
+        <div class="stream-box">
+          <h3 style="color:#ff3867; margin-bottom:6px;">▶ Watch Online - Streaming Servers (Optional)</h3>
+          <p class="muted" style="margin-top:0;">Streamlare, Filemoon leda Direct (.mp4/.m3u8) links ivvandi. Khali ga vadilesthe aa movie ki Watch Online button kanipinchadu.</p>
+
+          <label for="streamUrl1">⚡ Server 1 URL (Streamlare / Main Link)</label>
+          <input id="streamUrl1" type="url" placeholder="https://streamlare.com/e/... or https://.../movie.mp4">
+
+          <label for="streamUrl2">🚀 Server 2 URL (Filemoon / Backup Link)</label>
+          <input id="streamUrl2" type="url" placeholder="https://filemoon.sx/e/... or backup link">
+        </div>
+
         <label for="description">Description</label>
         <textarea id="description"></textarea>
 
@@ -147,6 +160,25 @@ hr{border-color:#303a50;margin:24px 0}
 
         <button type="submit" id="saveBtn">Save Movie</button>
         <button type="button" id="cancelBtn" class="secondary hidden">Cancel Edit</button>
+      </form>
+    </div>
+
+    <!-- QUICK STREAM SERVER MANAGER PANEL -->
+    <div class="panel" style="border: 1px solid #ff3867;">
+      <h2 style="color:#ff3867;">▶ Quick Online Stream Manager (Server 1 & Server 2)</h2>
+      <p class="muted">Edaina movie select chesi direct ga Server 1 (Streamlare) & Server 2 (Filemoon) links add leda remove cheyochu.</p>
+      <form id="quickStreamForm">
+        <label for="streamMovieSelect">Select Movie *</label>
+        <select id="streamMovieSelect" required><option value="">Loading movies...</option></select>
+
+        <label for="quickStream1Input">⚡ Server 1 URL (Optional)</label>
+        <input id="quickStream1Input" type="url" placeholder="https://streamlare.com/e/...">
+
+        <label for="quickStream2Input">🚀 Server 2 URL (Optional)</label>
+        <input id="quickStream2Input" type="url" placeholder="https://filemoon.sx/e/...">
+
+        <button type="submit" id="saveQuickStreamBtn">Save Stream Links</button>
+        <button type="button" id="clearQuickStreamBtn" class="secondary">Clear Both Links</button>
       </form>
     </div>
 
@@ -277,6 +309,9 @@ hr{border-color:#303a50;margin:24px 0}
   var versionList = document.getElementById("versionList");
   var categoryMovieSelect = document.getElementById("categoryMovieSelect");
   var quickCategoryInput = document.getElementById("quickCategoryInput");
+  var streamMovieSelect = document.getElementById("streamMovieSelect");
+  var quickStream1Input = document.getElementById("quickStream1Input");
+  var quickStream2Input = document.getElementById("quickStream2Input");
   var managerSearchInput = document.getElementById("managerSearchInput");
   var suggestionsBox = document.getElementById("suggestionsBox");
   var managerDropdownSelect = document.getElementById("managerDropdownSelect");
@@ -437,6 +472,8 @@ hr{border-color:#303a50;margin:24px 0}
       poster_url: safeHttpUrl(document.getElementById("poster").value.trim()) || null,
       description: document.getElementById("description").value.trim() || null,
       trailer_url: safeHttpUrl(document.getElementById("trailerUrl").value.trim()) || null,
+      stream_url_1: safeHttpUrl(document.getElementById("streamUrl1").value.trim()) || null,
+      stream_url_2: safeHttpUrl(document.getElementById("streamUrl2").value.trim()) || null,
       is_pinned: document.getElementById("pinned").checked,
       pin_label: document.getElementById("pinLabel").value.trim() || null,
       is_published: document.getElementById("published").checked
@@ -467,6 +504,11 @@ hr{border-color:#303a50;margin:24px 0}
     cFirst.value = "";
     categoryMovieSelect.appendChild(cFirst);
 
+    streamMovieSelect.innerHTML = "";
+    var sFirst = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
+    sFirst.value = "";
+    streamMovieSelect.appendChild(sFirst);
+
     managerDropdownSelect.innerHTML = "";
     var mFirst = makeElement("option", "", movies.length ? "Choose a movie from list..." : "Add a movie first");
     mFirst.value = "";
@@ -489,11 +531,17 @@ hr{border-color:#303a50;margin:24px 0}
       opt3.value = String(movie.id);
       opt3.textContent = label;
       managerDropdownSelect.appendChild(opt3);
+
+      var opt4 = document.createElement("option");
+      opt4.value = String(movie.id);
+      opt4.textContent = label;
+      streamMovieSelect.appendChild(opt4);
     });
 
     if (movies.length) {
       versionMovie.value = String(movies[0].id);
       categoryMovieSelect.value = String(movies[0].id);
+      streamMovieSelect.value = String(movies[0].id);
       loadVersions();
     }
   }
@@ -507,6 +555,49 @@ hr{border-color:#303a50;margin:24px 0}
     }
   });
 
+  streamMovieSelect.addEventListener("change", async function() {
+    var movieId = streamMovieSelect.value;
+    if (!movieId) {
+      quickStream1Input.value = "";
+      quickStream2Input.value = "";
+      return;
+    }
+    var activeMovie = allMoviesCache.find(function(m) { return String(m.id) === String(movieId); });
+    if (activeMovie) {
+      quickStream1Input.value = activeMovie.stream_url_1 || "";
+      quickStream2Input.value = activeMovie.stream_url_2 || "";
+    }
+  });
+
+  document.getElementById("quickStreamForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    var movieId = streamMovieSelect.value;
+    if (!movieId) { showMessage("Please select a movie."); return; }
+
+    var s1 = safeHttpUrl(quickStream1Input.value.trim()) || null;
+    var s2 = safeHttpUrl(quickStream2Input.value.trim()) || null;
+
+    var res = await supabase.from("movies").update({ stream_url_1: s1, stream_url_2: s2 }).eq("id", Number(movieId));
+    if (res.error) {
+      showMessage("Failed to update stream links: " + res.error.message);
+    } else {
+      showMessage("✅ Stream Server 1 & Server 2 links updated successfully!");
+      loadMovies();
+    }
+  });
+
+  document.getElementById("clearQuickStreamBtn").addEventListener("click", async function() {
+    var movieId = streamMovieSelect.value;
+    if (!movieId) return;
+    quickStream1Input.value = "";
+    quickStream2Input.value = "";
+    var res = await supabase.from("movies").update({ stream_url_1: null, stream_url_2: null }).eq("id", Number(movieId));
+    if (!res.error) {
+      showMessage("Stream links cleared for this movie.");
+      loadMovies();
+    }
+  });
+
   function displaySelectedMovie(movie) {
     managerMovieRow.innerHTML = "";
     if (movie.poster_url && safeHttpUrl(movie.poster_url)) {
@@ -517,7 +608,7 @@ hr{border-color:#303a50;margin:24px 0}
     }
     var info = makeElement("div", "movie-info");
     info.appendChild(makeElement("h3", "", movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "")));
-    info.appendChild(makeElement("p", "muted", "Category: " + (movie.category || "None")));
+    info.appendChild(makeElement("p", "muted", "Category: " + (movie.category || "None") + " | Stream: " + ((movie.stream_url_1 || movie.stream_url_2) ? "✅ Available" : "None")));
 
     var editBtn = makeElement("button", "secondary", "Full Edit");
     editBtn.addEventListener("click", function() {
@@ -528,6 +619,8 @@ hr{border-color:#303a50;margin:24px 0}
       document.getElementById("categoryInput").value = movie.category || "";
       document.getElementById("poster").value = movie.poster_url || "";
       document.getElementById("trailerUrl").value = movie.trailer_url || "";
+      document.getElementById("streamUrl1").value = movie.stream_url_1 || "";
+      document.getElementById("streamUrl2").value = movie.stream_url_2 || "";
       document.getElementById("description").value = movie.description || "";
       document.getElementById("pinned").checked = !!movie.is_pinned;
       document.getElementById("pinLabel").value = movie.pin_label || "";
@@ -625,6 +718,13 @@ hr{border-color:#303a50;margin:24px 0}
     if (categoryMovieSelect.value) {
       var activeMovie = movies.find(function(m) { return String(m.id) === String(categoryMovieSelect.value); });
       if (activeMovie) quickCategoryInput.value = activeMovie.category || "";
+    }
+    if (streamMovieSelect.value) {
+      var sMovie = movies.find(function(m) { return String(m.id) === String(streamMovieSelect.value); });
+      if (sMovie) {
+        quickStream1Input.value = sMovie.stream_url_1 || "";
+        quickStream2Input.value = sMovie.stream_url_2 || "";
+      }
     }
   }
 
