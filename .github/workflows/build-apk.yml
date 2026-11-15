@@ -90,6 +90,11 @@ jobs:
           }
           EOF
 
+      - name: 🎨 Generate Custom App Icon
+        run: |
+          npm install @capacitor/assets --save-dev
+          npx capacitor-assets generate --android --iconBackgroundColor '#090d18' --iconBackgroundColorDark '#090d18'
+
       - name: 🔄 Sync Web Code to Android
         run: npx cap sync android
 
