@@ -277,7 +277,7 @@ function loadHls(cb) {
   document.head.appendChild(s);
 }
 
-// ---------- FULLSCREEN ROTATION FIX (real Android orientation lock) ----------
+// ---------- FULLSCREEN (real Android orientation lock) ----------
 function lockLandscape() {
   try {
     var P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenOrientation;
@@ -298,27 +298,14 @@ function unlockOrientation() {
   }
 }
 
+// Sizing is done purely by CSS (inset:0), so just clear any inline styles
 function syncLandscapeDimensions() {
   var modal = document.getElementById("inAppVideoModal");
   var box = modal ? modal.querySelector(".jj-player-modal-box") : null;
   if (!box) return;
-
-  if (!box.classList.contains("jj-landscape-fs")) {
-    box.style.position = "";
-    box.style.width = "";
-    box.style.height = "";
-    box.style.transform = "";
-    box.style.top = "";
-    box.style.left = "";
-    return;
-  }
-
-  box.style.position = "fixed";
-  box.style.top = "0";
-  box.style.left = "0";
-  box.style.width = "100vw";
-  box.style.height = "100vh";
-  box.style.transform = "none";
+  ["position", "top", "left", "width", "height", "transform"].forEach(function (p) {
+    box.style[p] = "";
+  });
 }
 
 window.addEventListener("resize", syncLandscapeDimensions);
@@ -342,18 +329,6 @@ function wakePlayerControls() {
   }
 }
 
-function openNoStatusBarFullscreen() {
-  if (!currentActiveStreamUrl) return;
-  var clean = currentActiveStreamUrl.replace(/^https?:\/\//i, "");
-  var scheme = currentActiveStreamUrl.startsWith("https") ? "https" : "http";
-  var isAndroid = /Android/i.test(navigator.userAgent);
-  if (isAndroid) {
-    window.location.href = "intent://" + clean + "#Intent;scheme=" + scheme + ";package=com.android.chrome;end";
-  } else {
-    window.open(currentActiveStreamUrl, "_blank");
-  }
-}
-
 function ensureInAppPlayerModal() {
   var modal = document.getElementById("inAppVideoModal");
   if (!modal) {
@@ -370,7 +345,6 @@ function ensureInAppPlayerModal() {
           </div>
           <div class="jj-player-header-actions">
             <button type="button" id="jjFullscreenBtn" class="jj-player-fs-btn" onclick="togglePlayerFullscreen()">⛶ Rotate Fullscreen</button>
-            <button type="button" id="jjHideStatusBtn" class="jj-player-status-btn" onclick="openNoStatusBarFullscreen()" title="Hide Status Bar">🔥 Hide Status Bar</button>
             <button type="button" class="jj-player-close" onclick="closeInAppPlayer()" aria-label="Close">&times;</button>
           </div>
         </div>
@@ -395,16 +369,8 @@ function ensureInAppPlayerModal() {
       fsBtn.textContent = "⛶ Rotate Fullscreen";
       fsBtn.onclick = togglePlayerFullscreen;
 
-      var statusBtn = document.createElement("button");
-      statusBtn.type = "button";
-      statusBtn.id = "jjHideStatusBtn";
-      statusBtn.className = "jj-player-status-btn";
-      statusBtn.textContent = "🔥 Hide Status Bar";
-      statusBtn.onclick = openNoStatusBarFullscreen;
-
       closeBtn.parentNode.insertBefore(actionsWrap, closeBtn);
       actionsWrap.appendChild(fsBtn);
-      actionsWrap.appendChild(statusBtn);
       actionsWrap.appendChild(closeBtn);
     }
   }
@@ -651,7 +617,6 @@ window.openServerSelection = openServerSelection;
 window.playMovieStream = playMovieStream;
 window.closeInAppPlayer = closeInAppPlayer;
 window.togglePlayerFullscreen = togglePlayerFullscreen;
-window.openNoStatusBarFullscreen = openNoStatusBarFullscreen;
 
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
@@ -802,8 +767,7 @@ function createExtraSections() {
       .jj-player-modal-overlay {
         position: fixed;
         top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(4, 8, 16, 0.96);
-        backdrop-filter: blur(8px);
+        background: rgba(4, 8, 16, 0.98);
         z-index: 10000;
         justify-content: center;
         align-items: center;
@@ -854,17 +818,6 @@ function createExtraSections() {
         cursor: pointer;
         white-space: nowrap;
         box-shadow: 0 2px 8px rgba(255, 36, 80, 0.35);
-      }
-      .jj-player-status-btn {
-        background: #1e293b;
-        border: 1px solid #38bdf8;
-        color: #38bdf8;
-        font-size: 10px;
-        font-weight: 800;
-        padding: 6px 8px;
-        border-radius: 6px;
-        cursor: pointer;
-        white-space: nowrap;
       }
       .jj-vlc-badge {
         background: #ff6b00;
@@ -962,6 +915,16 @@ function createExtraSections() {
         max-height: none !important;
       }
 
+      /* Exact full-screen sizing (no 100vh) */
+      .jj-player-modal-box.jj-landscape-fs {
+        position: fixed !important;
+        inset: 0 !important;
+        width: auto !important;
+        height: auto !important;
+        transform: none !important;
+        overflow: hidden !important;
+      }
+
       .jj-player-modal-box:fullscreen .jj-player-stage,
       .jj-player-modal-box:-webkit-full-screen .jj-player-stage,
       .jj-player-modal-box.jj-landscape-fs .jj-player-stage {
@@ -972,6 +935,12 @@ function createExtraSections() {
         aspect-ratio: auto !important;
         border-radius: 0 !important;
         z-index: 10 !important;
+      }
+
+      .jj-player-modal-box.jj-landscape-fs iframe,
+      .jj-player-modal-box.jj-landscape-fs video {
+        width: 100% !important;
+        height: 100% !important;
       }
 
       .jj-player-modal-box:fullscreen .jj-player-header,
@@ -993,10 +962,22 @@ function createExtraSections() {
         display: none !important;
       }
 
-      .jj-player-modal-box.jj-controls-idle .jj-player-header,
-      .jj-player-modal-box.jj-controls-idle .jj-corner-arrow-btn {
+      .jj-player-modal-box.jj-controls-idle .jj-player-header {
         opacity: 0 !important;
         pointer-events: none !important;
+      }
+
+      /* Arrow button always visible */
+      .jj-corner-arrow-btn,
+      .jj-player-modal-box.jj-controls-idle .jj-corner-arrow-btn {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        z-index: 60 !important;
+      }
+      .jj-player-modal-box.jj-landscape-fs .jj-corner-arrow-btn {
+        top: 10px !important;
+        bottom: auto !important;
+        right: 14px !important;
       }
     `;
     document.head.appendChild(style);
