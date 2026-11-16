@@ -95,6 +95,16 @@ jobs:
           npm install @capacitor/assets --save-dev
           npx capacitor-assets generate --android --iconBackgroundColor '#090d18' --iconBackgroundColorDark '#090d18'
 
+          RES=android/app/src/main/res
+          mkdir -p $RES/values
+          printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#090D18</color>\n</resources>\n' > $RES/values/ic_launcher_background.xml
+
+          for f in $RES/mipmap-anydpi-v26/ic_launcher.xml $RES/mipmap-anydpi-v26/ic_launcher_round.xml; do
+            if [ -f "$f" ]; then
+              sed -i 's#@mipmap/ic_launcher_background#@color/ic_launcher_background#g' "$f"
+            fi
+          done
+
       - name: 🔄 Sync Web Code to Android
         run: npx cap sync android
 
