@@ -1681,6 +1681,15 @@ function showAppUpdateModal(latestVer, apkUrl, notes, isForce) {
   }
 }
 
+// ---------- 🙈 HIDE APK DOWNLOAD BUTTONS INSIDE ANDROID APP ----------
+(function hideApkButtonsInApp() {
+  if (isRunningInsideApk()) {
+    var st = document.createElement("style");
+    st.textContent = '.nav-download-app, .footer-app-link, a[href*="jj-movies.apk"] { display: none !important; }';
+    document.head.appendChild(st);
+  }
+})();
+
 ensureSearchBar();
 if (searchInput) searchInput.addEventListener("input", handleLiveSearch);
 if (genreFilter) genreFilter.addEventListener("change", renderMovies);
@@ -1706,3 +1715,22 @@ createExtraSections();
 loadMovies();
 initNeonFestivalMode();
 // checkApkUpdate();  // update popup disabled
+// ---------- 🔄 ADD FLOATING / TOPBAR REFRESH BUTTON FOR APP ----------
+(function addAppRefreshButton() {
+  var topNav = document.querySelector(".top-nav-right");
+  if (topNav && !document.getElementById("jjRefreshBtn")) {
+    var refBtn = document.createElement("button");
+    refBtn.id = "jjRefreshBtn";
+    refBtn.type = "button";
+    refBtn.innerHTML = "🔄";
+    refBtn.title = "Refresh App";
+    refBtn.style.cssText = "background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#fff;width:34px;height:34px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:0.2s;";
+    
+    refBtn.onclick = function() {
+      refBtn.style.transform = "rotate(360deg)";
+      setTimeout(function() { window.location.reload(); }, 300);
+    };
+
+    topNav.prepend(refBtn);
+  }
+})();
