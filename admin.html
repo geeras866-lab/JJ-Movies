@@ -127,7 +127,13 @@ hr{border-color:#303a50;margin:24px 0}
     <div class="panel">
       <h2 id="formTitle">Add Movie</h2>
       <form id="movieForm">
-        <label for="title">Movie Title *</label>
+        <label for="contentType">Type *</label>
+        <select id="contentType">
+          <option value="movie">🎬 Movie</option>
+          <option value="series">📺 Series (episodes separate ga add chestam)</option>
+        </select>
+
+        <label for="title">Movie / Series Title *</label>
         <input id="title" required maxlength="200">
 
         <label for="year">Release Year</label>
@@ -155,7 +161,7 @@ hr{border-color:#303a50;margin:24px 0}
         <input id="trailerUrl" type="url">
 
         <!-- 🎬 OPTIONAL IN-APP STREAMING LINKS -->
-        <div class="stream-box">
+        <div class="stream-box" id="movieStreamBox">
           <h3 style="color:#ff3867; margin-bottom:6px;">▶ Watch Online - Streaming Servers (Optional)</h3>
           <p class="muted" style="margin-top:0;">Streamlare, Filemoon, Byse.sx, PlayDrive leda Direct (.mp4/.m3u8) links ivvandi. Khali ga vadilesthe aa movie ki Watch Online button kanipinchadu.</p>
 
@@ -185,6 +191,44 @@ hr{border-color:#303a50;margin:24px 0}
         <button type="submit" id="saveBtn">Save Movie</button>
         <button type="button" id="cancelBtn" class="secondary hidden">Cancel Edit</button>
       </form>
+    </div>
+
+    <!-- SERIES EPISODES MANAGER -->
+    <div class="panel" style="border: 1px solid #38bdf8;">
+      <h2 style="color:#38bdf8;">📺 Series Episodes Manager</h2>
+      <p class="muted">Series select chesi Episode 1, 2, 3... links add cheyandi. Website lo prathi episode ki separate button vastundi.</p>
+      <form id="episodeForm">
+        <label for="episodeSeriesSelect">Select Series *</label>
+        <select id="episodeSeriesSelect"><option value="">Add a series first (Type = Series)</option></select>
+
+        <label for="episodeSeason">Season Number</label>
+        <input id="episodeSeason" type="number" min="1" value="1">
+
+        <label for="episodeNumber">Episode Number *</label>
+        <input id="episodeNumber" type="number" min="1" required placeholder="1">
+
+        <label for="episodeTitle">Episode Title (Optional)</label>
+        <input id="episodeTitle" type="text" maxlength="150" placeholder="e.g. The Beginning">
+
+        <label for="episodeStream1">⚡ Server 1 URL</label>
+        <input id="episodeStream1" type="url" placeholder="https://byse.sx/e/...">
+
+        <label for="episodeStream2">🚀 Server 2 URL (Optional)</label>
+        <input id="episodeStream2" type="url" placeholder="https://filemoon.sx/e/...">
+
+        <button type="submit" id="saveEpisodeBtn">Save Episode</button>
+        <button type="button" id="cancelEpisodeBtn" class="secondary hidden">Cancel Edit</button>
+      </form>
+
+      <hr>
+      <h3>⚡ Bulk Add (many episodes at once)</h3>
+      <p class="muted">Prathi line ki okka episode: <code>episode_no | server1 | server2(optional)</code>. Season number paina input nundi teesukuntundi.</p>
+      <textarea id="episodeBulkInput" placeholder="1 | https://byse.sx/e/aaa | https://filemoon.sx/e/aaa&#10;2 | https://byse.sx/e/bbb&#10;3 | https://byse.sx/e/ccc"></textarea>
+      <button type="button" id="bulkEpisodeBtn">Add All Episodes</button>
+
+      <hr>
+      <h3>Saved Episodes</h3>
+      <div id="episodeList" class="muted">Select a series above.</div>
     </div>
 
     <!-- QUICK STREAM SERVER MANAGER PANEL -->
@@ -505,6 +549,7 @@ hr{border-color:#303a50;margin:24px 0}
   function resetMovieForm() {
     editingId = null;
     document.getElementById("movieForm").reset();
+    toggleStreamBox();
     document.getElementById("formTitle").textContent = "Add Movie";
     document.getElementById("saveBtn").textContent = "Save Movie";
     document.getElementById("cancelBtn").classList.add("hidden");
@@ -518,6 +563,7 @@ hr{border-color:#303a50;margin:24px 0}
     if (selectedFile) { showMessage("Please upload the chosen poster image first."); return; }
 
     var movie = {
+      content_type: document.getElementById("contentType").value || "movie",
       title: document.getElementById("title").value.trim(),
       release_year: document.getElementById("year").value ? Number(document.getElementById("year").value) : null,
       runtime: document.getElementById("runtime").value.trim() || null,
@@ -544,8 +590,138 @@ hr{border-color:#303a50;margin:24px 0}
     loadMovies();
   });
 
+  // ---------- SERIES EPISODES ----------
+  var episodeSeriesSelect = document.getElementById("episodeSeriesSelect");
+  var episodeList = document.getElementById("episodeList");
+  var editingEpisodeId = null;
+
+  function toggleStreamBox() {
+    var box = document.getElementById("movieStreamBox");
+    if (box) box.classList.toggle("hidden", document.getElementById("contentType").value === "series");
+  }
+  document.getElementById("contentType").addEventListener("change", toggleStreamBox);
+
+  function populateSeriesSelect(movies) {
+    var keep = episodeSeriesSelect.value;
+    var series = movies.filter(function (m) { return m.content_type === "series"; });
+    episodeSeriesSelect.innerHTML = "";
+    var first = makeElement("option", "", series.length ? "Choose a series..." : "Add a series first (Type = Series)");
+    first.value = "";
+    episodeSeriesSelect.appendChild(first);
+    series.forEach(function (m) {
+      var o = document.createElement("option");
+      o.value = String(m.id);
+      o.textContent = m.title + (m.release_year ? " (" + m.release_year + ")" : "");
+      episodeSeriesSelect.appendChild(o);
+    });
+    if (keep && series.some(function (m) { return String(m.id) === keep; })) episodeSeriesSelect.value = keep;
+    else if (series.length) episodeSeriesSelect.value = String(series[0].id);
+    loadEpisodes();
+  }
+
+  async function loadEpisodes() {
+    var sid = episodeSeriesSelect.value;
+    episodeList.innerHTML = "";
+    if (!sid) { episodeList.textContent = "Select a series above."; return; }
+    var res = await supabase.from("episodes").select("*").eq("movie_id", Number(sid))
+      .order("season_number", { ascending: true }).order("episode_number", { ascending: true });
+    if (res.error) {
+      episodeList.textContent = "Episodes load avvaledu: " + res.error.message + " (series-episodes.sql run chesava?)";
+      return;
+    }
+    if (!res.data.length) { episodeList.textContent = "No episodes added yet."; return; }
+    res.data.forEach(function (ep) {
+      var row = makeElement("div", "version-row");
+      row.appendChild(makeElement("strong", "", "S" + ep.season_number + " • Episode " + ep.episode_number + (ep.title ? " — " + ep.title : "")));
+      row.appendChild(makeElement("p", "muted", "S1: " + (ep.stream_url_1 || "—") + (ep.stream_url_2 ? "\nS2: " + ep.stream_url_2 : "")));
+      var edit = makeElement("button", "secondary", "Edit");
+      edit.addEventListener("click", function () {
+        editingEpisodeId = ep.id;
+        document.getElementById("episodeSeason").value = ep.season_number || 1;
+        document.getElementById("episodeNumber").value = ep.episode_number;
+        document.getElementById("episodeTitle").value = ep.title || "";
+        document.getElementById("episodeStream1").value = ep.stream_url_1 || "";
+        document.getElementById("episodeStream2").value = ep.stream_url_2 || "";
+        document.getElementById("saveEpisodeBtn").textContent = "Update Episode";
+        document.getElementById("cancelEpisodeBtn").classList.remove("hidden");
+        document.getElementById("episodeForm").scrollIntoView({ behavior: "smooth" });
+      });
+      var del = makeElement("button", "danger", "Delete");
+      del.addEventListener("click", async function () {
+        if (!confirm("Delete Episode " + ep.episode_number + "?")) return;
+        var d = await supabase.from("episodes").delete().eq("id", ep.id);
+        if (d.error) showMessage("Delete failed: " + d.error.message);
+        loadEpisodes();
+      });
+      row.appendChild(edit);
+      row.appendChild(del);
+      episodeList.appendChild(row);
+    });
+  }
+
+  function resetEpisodeForm(keepSeason) {
+    editingEpisodeId = null;
+    var season = document.getElementById("episodeSeason").value || "1";
+    document.getElementById("episodeForm").reset();
+    document.getElementById("episodeSeason").value = keepSeason ? season : "1";
+    document.getElementById("saveEpisodeBtn").textContent = "Save Episode";
+    document.getElementById("cancelEpisodeBtn").classList.add("hidden");
+  }
+  document.getElementById("cancelEpisodeBtn").addEventListener("click", function () { resetEpisodeForm(true); });
+  episodeSeriesSelect.addEventListener("change", loadEpisodes);
+
+  document.getElementById("episodeForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var sid = episodeSeriesSelect.value;
+    if (!sid) { showMessage("Please select a series."); return; }
+    var s1 = safeHttpUrl(document.getElementById("episodeStream1").value.trim()) || null;
+    var s2 = safeHttpUrl(document.getElementById("episodeStream2").value.trim()) || null;
+    if (!s1 && !s2) { showMessage("Kanisam okka server link ivvandi."); return; }
+    var payload = {
+      movie_id: Number(sid),
+      season_number: Number(document.getElementById("episodeSeason").value) || 1,
+      episode_number: Number(document.getElementById("episodeNumber").value),
+      title: document.getElementById("episodeTitle").value.trim() || null,
+      stream_url_1: s1,
+      stream_url_2: s2
+    };
+    var res = editingEpisodeId !== null
+      ? await supabase.from("episodes").update(payload).eq("id", editingEpisodeId)
+      : await supabase.from("episodes").insert([payload]);
+    if (res.error) { showMessage("Episode save error: " + res.error.message); return; }
+    showMessage("✅ Episode " + payload.episode_number + " saved!");
+    resetEpisodeForm(true);
+    loadEpisodes();
+  });
+
+  document.getElementById("bulkEpisodeBtn").addEventListener("click", async function () {
+    var sid = episodeSeriesSelect.value;
+    if (!sid) { showMessage("Please select a series."); return; }
+    var season = Number(document.getElementById("episodeSeason").value) || 1;
+    var lines = document.getElementById("episodeBulkInput").value.split("\n");
+    var rows = [], bad = [];
+    lines.forEach(function (line) {
+      line = line.trim();
+      if (!line) return;
+      var parts = line.split("|").map(function (x) { return x.trim(); });
+      var n = Number(parts[0]);
+      var a = safeHttpUrl(parts[1] || "") || null;
+      var b = safeHttpUrl(parts[2] || "") || null;
+      if (!n || (!a && !b)) { bad.push(line); return; }
+      rows.push({ movie_id: Number(sid), season_number: season, episode_number: n, stream_url_1: a, stream_url_2: b });
+    });
+    if (bad.length) { showMessage("Ee lines format sariga ledu:\n" + bad.join("\n")); return; }
+    if (!rows.length) { showMessage("Bulk box lo episodes raayandi."); return; }
+    var res = await supabase.from("episodes").insert(rows);
+    if (res.error) { showMessage("Bulk add error: " + res.error.message); return; }
+    document.getElementById("episodeBulkInput").value = "";
+    showMessage("✅ " + rows.length + " episodes added to Season " + season + "!");
+    loadEpisodes();
+  });
+
   function populateMovieSelects(movies) {
     allMoviesCache = movies;
+    populateSeriesSelect(movies);
 
     versionMovie.innerHTML = "";
     var vFirst = makeElement("option", "", movies.length ? "Choose a movie..." : "Add a movie first");
@@ -661,11 +837,13 @@ hr{border-color:#303a50;margin:24px 0}
     }
     var info = makeElement("div", "movie-info");
     info.appendChild(makeElement("h3", "", movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "")));
-    info.appendChild(makeElement("p", "muted", "Category: " + (movie.category || "None") + " | Stream: " + ((movie.stream_url_1 || movie.stream_url_2) ? "✅ Available" : "None")));
+    info.appendChild(makeElement("p", "muted", (movie.content_type === "series" ? "📺 Series" : "🎬 Movie") + " | Category: " + (movie.category || "None") + " | Stream: " + ((movie.stream_url_1 || movie.stream_url_2) ? "✅ Available" : "None")));
 
     var editBtn = makeElement("button", "secondary", "Full Edit");
     editBtn.addEventListener("click", function() {
       editingId = movie.id;
+      document.getElementById("contentType").value = movie.content_type === "series" ? "series" : "movie";
+      toggleStreamBox();
       document.getElementById("title").value = movie.title || "";
       document.getElementById("year").value = movie.release_year || "";
       document.getElementById("runtime").value = movie.runtime || "";
