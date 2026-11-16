@@ -72,6 +72,13 @@
 
   <!-- Main Default Content (Hidden during search) -->
   <div id="mainContentWrapper">
+    <!-- Movies / Series type tabs -->
+    <div class="menu-bar type-bar" id="typeMenu">
+      <button class="menu-btn type-btn active" onclick="filterByType('all', this)">ALL</button>
+      <button class="menu-btn type-btn" onclick="filterByType('movie', this)">🎬 MOVIES</button>
+      <button class="menu-btn type-btn" onclick="filterByType('series', this)">📺 SERIES</button>
+    </div>
+
     <!-- Horizontal Category Menu -->
     <div class="menu-bar" id="categoryMenu">
       <button class="menu-btn active" onclick="filterByCustomCategory('all', this)">ALL</button>
@@ -150,7 +157,7 @@
   <script src="app.js"></script>
   <script>
     function filterByCustomCategory(category, btnElement) {
-      document.querySelectorAll('.menu-btn').forEach(function(btn) {
+      document.querySelectorAll('#categoryMenu .menu-btn').forEach(function(btn) {
         btn.classList.remove('active');
       });
       if (btnElement) btnElement.classList.add('active');
