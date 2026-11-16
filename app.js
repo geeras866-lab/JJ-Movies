@@ -21,6 +21,7 @@ var modalDetails = document.getElementById("modalDetails");
 var carouselInterval = null;
 var inlineSearch = "";
 var currentActiveStreamUrl = "";
+var currentType = "all"; // all | movie | series
 
 // ---------- Notch / cutout support + black background ----------
 (function () {
@@ -57,6 +58,20 @@ function safeURL(value) {
   }
   return val;
 }
+
+function isSeries(movie) {
+  return Boolean(movie && movie.type === "series");
+}
+
+function filterByType(type, btnElement) {
+  currentType = type;
+  document.querySelectorAll(".type-btn").forEach(function (b) { b.classList.remove("active"); });
+  if (btnElement) btnElement.classList.add("active");
+  var h = document.querySelector("#collection .collection-heading h2");
+  if (h) h.textContent = type === "series" ? "Series Collection" : (type === "movie" ? "Movie Collection" : "All Movies & Series");
+  renderMovies();
+}
+window.filterByType = filterByType;
 
 function getMoviePinLabel(movie) {
   if (!movie || movie.pinned !== true) return "";
@@ -814,6 +829,21 @@ function createExtraSections() {
       .jj-corner-arrow-btn:active {
         background: #ff2450;
       }
+
+      /* Series episodes */
+      .jj-episodes-wrap { margin: 14px 0 12px; padding: 12px; background: #0d1526; border: 1.5px solid rgba(255,65,102,0.45); border-radius: 14px; }
+      .jj-episodes-head { color: #fff; font-weight: 800; font-size: 14px; margin-bottom: 10px; }
+      .jj-season-tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 10px; scrollbar-width: none; }
+      .jj-season-tabs::-webkit-scrollbar { display: none; }
+      .jj-season-btn { flex-shrink: 0; background: #162238; border: 1px solid rgba(255,255,255,0.14); color: #cbd5e1; font-size: 11px; font-weight: 700; padding: 6px 14px; border-radius: 6px; cursor: pointer; }
+      .jj-season-btn.active { background: #ff2450; border-color: #ff2450; color: #fff; }
+      .jj-ep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+      .jj-ep-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: linear-gradient(135deg, #ff2450 0%, #ff6b00 100%); color: #fff; border: none; border-radius: 9px; padding: 10px 12px; cursor: pointer; box-shadow: 0 4px 14px rgba(255,36,80,0.3); }
+      .jj-ep-btn:active { transform: scale(0.97); }
+      .jj-ep-btn.disabled { background: #1a2536; color: #64748b; box-shadow: none; cursor: not-allowed; }
+      .jj-ep-num { font-size: 12px; font-weight: 800; }
+      .jj-ep-sub { font-size: 10px; font-weight: 600; opacity: 0.9; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .jj-ep-empty { color: #64748b; font-size: 12px; text-align: center; padding: 10px 0; margin: 0; }
     `;
     document.head.appendChild(style);
   }
@@ -1082,6 +1112,7 @@ function loadMovies() {
           year: item.release_year || "",
           runtime: item.runtime || "",
           category: item.category || "",
+          type: String(item.content_type || "movie").toLowerCase() === "series" ? "series" : "movie",
           genre: item.genre || "",
           poster: item.poster_url || "",
           description: item.description || "",
@@ -1127,7 +1158,7 @@ function renderShowcaseCarousel() {
     var isCurrent = index === 0 ? "active" : "";
     var tagBadge = getMoviePinLabel(movie) || "POPULAR";
     var posterSrc = getAdaptivePosterUrl(movie.poster);
-    var hasStream = Boolean(movie.stream1 || movie.stream2);
+    var hasStream = !isSeries(movie) && Boolean(movie.stream1 || movie.stream2);
 
     return `
       <div class="banner-slide ${isCurrent}">
@@ -1144,7 +1175,7 @@ function renderShowcaseCarousel() {
           <h1 class="banner-title">${escapeHTML(movie.title)}</h1>
           <p class="banner-desc">${escapeHTML(movie.description || "Grab complete downloads and quality prints instantly on Telegram bot.")}</p>
           <div class="banner-action-row">
-            <button onclick="showMovieDetails('${escapeHTML(movie.id)}')" class="btn-banner-primary">⚡ View Movie Details</button>
+            <button onclick="showMovieDetails('${escapeHTML(movie.id)}')" class="btn-banner-primary">${isSeries(movie) ? "📺 View Episodes" : "⚡ View Movie Details"}</button>
             ${hasStream ? `<button onclick="openMoviePlayerById('${escapeHTML(movie.id)}')" class="btn-banner-secondary">▶ Watch Online</button>` : ""}
             ${movie.trailer ? `<a href="${escapeHTML(movie.trailer)}" target="_blank" rel="noopener noreferrer" class="btn-banner-secondary">▶ Trailer</a>` : ""}
           </div>
@@ -1197,13 +1228,14 @@ function matchesFilters(movie) {
   var movieCategory = (movie.category || "").toLowerCase().trim();
   var matchesCategory = selectedCategory === "all" || movieCategory === selectedCategory;
   var matchesYear = year === "all" || String(movie.year) === year;
+  var matchesType = currentType === "all" || movie.type === currentType;
   var matchesText = true;
   if (inlineSearch) {
     matchesText = (movie.title || "").toLowerCase().includes(inlineSearch) ||
       (movie.description || "").toLowerCase().includes(inlineSearch) ||
       (movie.category || "").toLowerCase().includes(inlineSearch);
   }
-  return matchesCategory && matchesYear && matchesText;
+  return matchesType && matchesCategory && matchesYear && matchesText;
 }
 
 function createMovieCard(movie) {
@@ -1213,7 +1245,7 @@ function createMovieCard(movie) {
   var wrapper = document.createElement("div");
   wrapper.className = "card-poster-wrapper";
 
-  var tagBadgeLeftText = movie.category || "FILMS";
+  var tagBadgeLeftText = movie.category || (isSeries(movie) ? "SERIES" : "FILMS");
   var yearTagRightText = movie.year || "2026";
   var isPremium = getMoviePinLabel(movie);
   if (isPremium) tagBadgeLeftText = isPremium;
@@ -1275,7 +1307,7 @@ function createMovieCard(movie) {
   var button = document.createElement("button");
   button.className = "details-button";
   button.type = "button";
-  button.textContent = (movie.stream1 || movie.stream2) ? "▶ Watch / Downloads" : "⚡ Get Downloads";
+  button.textContent = isSeries(movie) ? "📺 Watch Episodes" : ((movie.stream1 || movie.stream2) ? "▶ Watch / Downloads" : "⚡ Get Downloads");
   button.addEventListener("click", function () {
     showMovieDetails(movie.id);
   });
@@ -1304,7 +1336,8 @@ function renderMovies() {
   });
 
   if (movieCount) {
-    movieCount.textContent = filtered.length + (filtered.length === 1 ? " movie" : " movies");
+    var noun = currentType === "series" ? "series" : (currentType === "movie" ? "movie" : "title");
+    movieCount.textContent = filtered.length + " " + noun + (noun !== "series" && filtered.length !== 1 ? "s" : "");
   }
   if (emptyMessage) {
     emptyMessage.hidden = filtered.length !== 0;
@@ -1369,6 +1402,75 @@ function clearLiveSearch() {
   }
 }
 
+// ---------- 📺 SERIES EPISODES ----------
+async function loadEpisodes(movie) {
+  var box = document.getElementById("modalEpisodesContainer");
+  if (!box) return;
+  try {
+    var res = await fetch(
+      SUPABASE_URL + "/rest/v1/episodes?select=id,season_number,episode_number,title,stream_url_1,stream_url_2&movie_id=eq." +
+      encodeURIComponent(movie.id) + "&order=season_number.asc,episode_number.asc",
+      { headers: getHeaders() }
+    );
+    if (!res.ok) throw new Error("Episodes request failed: " + res.status);
+    var eps = await res.json();
+    box = document.getElementById("modalEpisodesContainer");
+    if (!box) return;
+    if (!eps || !eps.length) {
+      box.innerHTML = '<p class="jj-ep-empty">Episodes inka add cheyaledu.</p>';
+      return;
+    }
+    renderEpisodes(movie, eps, box);
+  } catch (err) {
+    console.error("Episodes load error:", err);
+    if (box) box.innerHTML = '<p class="jj-ep-empty" style="color:#ef4444;">Episodes load avvaledu.</p>';
+  }
+}
+
+function renderEpisodes(movie, eps, box) {
+  var seasons = [];
+  eps.forEach(function (e) {
+    var n = Number(e.season_number) || 1;
+    if (seasons.indexOf(n) === -1) seasons.push(n);
+  });
+  seasons.sort(function (a, b) { return a - b; });
+  var activeSeason = seasons[0];
+
+  function draw() {
+    var tabs = seasons.length > 1
+      ? '<div class="jj-season-tabs">' + seasons.map(function (n) {
+          return '<button type="button" class="jj-season-btn' + (n === activeSeason ? " active" : "") + '" data-season="' + n + '">Season ' + n + '</button>';
+        }).join("") + '</div>'
+      : "";
+
+    var list = eps.filter(function (e) { return (Number(e.season_number) || 1) === activeSeason; });
+    var grid = list.map(function (e) {
+      var playable = Boolean(e.stream_url_1 || e.stream_url_2);
+      var sub = e.title ? '<span class="jj-ep-sub">' + escapeHTML(e.title) + '</span>' : "";
+      return '<button type="button" class="jj-ep-btn' + (playable ? "" : " disabled") + '" data-ep="' + escapeHTML(e.id) + '"' + (playable ? "" : " disabled") + '>' +
+        '<span class="jj-ep-num">▶ Episode ' + escapeHTML(e.episode_number) + '</span>' + sub + '</button>';
+    }).join("");
+
+    box.innerHTML = tabs + '<div class="jj-ep-grid">' + grid + '</div>';
+
+    box.querySelectorAll(".jj-season-btn").forEach(function (b) {
+      b.addEventListener("click", function () {
+        activeSeason = Number(b.getAttribute("data-season"));
+        draw();
+      });
+    });
+    box.querySelectorAll(".jj-ep-btn:not(.disabled)").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var ep = eps.find(function (x) { return String(x.id) === b.getAttribute("data-ep"); });
+        if (!ep) return;
+        var label = movie.title + (seasons.length > 1 ? " • S" + (Number(ep.season_number) || 1) : "") + " • Episode " + ep.episode_number;
+        openServerSelection(label, safeURL(ep.stream_url_1), safeURL(ep.stream_url_2));
+      });
+    });
+  }
+  draw();
+}
+
 async function showMovieDetails(movieId) {
   var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
   if (!movie) return;
@@ -1381,7 +1483,12 @@ async function showMovieDetails(movieId) {
     : "https://www.youtube.com/results?search_query=" + encodeURIComponent(movie.title + " Telugu trailer");
 
   var modalPosterSrc = getAdaptivePosterUrl(movie.poster);
-  var hasStream = Boolean(movie.stream1 || movie.stream2);
+  var seriesMode = isSeries(movie);
+  var hasStream = !seriesMode && Boolean(movie.stream1 || movie.stream2);
+
+  var episodesSectionHTML = seriesMode
+    ? `<div class="jj-episodes-wrap"><div class="jj-episodes-head">📺 Episodes</div><div id="modalEpisodesContainer"><p class="jj-ep-empty">Loading episodes...</p></div></div>`
+    : "";
 
   var bigWatchOnlineSectionHTML = hasStream
     ? `
@@ -1414,6 +1521,7 @@ async function showMovieDetails(movieId) {
       </div>
     </div>
     ${bigWatchOnlineSectionHTML}
+    ${episodesSectionHTML}
     <div class="prints-header-bar">
       <span>Available Quality Prints</span>
       <span class="status-dot-active">● Ready to Download</span>
@@ -1442,6 +1550,8 @@ async function showMovieDetails(movieId) {
       history.pushState({ jjModalOpen: true }, "", window.location.href);
     } catch (e) {}
   }
+
+  if (seriesMode) loadEpisodes(movie);
 
   var shareAnchor = document.getElementById("btnShareModalWhatsApp");
   if (shareAnchor) {
