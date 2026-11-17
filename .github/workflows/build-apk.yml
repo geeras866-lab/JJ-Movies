@@ -18,6 +18,8 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     env:
+      # 👇 Mee website URL ikkada okkasari set cheyandi. APK ee site ni live ga load chestundi,
+      # kaabatti site update chesthe APK malli build cheyakkarledu.
       SITE_URL: https://jj-movies.pages.dev/
 
     steps:
@@ -74,11 +76,6 @@ jobs:
           import android.view.View;
           import android.view.ViewGroup;
           import android.view.WindowManager;
-          import android.net.Uri;
-          import android.webkit.JavascriptInterface;
-          import android.webkit.WebResourceRequest;
-          import android.webkit.WebViewClient;
-          import com.getcapacitor.BridgeWebViewClient;
           import android.webkit.WebChromeClient;
           import android.webkit.WebSettings;
           import android.webkit.WebView;
@@ -91,7 +88,6 @@ jobs:
               private View customView;
               private WebChromeClient.CustomViewCallback customViewCallback;
               private FrameLayout fullscreenContainer;
-              private volatile boolean playerOpen = false;
 
               private void hideSystemUi() {
                   getWindow().getDecorView().setSystemUiVisibility(
@@ -148,30 +144,6 @@ jobs:
                   ws.setMediaPlaybackRequiresUserGesture(false);
                   ws.setJavaScriptEnabled(true);
                   ws.setDomStorageEnabled(true);
-
-                  // JS ikkada nundi player open/close status cheptundi
-                  wv.addJavascriptInterface(new Object() {
-                      @JavascriptInterface
-                      public void setPlayerOpen(boolean open) { playerOpen = open; }
-                  }, "JJNative");
-
-                  // Player open unnappudu external links (Chrome / ad redirects) purthiga block
-                  wv.setWebViewClient(new BridgeWebViewClient(getBridge()) {
-                      @Override
-                      public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                          if (playerOpen) {
-                              // iframe lopala jarige loads ni allow cheyyali (player work avvali)
-                              if (!request.isForMainFrame()) return false;
-                              String host = request.getUrl().getHost();
-                              String cur = view.getUrl();
-                              String curHost = cur == null ? null : Uri.parse(cur).getHost();
-                              if (host == null || curHost == null || !host.equalsIgnoreCase(curHost)) {
-                                  return true; // block: Chrome open avvadu
-                              }
-                          }
-                          return super.shouldOverrideUrlLoading(view, request);
-                      }
-                  });
 
                   // Chrome-like fullscreen handler: works on every phone
                   wv.setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
