@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#090d18">
+  <title>JJ Movies</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#090d18;color:#fff;font-family:system-ui,-apple-system,Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+    header{padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px}
+    .box{background:#ff2450;border-radius:8px;padding:4px 9px;font-weight:900}
+    .name{font-weight:800;letter-spacing:2px;font-size:20px}
+    main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px}
+    .icon{font-size:56px;margin-bottom:14px}
+    h1{font-size:20px;margin-bottom:8px}
+    p{color:#94a3b8;font-size:14px;line-height:1.5;max-width:300px}
+    #ptr{position:fixed;top:0;left:50%;transform:translate(-50%,-60px);background:#162238;border:1px solid rgba(255,255,255,.15);padding:8px 16px;border-radius:999px;font-size:12px;font-weight:700}
+  </style>
+</head>
+<body>
+  <div id="ptr">↓ Pull down to refresh</div>
+  <header><span class="box">JJ</span><span class="name">MOVIES</span></header>
+  <main>
+    <div class="icon">📡</div>
+    <h1>No internet connection</h1>
+    <p>Please turn on your internet, then pull down to refresh.</p>
+  </main>
+  <script>
+    var SITE = "https://jj-movies.pages.dev/";
+    var y0 = 0, dist = 0, on = false, ptr = document.getElementById("ptr");
+    document.addEventListener("touchstart", function (e) { y0 = e.touches[0].clientY; on = true; dist = 0; }, { passive: true });
+    document.addEventListener("touchmove", function (e) {
+      if (!on) return;
+      dist = e.touches[0].clientY - y0;
+      if (dist > 0) ptr.style.transform = "translate(-50%," + (Math.min(dist / 2, 80) - 50) + "px)";
+    }, { passive: true });
+    document.addEventListener("touchend", function () {
+      on = false;
+      ptr.style.transform = "translate(-50%,-60px)";
+      if (dist > 90) {
+        if (navigator.onLine) { ptr.textContent = "Refreshing..."; window.location.href = SITE; }
+        else { alert("Please turn on your internet and try again."); }
+      }
+    });
+    window.addEventListener("online", function () { window.location.href = SITE; });
+  </script>
+</body>
+</html>
