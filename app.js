@@ -821,7 +821,8 @@ function createExtraSections() {
 
       /* Series episodes */
       .jj-episodes-wrap { margin: 14px 0 12px; padding: 12px; background: #0d1526; border: 1.5px solid rgba(255,65,102,0.45); border-radius: 14px; }
-      .jj-episodes-head { color: #fff; font-weight: 800; font-size: 14px; margin-bottom: 10px; }
+      .jj-episodes-head { color: #fff; font-weight: 800; font-size: 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 3px; }
+      .jj-episodes-sub { color: #94a3b8; font-size: 10px; font-weight: 600; }
       .jj-season-tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 10px; scrollbar-width: none; }
       .jj-season-tabs::-webkit-scrollbar { display: none; }
       .jj-season-btn { flex-shrink: 0; background: #162238; border: 1px solid rgba(255,255,255,0.14); color: #cbd5e1; font-size: 11px; font-weight: 700; padding: 6px 14px; border-radius: 6px; cursor: pointer; }
@@ -1189,8 +1190,8 @@ function renderShowcaseCarousel() {
           <h1 class="banner-title">${escapeHTML(movie.title)}</h1>
           <p class="banner-desc">${escapeHTML(movie.description || "Grab complete downloads and quality prints instantly on Telegram bot.")}</p>
           <div class="banner-action-row">
-            <button onclick="showMovieDetails('${escapeHTML(movie.id)}')" class="btn-banner-primary">${isSeries(movie) ? "📺 View Episodes" : "⚡ View Movie Details"}</button>
-            ${hasStream ? `<button onclick="openMoviePlayerById('${escapeHTML(movie.id)}')" class="btn-banner-secondary">▶ Watch Online</button>` : ""}
+            <button onclick="showMovieDetails('${escapeHTML(movie.id)}')" class="btn-banner-primary">${isSeries(movie) ? "⚡ View Series Details" : "⚡ View Movie Details"}</button>
+            ${hasStream ? `<button onclick="openMoviePlayerById('${escapeHTML(movie.id)}')" class="btn-banner-secondary">▶ Watch Online</button>` : (isSeries(movie) ? `<button onclick="showMovieDetails('${escapeHTML(movie.id)}')" class="btn-banner-secondary">▶ Watch Online</button>` : "")}
             ${movie.trailer ? `<a href="${escapeHTML(movie.trailer)}" target="_blank" rel="noopener noreferrer" class="btn-banner-secondary">▶ Trailer</a>` : ""}
           </div>
         </div>
@@ -1320,7 +1321,7 @@ function createMovieCard(movie) {
   var button = document.createElement("button");
   button.className = "details-button";
   button.type = "button";
-  button.textContent = isSeries(movie) ? "📺 Watch Episodes" : ((movie.stream1 || movie.stream2) ? "▶ Watch / Downloads" : "⚡ Get Downloads");
+  button.textContent = isSeries(movie) ? "▶ Watch Online / Downloads" : ((movie.stream1 || movie.stream2) ? "▶ Watch / Downloads" : "⚡ Get Downloads");
   button.addEventListener("click", function () {
     showMovieDetails(movie.id);
   });
@@ -1508,7 +1509,7 @@ async function showMovieDetails(movieId) {
   var hasStream = !seriesMode && Boolean(movie.stream1 || movie.stream2);
 
   var episodesSectionHTML = seriesMode
-    ? `<div class="jj-episodes-wrap"><div class="jj-episodes-head">📺 Episodes</div><div id="modalEpisodesContainer"><p class="jj-ep-empty">Loading episodes...</p></div></div>`
+    ? `<div class="jj-episodes-wrap"><div class="jj-episodes-head">▶ WATCH ONLINE <span class="jj-episodes-sub">⚡ Direct In-App Streaming • No Download Required</span></div><div id="modalEpisodesContainer"><p class="jj-ep-empty">Loading episodes...</p></div></div>`
     : "";
 
   var bigWatchOnlineSectionHTML = hasStream
