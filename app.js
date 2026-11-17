@@ -21,7 +21,6 @@ var modalDetails = document.getElementById("modalDetails");
 var carouselInterval = null;
 var inlineSearch = "";
 var currentActiveStreamUrl = "";
-var currentType = "all"; // all | movie | series
 
 // ---------- Notch / cutout support + black background ----------
 (function () {
@@ -62,16 +61,6 @@ function safeURL(value) {
 function isSeries(movie) {
   return Boolean(movie && movie.type === "series");
 }
-
-function filterByType(type, btnElement) {
-  currentType = type;
-  document.querySelectorAll(".type-btn").forEach(function (b) { b.classList.remove("active"); });
-  if (btnElement) btnElement.classList.add("active");
-  var h = document.querySelector("#collection .collection-heading h2");
-  if (h) h.textContent = type === "series" ? "Series Collection" : (type === "movie" ? "Movie Collection" : "All Movies & Series");
-  renderMovies();
-}
-window.filterByType = filterByType;
 
 function getMoviePinLabel(movie) {
   if (!movie || movie.pinned !== true) return "";
@@ -1090,18 +1079,7 @@ function startSubtleHeaderSparks(type) {
   loop();
 }
 
-function loadMovies() {
-  if (movieCount) movieCount.textContent = "Loading movies...";
-
-  fetch(
-    SUPABASE_URL + "/rest/v1/movies?select=*&is_published=eq.true&order=created_at.desc",
-    { headers: getHeaders() }
-  )
-    .then(function (response) {
-      if (!response.ok) throw new Error("Movies request failed: " + response.status);
-      return response.json();
-    })
-    .then(function (data) {
+function applyMoviesData(data) {
       movies = data.map(function (item) {
         var rawTrailer = item.trailer_url || item.trailer || item.trailer_link || item.video_url || item.youtube_link || item.trailerUrl || "";
         var rawStream1 = item.stream_url_1 || item.stream_url || item.stream1 || "";
@@ -1133,15 +1111,51 @@ function loadMovies() {
       if (qid) showMovieDetails(qid);
 
       loadMessages();
+}
+
+var MOVIES_CACHE_KEY = "jj_movies_cache_v1";
+
+function readMoviesCache() {
+  try {
+    var raw = localStorage.getItem(MOVIES_CACHE_KEY);
+    var arr = raw ? JSON.parse(raw) : null;
+    return Array.isArray(arr) && arr.length ? arr : null;
+  } catch (e) { return null; }
+}
+
+function loadMovies() {
+  if (movieCount) movieCount.textContent = "Loading movies...";
+
+  fetch(
+    SUPABASE_URL + "/rest/v1/movies?select=*&is_published=eq.true&order=created_at.desc",
+    { headers: getHeaders() }
+  )
+    .then(function (response) {
+      if (!response.ok) throw new Error("Movies request failed: " + response.status);
+      return response.json();
+    })
+    .then(function (data) {
+      try { localStorage.setItem(MOVIES_CACHE_KEY, JSON.stringify(data)); } catch (e) {}
+      hideOfflineBar();
+      applyMoviesData(data);
     })
     .catch(function (error) {
       console.error("JJ Movies error:", error);
+      var cached = readMoviesCache();
+      if (cached) {
+        applyMoviesData(cached);
+        showOfflineBar();
+        return;
+      }
       if (movieCount) movieCount.textContent = "Unable to load movies";
       if (emptyMessage) {
         emptyMessage.hidden = false;
-        emptyMessage.textContent = "Movies load avvaledu.";
+        emptyMessage.textContent = navigator.onLine === false
+          ? "No internet connection. Please turn on your internet and pull down to refresh."
+          : "Unable to load movies. Please pull down to refresh.";
       }
       if (movieGrid) movieGrid.innerHTML = "";
+      showOfflineBar();
       loadMessages();
     });
 }
@@ -1228,14 +1242,13 @@ function matchesFilters(movie) {
   var movieCategory = (movie.category || "").toLowerCase().trim();
   var matchesCategory = selectedCategory === "all" || movieCategory === selectedCategory;
   var matchesYear = year === "all" || String(movie.year) === year;
-  var matchesType = currentType === "all" || movie.type === currentType;
   var matchesText = true;
   if (inlineSearch) {
     matchesText = (movie.title || "").toLowerCase().includes(inlineSearch) ||
       (movie.description || "").toLowerCase().includes(inlineSearch) ||
       (movie.category || "").toLowerCase().includes(inlineSearch);
   }
-  return matchesType && matchesCategory && matchesYear && matchesText;
+  return matchesCategory && matchesYear && matchesText;
 }
 
 function createMovieCard(movie) {
@@ -1336,8 +1349,7 @@ function renderMovies() {
   });
 
   if (movieCount) {
-    var noun = currentType === "series" ? "series" : (currentType === "movie" ? "movie" : "title");
-    movieCount.textContent = filtered.length + " " + noun + (noun !== "series" && filtered.length !== 1 ? "s" : "");
+    movieCount.textContent = filtered.length + (filtered.length === 1 ? " title" : " titles");
   }
   if (emptyMessage) {
     emptyMessage.hidden = filtered.length !== 0;
@@ -1414,16 +1426,25 @@ async function loadEpisodes(movie) {
     );
     if (!res.ok) throw new Error("Episodes request failed: " + res.status);
     var eps = await res.json();
+    try { localStorage.setItem("jj_eps_" + movie.id, JSON.stringify(eps)); } catch (e) {}
     box = document.getElementById("modalEpisodesContainer");
     if (!box) return;
     if (!eps || !eps.length) {
-      box.innerHTML = '<p class="jj-ep-empty">Episodes inka add cheyaledu.</p>';
+      box.innerHTML = '<p class="jj-ep-empty">No episodes added yet.</p>';
       return;
     }
     renderEpisodes(movie, eps, box);
   } catch (err) {
     console.error("Episodes load error:", err);
-    if (box) box.innerHTML = '<p class="jj-ep-empty" style="color:#ef4444;">Episodes load avvaledu.</p>';
+    box = document.getElementById("modalEpisodesContainer");
+    if (!box) return;
+    var cachedEps = null;
+    try { cachedEps = JSON.parse(localStorage.getItem("jj_eps_" + movie.id) || "null"); } catch (e) {}
+    if (cachedEps && cachedEps.length) {
+      renderEpisodes(movie, cachedEps, box);
+    } else {
+      box.innerHTML = '<p class="jj-ep-empty" style="color:#ef4444;">No internet connection. Please turn on your internet and try again.</p>';
+    }
   }
 }
 
@@ -1437,7 +1458,7 @@ function renderEpisodes(movie, eps, box) {
   var activeSeason = seasons[0];
 
   function draw() {
-    var tabs = seasons.length > 1
+    var tabs = seasons.length >= 1
       ? '<div class="jj-season-tabs">' + seasons.map(function (n) {
           return '<button type="button" class="jj-season-btn' + (n === activeSeason ? " active" : "") + '" data-season="' + n + '">Season ' + n + '</button>';
         }).join("") + '</div>'
@@ -1463,7 +1484,7 @@ function renderEpisodes(movie, eps, box) {
       b.addEventListener("click", function () {
         var ep = eps.find(function (x) { return String(x.id) === b.getAttribute("data-ep"); });
         if (!ep) return;
-        var label = movie.title + (seasons.length > 1 ? " • S" + (Number(ep.season_number) || 1) : "") + " • Episode " + ep.episode_number;
+        var label = movie.title + " • S" + (Number(ep.season_number) || 1) + " • Episode " + ep.episode_number;
         openServerSelection(label, safeURL(ep.stream_url_1), safeURL(ep.stream_url_2));
       });
     });
@@ -1825,22 +1846,76 @@ createExtraSections();
 loadMovies();
 initNeonFestivalMode();
 // checkApkUpdate();  // update popup disabled
-// ---------- 🔄 ADD FLOATING / TOPBAR REFRESH BUTTON FOR APP ----------
-(function addAppRefreshButton() {
-  var topNav = document.querySelector(".top-nav-right");
-  if (topNav && !document.getElementById("jjRefreshBtn")) {
-    var refBtn = document.createElement("button");
-    refBtn.id = "jjRefreshBtn";
-    refBtn.type = "button";
-    refBtn.innerHTML = "🔄";
-    refBtn.title = "Refresh App";
-    refBtn.style.cssText = "background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#fff;width:34px;height:34px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:0.2s;";
-    
-    refBtn.onclick = function() {
-      refBtn.style.transform = "rotate(360deg)";
-      setTimeout(function() { window.location.reload(); }, 300);
-    };
+// ---------- 📡 OFFLINE MESSAGE + PULL TO REFRESH ----------
+var OFFLINE_TEXT = "📡 No internet connection. Please turn on your internet and pull down to refresh.";
 
-    topNav.prepend(refBtn);
+function showOfflineBar() {
+  var bar = document.getElementById("jjOfflineBar");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "jjOfflineBar";
+    bar.style.cssText = "position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom, 0px));z-index:99999;background:#ff2450;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:10px 14px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.5);";
+    bar.textContent = OFFLINE_TEXT;
+    document.body.appendChild(bar);
   }
+  bar.style.display = "block";
+}
+
+function hideOfflineBar() {
+  var bar = document.getElementById("jjOfflineBar");
+  if (bar) bar.style.display = "none";
+}
+
+window.addEventListener("offline", showOfflineBar);
+window.addEventListener("online", function () { hideOfflineBar(); loadMovies(); });
+if (navigator.onLine === false) showOfflineBar();
+
+(function initPullToRefresh() {
+  var startY = 0, dist = 0, active = false, THRESH = 90;
+  var ind = document.createElement("div");
+  ind.style.cssText = "position:fixed;top:calc(8px + env(safe-area-inset-top, 0px));left:50%;transform:translate(-50%,-70px);z-index:99998;background:#162238;border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:12px;font-weight:700;padding:8px 16px;border-radius:999px;transition:transform 0.15s;pointer-events:none;";
+  ind.textContent = "↓ Pull down to refresh";
+  document.body.appendChild(ind);
+
+  function blocked(t) {
+    return t && t.closest && t.closest('[id*="odal"], [id*="layer"], [class*="modal"], [class*="player"]');
+  }
+
+  document.addEventListener("touchstart", function (e) {
+    if ((window.scrollY || document.documentElement.scrollTop) > 0 || blocked(e.target)) { active = false; return; }
+    startY = e.touches[0].clientY; dist = 0; active = true;
+  }, { passive: true });
+
+  document.addEventListener("touchmove", function (e) {
+    if (!active) return;
+    dist = e.touches[0].clientY - startY;
+    if (dist > 0) {
+      ind.style.transition = "none";
+      ind.style.transform = "translate(-50%," + (Math.min(dist / 2, 70) - 70) + "px)";
+      ind.textContent = dist > THRESH ? "Release to refresh" : "↓ Pull down to refresh";
+    }
+  }, { passive: true });
+
+  document.addEventListener("touchend", function () {
+    if (!active) return;
+    active = false;
+    ind.style.transition = "transform 0.15s";
+    ind.style.transform = "translate(-50%,-70px)";
+    if (dist > THRESH) {
+      if (navigator.onLine === false) {
+        showOfflineBar();
+      } else {
+        ind.textContent = "Refreshing...";
+        ind.style.transform = "translate(-50%,0)";
+        setTimeout(function () { window.location.reload(); }, 250);
+      }
+    }
+  });
 })();
+
+// ---------- Service worker (offline UI) ----------
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("./sw.js").catch(function (err) { console.warn("SW register failed:", err); });
+  });
+}
