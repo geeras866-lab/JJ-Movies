@@ -99,30 +99,6 @@ hr{border-color:#303a50;margin:24px 0}
       <span id="festivalStatusMsg" style="margin-left:10px; font-size:14px; font-weight:bold; color:#00f0ff;"></span>
     </div>
 
-    <!-- 📲 APP VERSION UPDATE CONTROL -->
-    <div class="panel" style="border: 1px solid #38bdf8; box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);">
-      <h2 style="color: #38bdf8; display:flex; align-items:center; gap:8px;">
-        📲 App Update Manager (APK Version Control)
-      </h2>
-      <p class="muted">Kotha APK build chesinappudu ikkada Latest Version penchandi (e.g., 1.0.1 -> 1.0.2). Old APK unna vallaki ventane Update popup vasthundi.</p>
-
-      <label for="latestAppVerInput">Latest App Version *</label>
-      <input id="latestAppVerInput" type="text" placeholder="1.0.1" value="1.0.0">
-
-      <label for="apkDownloadUrlInput">APK Download Link *</label>
-      <input id="apkDownloadUrlInput" type="url" placeholder="https://your-site.com/jj-movies.apk">
-
-      <label for="updateMessageInput">Update Message (What's New)</label>
-      <textarea id="updateMessageInput" placeholder="New features added, bug fixes & faster streaming player!"></textarea>
-
-      <label class="checkline">
-        <input id="forceUpdateToggle" type="checkbox"> <strong>Force Update</strong> (Update cheyakapothe old app close avvadu)
-      </label>
-
-      <button type="button" id="btnSaveAppVersion" style="background:#0284c7;">Save App Update Settings</button>
-      <span id="appVerStatusMsg" style="margin-left:10px; font-size:14px; font-weight:bold; color:#38bdf8;"></span>
-    </div>
-
     <!-- ADD / EDIT MOVIE PANEL -->
     <div class="panel">
       <h2 id="formTitle">Add Movie</h2>
@@ -429,7 +405,6 @@ hr{border-color:#303a50;margin:24px 0}
     loadMovies();
     loadAnnouncements();
     loadFestivalSettings();
-    loadAppVersionSettings();
   }
 
   // --- FESTIVAL SETTINGS LOGIC ---
@@ -462,38 +437,6 @@ hr{border-color:#303a50;margin:24px 0}
       festivalStatusMsg.textContent = "✅ Saved Successfully!";
     }
     setTimeout(function () { festivalStatusMsg.textContent = ""; }, 3500);
-  });
-
-  // --- APP VERSION UPDATE SETTINGS LOGIC ---
-  async function loadAppVersionSettings() {
-    try {
-      var res = await supabase.from("site_settings").select("value").eq("key", "app_version_config").single();
-      if (res.data && res.data.value) {
-        document.getElementById("latestAppVerInput").value = res.data.value.version || "1.0.0";
-        document.getElementById("apkDownloadUrlInput").value = res.data.value.apk_url || "";
-        document.getElementById("updateMessageInput").value = res.data.value.notes || "";
-        document.getElementById("forceUpdateToggle").checked = res.data.value.force === true;
-      }
-    } catch (err) {
-      console.warn("Could not load app version settings:", err);
-    }
-  }
-
-  document.getElementById("btnSaveAppVersion").addEventListener("click", async function () {
-    var statusEl = document.getElementById("appVerStatusMsg");
-    statusEl.textContent = "Saving...";
-    var payload = {
-      key: "app_version_config",
-      value: {
-        version: (document.getElementById("latestAppVerInput").value || "1.0.0").trim(),
-        apk_url: (document.getElementById("apkDownloadUrlInput").value || "./jj-movies.apk").trim(),
-        notes: (document.getElementById("updateMessageInput").value || "Kotha version vachindi! Fast streaming kosam app ni ventane update cheskondi.").trim(),
-        force: document.getElementById("forceUpdateToggle").checked
-      }
-    };
-    var res = await supabase.from("site_settings").upsert(payload);
-    statusEl.textContent = res.error ? "❌ Failed: " + res.error.message : "✅ Saved Successfully!";
-    setTimeout(function () { statusEl.textContent = ""; }, 3500);
   });
 
   document.getElementById("loginForm").addEventListener("submit", async function (e) {
