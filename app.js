@@ -417,7 +417,13 @@ function openMoviePlayerById(movieId) {
   openServerSelection(movie.title, movie.stream1, movie.stream2);
 }
 
+// APK native ki cheppadam: player open unte external links (Chrome) block avtayi
+function jjSetPlayerOpen(flag) {
+  try { if (window.JJNative && window.JJNative.setPlayerOpen) window.JJNative.setPlayerOpen(!!flag); } catch (e) {}
+}
+
 function openServerSelection(title, s1, s2) {
+  jjSetPlayerOpen(true);
   ensureInAppPlayerModal();
   var modal = document.getElementById("inAppVideoModal");
   var titleElem = document.getElementById("modalMovieTitle");
@@ -453,6 +459,9 @@ function openServerSelection(title, s1, s2) {
     playMovieStream(servers[0].url);
   }
 }
+
+// true = popups/ads block. Konni server "sandbox detected" ani play cheyyakapothe false cheyyandi.
+var JJ_BLOCK_POPUPS = true;
 
 function playMovieStream(rawUrl) {
   var stage = document.getElementById("jjPlayerStage");
@@ -502,6 +511,12 @@ function playMovieStream(rawUrl) {
     iframe.style.width = "100%";
     iframe.style.height = "100%";
     iframe.style.border = "0";
+    // AD / POPUP BLOCK: allow-popups & allow-top-navigation ledu, kabatti player lo ye button click chesina
+    // Chrome open avvadu, app page redirect avvadu. Video play + fullscreen work avtayi.
+    if (JJ_BLOCK_POPUPS) {
+      iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms allow-presentation");
+    }
+    iframe.setAttribute("referrerpolicy", "no-referrer");
     stage.appendChild(iframe);
 
     var arrowSyncBtn = document.createElement("button");
@@ -518,6 +533,7 @@ function playMovieStream(rawUrl) {
 }
 
 function closeInAppPlayer(fromPopState) {
+  jjSetPlayerOpen(false);
   var modal = document.getElementById("inAppVideoModal");
   var stage = document.getElementById("jjPlayerStage");
 
