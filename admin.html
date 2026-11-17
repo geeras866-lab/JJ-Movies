@@ -171,11 +171,42 @@ hr{border-color:#303a50;margin:24px 0}
 
     <!-- SERIES EPISODES MANAGER -->
     <div class="panel" style="border: 1px solid #38bdf8;">
-      <h2 style="color:#38bdf8;">📺 Series Episodes Manager</h2>
-      <p class="muted">Series select chesi Episode 1, 2, 3... links add cheyandi. Website lo prathi episode ki separate button vastundi.</p>
+      <h2 style="color:#38bdf8;">📺 Web Series Manager</h2>
+
+      <h3 style="color:#fff; margin-top:14px;">Option A: Create a brand new series</h3>
+      <p class="muted">Website lo inka lenidi kotha series aithe matrame idi vadandi. Already website lo unna old series kosam Option B ki vellandi.</p>
+      <form id="newSeriesForm">
+        <label for="newSeriesTitle">Series Title *</label>
+        <input id="newSeriesTitle" type="text" required maxlength="200" placeholder="e.g. Vision Quest">
+
+        <label for="newSeriesYear">Release Year</label>
+        <input id="newSeriesYear" type="number" min="1888" max="2100" placeholder="2026">
+
+        <label for="newSeriesCategory">Category Folder (Optional)</label>
+        <input id="newSeriesCategory" type="text" placeholder="e.g. Marvel, DC">
+
+        <label for="newSeriesPoster">Poster URL</label>
+        <input id="newSeriesPoster" type="url" placeholder="https://...jpg">
+
+        <label for="newSeriesDesc">Description</label>
+        <textarea id="newSeriesDesc" placeholder="Short story line..."></textarea>
+
+        <label class="checkline">
+          <input id="newSeriesPublished" type="checkbox" checked> Publish on website
+        </label>
+
+        <button type="submit" id="createSeriesBtn">➕ Create Series</button>
+      </form>
+
+      <hr>
+      <h3 style="color:#fff;">Option B: Add episodes (old series kuda ikkade)</h3>
+      <p class="muted">Website lo already unna series peru search chesi select cheyandi. Episodes save chesthe aa title automatic ga Series ga marutundi, "▶ Episode N" buttons vastayi. Movies ni touch cheyyadu.</p>
       <form id="episodeForm">
+        <label for="episodeSeriesSearch">Search Title</label>
+        <input id="episodeSeriesSearch" type="text" placeholder="Type series name... (e.g. Vision Quest)" autocomplete="off">
+
         <label for="episodeSeriesSelect">Select Series *</label>
-        <select id="episodeSeriesSelect"><option value="">Add a series first (Type = Series)</option></select>
+        <select id="episodeSeriesSelect" size="8" style="height:230px; padding:6px;"><option value="">Loading titles...</option></select>
 
         <label for="episodeSeason">Season Number</label>
         <input id="episodeSeason" type="number" min="1" value="1">
@@ -544,22 +575,81 @@ hr{border-color:#303a50;margin:24px 0}
   }
   document.getElementById("contentType").addEventListener("change", toggleStreamBox);
 
-  function populateSeriesSelect(movies) {
-    var keep = episodeSeriesSelect.value;
-    var series = movies.filter(function (m) { return m.content_type === "series"; });
+  var pendingSeriesId = null;
+
+  document.getElementById("newSeriesForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var btn = document.getElementById("createSeriesBtn");
+    var title = document.getElementById("newSeriesTitle").value.trim();
+    if (!title) { showMessage("Series title ivvandi."); return; }
+    btn.disabled = true;
+    var row = {
+      content_type: "series",
+      title: title,
+      release_year: document.getElementById("newSeriesYear").value ? Number(document.getElementById("newSeriesYear").value) : null,
+      category: document.getElementById("newSeriesCategory").value.trim() || null,
+      poster_url: safeHttpUrl(document.getElementById("newSeriesPoster").value.trim()) || null,
+      description: document.getElementById("newSeriesDesc").value.trim() || null,
+      is_published: document.getElementById("newSeriesPublished").checked,
+      is_pinned: false
+    };
+    var res = await supabase.from("movies").insert([row]).select("id").single();
+    btn.disabled = false;
+    if (res.error) { showMessage("Series create error: " + res.error.message); return; }
+    pendingSeriesId = res.data && res.data.id != null ? String(res.data.id) : null;
+    document.getElementById("newSeriesForm").reset();
+    document.getElementById("newSeriesPublished").checked = true;
+    showMessage("✅ Series created! Ippudu kinda Option B lo episodes add cheyandi.");
+    loadMovies();
+    document.getElementById("episodeForm").scrollIntoView({ behavior: "smooth" });
+  });
+
+  var seriesPickerAll = [];
+
+  function renderSeriesOptions(keepId) {
+    var q = (document.getElementById("episodeSeriesSearch").value || "").trim().toLowerCase();
+    var list = seriesPickerAll.filter(function (m) {
+      return !q || String(m.title || "").toLowerCase().indexOf(q) !== -1;
+    });
     episodeSeriesSelect.innerHTML = "";
-    var first = makeElement("option", "", series.length ? "Choose a series..." : "Add a series first (Type = Series)");
+    var first = makeElement("option", "", list.length ? "Choose a series... (" + list.length + " titles)" : "No title found");
     first.value = "";
     episodeSeriesSelect.appendChild(first);
-    series.forEach(function (m) {
+    list.forEach(function (m) {
       var o = document.createElement("option");
       o.value = String(m.id);
-      o.textContent = m.title + (m.release_year ? " (" + m.release_year + ")" : "");
+      o.textContent = (m.content_type === "series" ? "📺 " : "") + m.title + (m.release_year ? " (" + m.release_year + ")" : "");
       episodeSeriesSelect.appendChild(o);
     });
-    if (keep && series.some(function (m) { return String(m.id) === keep; })) episodeSeriesSelect.value = keep;
-    else if (series.length) episodeSeriesSelect.value = String(series[0].id);
+    if (keepId && list.some(function (m) { return String(m.id) === String(keepId); })) {
+      episodeSeriesSelect.value = String(keepId);
+    }
     loadEpisodes();
+  }
+
+  function populateSeriesSelect(movies) {
+    seriesPickerAll = movies.slice().sort(function (a, b) {
+      return String(a.title || "").localeCompare(String(b.title || ""));
+    });
+    var keep = pendingSeriesId || episodeSeriesSelect.value;
+    pendingSeriesId = null;
+    renderSeriesOptions(keep);
+  }
+
+  document.getElementById("episodeSeriesSearch").addEventListener("input", function () {
+    renderSeriesOptions(episodeSeriesSelect.value);
+  });
+
+  // Old movie-type title ni episodes add chese mundu automatic ga Series ga marchadam
+  async function ensureIsSeries(sid) {
+    var m = seriesPickerAll.find(function (x) { return String(x.id) === String(sid); });
+    if (!m || m.content_type === "series") return true;
+    var r = await supabase.from("movies").update({ content_type: "series" }).eq("id", Number(sid));
+    if (r.error) { showMessage("Series ga marchadam fail: " + r.error.message); return false; }
+    m.content_type = "series";
+    var opt = episodeSeriesSelect.querySelector('option[value="' + sid + '"]');
+    if (opt && opt.textContent.indexOf("📺") !== 0) opt.textContent = "📺 " + opt.textContent;
+    return true;
   }
 
   async function loadEpisodes() {
@@ -628,6 +718,7 @@ hr{border-color:#303a50;margin:24px 0}
       stream_url_1: s1,
       stream_url_2: s2
     };
+    if (!(await ensureIsSeries(sid))) return;
     var res = editingEpisodeId !== null
       ? await supabase.from("episodes").update(payload).eq("id", editingEpisodeId)
       : await supabase.from("episodes").insert([payload]);
@@ -655,6 +746,7 @@ hr{border-color:#303a50;margin:24px 0}
     });
     if (bad.length) { showMessage("Ee lines format sariga ledu:\n" + bad.join("\n")); return; }
     if (!rows.length) { showMessage("Bulk box lo episodes raayandi."); return; }
+    if (!(await ensureIsSeries(sid))) return;
     var res = await supabase.from("episodes").insert(rows);
     if (res.error) { showMessage("Bulk add error: " + res.error.message); return; }
     document.getElementById("episodeBulkInput").value = "";
