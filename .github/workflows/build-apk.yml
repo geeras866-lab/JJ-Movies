@@ -17,6 +17,10 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    env:
+      # 👇 Mee website URL ikkada okkasari set cheyandi. APK ee site ni live ga load chestundi,
+      # kaabatti site update chesthe APK malli build cheyakkarledu.
+      SITE_URL: https://jj-movies.pages.dev/
 
     steps:
       - name: 📥 Checkout Repository Code
@@ -38,6 +42,7 @@ jobs:
           mkdir -p www
           cp index.html app.js style.css www/
           if [ -f admin.html ]; then cp admin.html www/; fi
+          if [ -f offline.html ]; then cp offline.html www/; fi
 
           VER="${{ github.event.inputs.app_version || '1.0.0' }}"
           sed -i "1s/^/window.JJ_BUILD_VERSION = '${VER}';\n/" www/app.js
@@ -220,6 +225,7 @@ jobs:
             const c=JSON.parse(fs.readFileSync(f,"utf8"));
             c.backgroundColor="#000000";
             c.android=Object.assign({},c.android,{backgroundColor:"#000000"});
+            c.server=Object.assign({},c.server,{url:process.env.SITE_URL,cleartext:false,errorPath:"offline.html"});
             fs.writeFileSync(f,JSON.stringify(c,null,2));
           }'
 
