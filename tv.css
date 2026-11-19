@@ -1,0 +1,16 @@
+html.tv-mode body { cursor: none; }
+.tv-mode :focus {
+  outline: 3px solid #fff !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 7px rgba(229, 9, 20, .75) !important;
+}
+.tv-mode .movie-card { transition: transform .15s; }
+.tv-mode .movie-card:focus { transform: scale(1.08); position: relative; z-index: 5; }
+.tv-mode .movie-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 30px; }
+.tv-mode .menu-btn { padding: 14px 30px; font-size: 18px; }
+.tv-mode .container, .tv-mode .topbar { padding-left: 4vw; padding-right: 4vw; }
+.tv-mode .nav-download-app,
+.tv-mode .footer-app-link,
+.tv-mode a[download],
+.tv-mode .jj-player-fs-btn,
+.tv-mode #jjFullscreenBtn { display: none !important; }
