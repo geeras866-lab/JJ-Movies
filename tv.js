@@ -3,11 +3,39 @@
   if (!isTV) return;
   document.documentElement.classList.add('tv-mode');
 
+  // ===== TV: online watch matrame (downloads/prints kanipinchavu) =====
+  function hasStreamRaw(item) {
+    return String(item.content_type || '').toLowerCase() === 'series' ||
+      !!(item.stream_url_1 || item.stream_url || item.stream1 || item.stream_url_2 || item.stream2);
+  }
+  function hasStreamMovie(m) {
+    return m.type === 'series' || !!(m.stream1 || m.stream2);
+  }
+  // Kotha data vachinappudu stream lenivi teseyyali
+  if (typeof window.applyMoviesData === 'function') {
+    var origApply = window.applyMoviesData;
+    window.applyMoviesData = function (data) {
+      return origApply(Array.isArray(data) ? data.filter(hasStreamRaw) : data);
+    };
+  }
+  // Already render ayipoyina (cache) data ni kuda filter chesi malli render
+  try {
+    if (Array.isArray(window.movies) && window.movies.length) {
+      window.movies = window.movies.filter(hasStreamMovie);
+      if (typeof window.setupYears === 'function') window.setupYears();
+      if (typeof window.renderMovies === 'function') window.renderMovies();
+      if (typeof window.renderShowcaseCarousel === 'function') window.renderShowcaseCarousel();
+    }
+  } catch (e) {}
+
   var SEL = 'a[href],button:not([disabled]),input,select,.movie-card,[tabindex]';
 
   function mark() {
     document.querySelectorAll('.movie-card').forEach(function (c) { c.tabIndex = 0; });
-    document.querySelectorAll('.movie-card .details-button').forEach(function (b) { b.tabIndex = -1; });
+    document.querySelectorAll('.movie-card .details-button').forEach(function (b) {
+      b.tabIndex = -1;
+      if (b.textContent !== '\u25B6 Watch Now') b.textContent = '\u25B6 Watch Now';
+    });
   }
   mark();
   new MutationObserver(mark).observe(document.body, { childList: true, subtree: true });
