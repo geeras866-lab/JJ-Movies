@@ -14,3 +14,17 @@ html.tv-mode body { cursor: none; }
 .tv-mode a[download],
 .tv-mode .jj-player-fs-btn,
 .tv-mode #jjFullscreenBtn { display: none !important; }
+
+/* ===== TV: online watch matrame, downloads kanipinchavu ===== */
+.tv-mode .prints-header-bar,
+.tv-mode #modalVersionContainer,
+.tv-mode .version-list-grid,
+.tv-mode .version-tile,
+.tv-mode .btn-tele-bot,
+.tv-mode .modal-footer-sharing,
+.tv-mode .btn-whatsapp-share,
+.tv-mode .modal-action-buttons-row,
+.tv-mode .btn-modal-trailer,
+.tv-mode a[target="_blank"],
+.tv-mode .about-section,
+.tv-mode nav a[href="#about"] { display: none !important; }
