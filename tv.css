@@ -28,3 +28,23 @@ html.tv-mode body { cursor: none; }
 .tv-mode a[target="_blank"],
 .tv-mode .about-section,
 .tv-mode nav a[href="#about"] { display: none !important; }
+
+/* ===== Mobile header fix (logo + nav + buttons chirak ga undakunda) ===== */
+@media (max-width: 700px) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding: 10px 14px;
+  }
+  .top-nav-right { display: contents; }
+  .logo { order: 1; }
+  .topbar .nav-download-app { order: 2; }
+  .topbar nav {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  /* TV App button phone lo avasaram ledu (footer lo untundi) */
+  .topbar .nav-download-app[href*="tv"] { display: none; }
+}
