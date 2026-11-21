@@ -139,13 +139,13 @@ hr{border-color:#303a50;margin:24px 0}
         <!-- 🎬 OPTIONAL IN-APP STREAMING LINKS -->
         <div class="stream-box" id="movieStreamBox">
           <h3 style="color:#ff3867; margin-bottom:6px;">▶ Watch Online - Streaming Servers (Optional)</h3>
-          <p class="muted" style="margin-top:0;">Streamlare, Filemoon, Byse.sx, PlayDrive leda Direct (.mp4/.m3u8) links ivvandi. Khali ga vadilesthe aa movie ki Watch Online button kanipinchadu.</p>
+          <p class="muted" style="margin-top:0;">Pixeldrain (<code>https://pixeldrain.com/u/...</code>), Streamlare, Filemoon, Byse.sx leda Direct (<code>.mp4</code>/<code>.mkv</code>/<code>.m3u8</code>) links ivvandi. Khali ga vadilesthe aa movie ki Watch Online button kanipinchadu.</p>
 
           <label for="streamUrl1">⚡ Server 1 URL (Main Link)</label>
-          <input id="streamUrl1" type="url" placeholder="https://byse.sx/e/... or https://.../movie.mp4">
+          <input id="streamUrl1" type="url" placeholder="https://pixeldrain.com/u/hbiZkCJD or https://.../movie.mp4">
 
           <label for="streamUrl2">🚀 Server 2 URL (Backup Link)</label>
-          <input id="streamUrl2" type="url" placeholder="https://filemoon.sx/e/... or backup link">
+          <input id="streamUrl2" type="url" placeholder="https://pixeldrain.com/u/... or backup link">
         </div>
 
         <label for="description">Description</label>
@@ -218,10 +218,10 @@ hr{border-color:#303a50;margin:24px 0}
         <input id="episodeTitle" type="text" maxlength="150" placeholder="e.g. The Beginning">
 
         <label for="episodeStream1">⚡ Server 1 URL</label>
-        <input id="episodeStream1" type="url" placeholder="https://byse.sx/e/...">
+        <input id="episodeStream1" type="url" placeholder="https://pixeldrain.com/u/... or https://.../ep1.mkv">
 
         <label for="episodeStream2">🚀 Server 2 URL (Optional)</label>
-        <input id="episodeStream2" type="url" placeholder="https://filemoon.sx/e/...">
+        <input id="episodeStream2" type="url" placeholder="https://pixeldrain.com/u/... or backup link">
 
         <button type="submit" id="saveEpisodeBtn">Save Episode</button>
         <button type="button" id="cancelEpisodeBtn" class="secondary hidden">Cancel Edit</button>
@@ -230,7 +230,7 @@ hr{border-color:#303a50;margin:24px 0}
       <hr>
       <h3>⚡ Bulk Add (many episodes at once)</h3>
       <p class="muted">Prathi line ki okka episode: <code>episode_no | server1 | server2(optional)</code>. Season number paina input nundi teesukuntundi.</p>
-      <textarea id="episodeBulkInput" placeholder="1 | https://byse.sx/e/aaa | https://filemoon.sx/e/aaa&#10;2 | https://byse.sx/e/bbb&#10;3 | https://byse.sx/e/ccc"></textarea>
+      <textarea id="episodeBulkInput" placeholder="1 | https://pixeldrain.com/u/aaa | https://pixeldrain.com/u/bbb&#10;2 | https://pixeldrain.com/u/ccc&#10;3 | https://pixeldrain.com/u/ddd"></textarea>
       <button type="button" id="bulkEpisodeBtn">Add All Episodes</button>
 
       <hr>
@@ -247,10 +247,10 @@ hr{border-color:#303a50;margin:24px 0}
         <select id="streamMovieSelect" required><option value="">Loading movies...</option></select>
 
         <label for="quickStream1Input">⚡ Server 1 URL (Optional)</label>
-        <input id="quickStream1Input" type="url" placeholder="https://byse.sx/e/...">
+        <input id="quickStream1Input" type="url" placeholder="https://pixeldrain.com/u/hbiZkCJD">
 
         <label for="quickStream2Input">🚀 Server 2 URL (Optional)</label>
-        <input id="quickStream2Input" type="url" placeholder="https://filemoon.sx/e/...">
+        <input id="quickStream2Input" type="url" placeholder="https://pixeldrain.com/u/...">
 
         <button type="submit" id="saveQuickStreamBtn">Save Stream Links</button>
         <button type="button" id="clearQuickStreamBtn" class="secondary">Clear Both Links</button>
@@ -397,10 +397,24 @@ hr{border-color:#303a50;margin:24px 0}
   var festivalStatusMsg = document.getElementById("festivalStatusMsg");
 
   function showMessage(text) { message.textContent = text; }
+
+  function normalizeStreamInputUrl(value) {
+    var raw = String(value || "").trim();
+    if (!raw) return "";
+    if (/^[A-Za-z0-9_-]{6,20}$/.test(raw)) {
+      return "https://pixeldrain.com/u/" + raw;
+    }
+    if (!/^https?:\/\//i.test(raw)) {
+      raw = "https://" + raw;
+    }
+    return safeHttpUrl(raw);
+  }
+
   function safeHttpUrl(value) {
     if (!value) return "";
     try { var p = new URL(value); return p.protocol === "http:" || p.protocol === "https:" ? p.href : ""; } catch(e) { return ""; }
   }
+
   function makeElement(tag, className, text) {
     var el = document.createElement(tag);
     if (className) el.className = className;
@@ -545,8 +559,8 @@ hr{border-color:#303a50;margin:24px 0}
       poster_url: safeHttpUrl(document.getElementById("poster").value.trim()) || null,
       description: document.getElementById("description").value.trim() || null,
       trailer_url: safeHttpUrl(document.getElementById("trailerUrl").value.trim()) || null,
-      stream_url_1: safeHttpUrl(document.getElementById("streamUrl1").value.trim()) || null,
-      stream_url_2: safeHttpUrl(document.getElementById("streamUrl2").value.trim()) || null,
+      stream_url_1: normalizeStreamInputUrl(document.getElementById("streamUrl1").value) || null,
+      stream_url_2: normalizeStreamInputUrl(document.getElementById("streamUrl2").value) || null,
       is_pinned: document.getElementById("pinned").checked,
       pin_label: document.getElementById("pinLabel").value.trim() || null,
       is_published: document.getElementById("published").checked
@@ -640,7 +654,6 @@ hr{border-color:#303a50;margin:24px 0}
     renderSeriesOptions(episodeSeriesSelect.value);
   });
 
-  // Old movie-type title ni episodes add chese mundu automatic ga Series ga marchadam
   async function ensureIsSeries(sid) {
     var m = seriesPickerAll.find(function (x) { return String(x.id) === String(sid); });
     if (!m || m.content_type === "series") return true;
@@ -707,8 +720,8 @@ hr{border-color:#303a50;margin:24px 0}
     e.preventDefault();
     var sid = episodeSeriesSelect.value;
     if (!sid) { showMessage("Please select a series."); return; }
-    var s1 = safeHttpUrl(document.getElementById("episodeStream1").value.trim()) || null;
-    var s2 = safeHttpUrl(document.getElementById("episodeStream2").value.trim()) || null;
+    var s1 = normalizeStreamInputUrl(document.getElementById("episodeStream1").value) || null;
+    var s2 = normalizeStreamInputUrl(document.getElementById("episodeStream2").value) || null;
     if (!s1 && !s2) { showMessage("Kanisam okka server link ivvandi."); return; }
     var payload = {
       movie_id: Number(sid),
@@ -739,8 +752,8 @@ hr{border-color:#303a50;margin:24px 0}
       if (!line) return;
       var parts = line.split("|").map(function (x) { return x.trim(); });
       var n = Number(parts[0]);
-      var a = safeHttpUrl(parts[1] || "") || null;
-      var b = safeHttpUrl(parts[2] || "") || null;
+      var a = normalizeStreamInputUrl(parts[1] || "") || null;
+      var b = normalizeStreamInputUrl(parts[2] || "") || null;
       if (!n || (!a && !b)) { bad.push(line); return; }
       rows.push({ movie_id: Number(sid), season_number: season, episode_number: n, stream_url_1: a, stream_url_2: b });
     });
@@ -838,8 +851,8 @@ hr{border-color:#303a50;margin:24px 0}
     var movieId = streamMovieSelect.value;
     if (!movieId) { showMessage("Please select a movie."); return; }
 
-    var s1 = safeHttpUrl(quickStream1Input.value.trim()) || null;
-    var s2 = safeHttpUrl(quickStream2Input.value.trim()) || null;
+    var s1 = normalizeStreamInputUrl(quickStream1Input.value) || null;
+    var s2 = normalizeStreamInputUrl(quickStream2Input.value) || null;
 
     var res = await supabase.from("movies").update({ stream_url_1: s1, stream_url_2: s2 }).eq("id", Number(movieId));
     if (res.error) {
