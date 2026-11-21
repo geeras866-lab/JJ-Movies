@@ -21,6 +21,7 @@ var modalDetails = document.getElementById("modalDetails");
 var carouselInterval = null;
 var inlineSearch = "";
 var currentActiveStreamUrl = "";
+var currentActiveMovieTitle = "JJ Movies";
 
 // ---------- Notch / cutout support + black background ----------
 (function () {
@@ -270,19 +271,70 @@ function showTextPlaceholder(imgElement, movieTitle) {
 
 window.handleMissingPoster = handleMissingPoster;
 
-// ---------- 🎬 IN-APP PLAYER ----------
+// ---------- 🎬 FULL NATIVE VLC PLAYER + PIXELDRAIN BRIDGE ----------
 function isDirectVideoFile(url) {
   if (!url) return false;
-  return /\.(mp4|mkv|webm|m3u8)(\?.*)?$/i.test(url);
+  return /\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(url);
+}
+
+function extractPixeldrainId(rawUrl) {
+  var val = String(rawUrl || "").trim();
+  if (!val) return "";
+
+  var uMatch = val.match(/(?:https?:\/\/)?(?:www\.)?pixeldrain\.com\/u\/([A-Za-z0-9_-]+)/i);
+  if (uMatch && uMatch[1]) return uMatch[1];
+
+  var apiMatch = val.match(/(?:https?:\/\/)?(?:www\.)?pixeldrain\.com\/api\/file\/([A-Za-z0-9_-]+)/i);
+  if (apiMatch && apiMatch[1]) return apiMatch[1];
+
+  if (/^[A-Za-z0-9_-]{6,20}$/.test(val)) return val;
+  return "";
+}
+
+function isPixeldrainLink(rawUrl) {
+  return Boolean(extractPixeldrainId(rawUrl));
+}
+
+function resolvePixeldrainStreamUrl(rawUrl) {
+  var id = extractPixeldrainId(rawUrl);
+  if (id) {
+    return "https://pixeldrain.com/api/file/" + id;
+  }
+  return "";
 }
 
 function normalizeStreamUrl(url) {
-  var u = safeURL(url);
+  var raw = String(url || "").trim();
+  if (!raw) return "";
+
+  if (isPixeldrainLink(raw)) {
+    return resolvePixeldrainStreamUrl(raw);
+  }
+
+  var u = safeURL(raw);
   if (!u || isDirectVideoFile(u)) return u;
   if (u.indexOf("/e/") !== -1) return u;
+
   var m = u.match(/^(https?:\/\/[^\/]+)\/(?:d|v)\/([A-Za-z0-9]+)(\?.*)?$/i);
   if (m) return m[1] + "/e/" + m[2] + (m[3] || "");
+
   return u.replace(/streamlare\.com\/(v|d)\//, "streamlare.com/e/");
+}
+
+function hasNativeVlcBridge() {
+  return Boolean(window.AndroidVlc && typeof window.AndroidVlc.playVideo === "function");
+}
+
+function launchNativeVlc(playableUrl, title) {
+  var activeTitle = title ||
+    currentActiveMovieTitle ||
+    (document.getElementById("modalMovieTitle") && document.getElementById("modalMovieTitle").textContent) ||
+    "JJ Movies";
+  if (hasNativeVlcBridge()) {
+    window.AndroidVlc.playVideo(String(playableUrl || ""), String(activeTitle));
+    return true;
+  }
+  return false;
 }
 
 function loadHls(cb) {
@@ -373,7 +425,7 @@ function ensureInAppPlayerModal() {
       <div class="jj-player-modal-box">
         <div class="jj-player-header">
           <div class="jj-player-title-wrap">
-            <span class="jj-vlc-badge">▶ IN-APP PLAYER</span>
+            <span class="jj-vlc-badge">VLC PLAYER</span>
             <h3 id="modalMovieTitle" class="jj-player-title">Playing Movie</h3>
           </div>
           <div class="jj-player-header-actions">
@@ -418,12 +470,28 @@ function openMoviePlayerById(movieId) {
 }
 
 function openServerSelection(title, s1, s2) {
+  var cleanTitle = title || "Playing Movie";
+  currentActiveMovieTitle = cleanTitle;
+
+  var servers = [];
+  if (s1) servers.push({ name: "⚡ Server 1", url: s1 });
+  if (s2) servers.push({ name: "🚀 Server 2", url: s2 });
+  if (!servers.length) return;
+
+  var firstResolved = normalizeStreamUrl(servers[0].url);
+  if (hasNativeVlcBridge() && (isPixeldrainLink(servers[0].url) || isDirectVideoFile(firstResolved))) {
+    currentActiveStreamUrl = firstResolved;
+    if (launchNativeVlc(firstResolved, cleanTitle)) {
+      return;
+    }
+  }
+
   ensureInAppPlayerModal();
   var modal = document.getElementById("inAppVideoModal");
   var titleElem = document.getElementById("modalMovieTitle");
   var serverContainer = document.getElementById("serverSwitchContainer");
 
-  if (titleElem) titleElem.textContent = title || "Playing Movie";
+  if (titleElem) titleElem.textContent = cleanTitle;
   modal.style.display = "flex";
 
   try {
@@ -431,10 +499,6 @@ function openServerSelection(title, s1, s2) {
   } catch (e) {}
 
   serverContainer.innerHTML = "";
-  var servers = [];
-  if (s1) servers.push({ name: "⚡ Server 1", url: s1 });
-  if (s2) servers.push({ name: "🚀 Server 2", url: s2 });
-
   servers.forEach(function (srv, idx) {
     var btn = document.createElement("button");
     btn.type = "button";
@@ -444,22 +508,33 @@ function openServerSelection(title, s1, s2) {
       var allBtns = serverContainer.querySelectorAll(".jj-server-btn");
       allBtns.forEach(function (b) { b.classList.remove("active"); });
       btn.classList.add("active");
-      playMovieStream(srv.url);
+      playMovieStream(srv.url, cleanTitle);
     });
     serverContainer.appendChild(btn);
   });
 
-  if (servers.length > 0) {
-    playMovieStream(servers[0].url);
-  }
+  playMovieStream(servers[0].url, cleanTitle);
 }
 
-function playMovieStream(rawUrl) {
+function playMovieStream(rawUrl, title) {
   var stage = document.getElementById("jjPlayerStage");
   if (!stage) return;
-  var url = normalizeStreamUrl(rawUrl);
+  var raw = String(rawUrl || "").trim();
+  var url = normalizeStreamUrl(raw);
   currentActiveStreamUrl = url;
+  if (title) currentActiveMovieTitle = title;
   stage.innerHTML = "";
+
+  if (hasNativeVlcBridge() && (isPixeldrainLink(raw) || isDirectVideoFile(url))) {
+    if (launchNativeVlc(url, currentActiveMovieTitle)) {
+      stage.innerHTML =
+        '<div style="color:#e2e8f0;padding:24px;text-align:center;font-size:13px;">' +
+        'VLC Player lo play avuthundi...<br>' +
+        '<button type="button" style="margin-top:12px;padding:8px 14px;border:none;border-radius:6px;background:#ff2450;color:#fff;font-weight:bold;cursor:pointer;" onclick="launchNativeVlc(currentActiveStreamUrl, currentActiveMovieTitle)">Open VLC Player</button>' +
+        '</div>';
+      return;
+    }
+  }
 
   if (isDirectVideoFile(url)) {
     var video = document.createElement("video");
@@ -536,6 +611,7 @@ window.openServerSelection = openServerSelection;
 window.playMovieStream = playMovieStream;
 window.closeInAppPlayer = closeInAppPlayer;
 window.togglePlayerFullscreen = togglePlayerFullscreen;
+window.launchNativeVlc = launchNativeVlc;
 
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
