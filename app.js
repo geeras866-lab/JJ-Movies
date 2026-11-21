@@ -1,4 +1,4 @@
-var SUPABASE_URL = "https://tswyabgdldbsaopipvug.supabase.co";
+ var SUPABASE_URL = "https://tswyabgdldbsaopipvug.supabase.co";
 var SUPABASE_KEY = "sb_publishable_902itkUPAUe272Q4B4jF0w_OEKDNuxr";
 var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 var TMDB_API_KEY = "200b7daf6101f22010cdd5eccea4a119";
@@ -478,10 +478,17 @@ function openServerSelection(title, s1, s2) {
   if (s2) servers.push({ name: "🚀 Server 2", url: s2 });
   if (!servers.length) return;
 
-  var firstResolved = normalizeStreamUrl(servers[0].url);
-  if (hasNativeVlcBridge() && (isPixeldrainLink(servers[0].url) || isDirectVideoFile(firstResolved))) {
-    currentActiveStreamUrl = firstResolved;
-    if (launchNativeVlc(firstResolved, cleanTitle)) {
+  // Server 1 or Server 2 — ekkada Pixeldrain / direct video link unna direct ga landscape VLC lo play avuthundi
+  if (hasNativeVlcBridge()) {
+    var vlcServer = servers.find(function (srv) {
+      var resolved = normalizeStreamUrl(srv.url);
+      return isPixeldrainLink(srv.url) || isDirectVideoFile(resolved);
+    });
+
+    if (vlcServer) {
+      var directUrl = normalizeStreamUrl(vlcServer.url);
+      currentActiveStreamUrl = directUrl;
+      launchNativeVlc(directUrl, cleanTitle);
       return;
     }
   }
@@ -526,14 +533,9 @@ function playMovieStream(rawUrl, title) {
   stage.innerHTML = "";
 
   if (hasNativeVlcBridge() && (isPixeldrainLink(raw) || isDirectVideoFile(url))) {
-    if (launchNativeVlc(url, currentActiveMovieTitle)) {
-      stage.innerHTML =
-        '<div style="color:#e2e8f0;padding:24px;text-align:center;font-size:13px;">' +
-        'VLC Player lo play avuthundi...<br>' +
-        '<button type="button" style="margin-top:12px;padding:8px 14px;border:none;border-radius:6px;background:#ff2450;color:#fff;font-weight:bold;cursor:pointer;" onclick="launchNativeVlc(currentActiveStreamUrl, currentActiveMovieTitle)">Open VLC Player</button>' +
-        '</div>';
-      return;
-    }
+    closeInAppPlayer();
+    launchNativeVlc(url, currentActiveMovieTitle);
+    return;
   }
 
   if (isDirectVideoFile(url)) {
@@ -1157,37 +1159,37 @@ function startSubtleHeaderSparks(type) {
 }
 
 function applyMoviesData(data) {
-      movies = data.map(function (item) {
-        var rawTrailer = item.trailer_url || item.trailer || item.trailer_link || item.video_url || item.youtube_link || item.trailerUrl || "";
-        var rawStream1 = item.stream_url_1 || item.stream_url || item.stream1 || "";
-        var rawStream2 = item.stream_url_2 || item.stream2 || "";
-        return {
-          id: item.id,
-          title: item.title || "Untitled",
-          year: item.release_year || "",
-          runtime: item.runtime || "",
-          category: item.category || "",
-          type: String(item.content_type || "movie").toLowerCase() === "series" ? "series" : "movie",
-          genre: item.genre || "",
-          poster: item.poster_url || "",
-          description: item.description || "",
-          pinned: item.is_pinned === true,
-          pinLabel: String(item.pin_label || "").trim(),
-          trailer: safeURL(rawTrailer),
-          stream1: safeURL(rawStream1),
-          stream2: safeURL(rawStream2),
-          versions: []
-        };
-      });
+  movies = data.map(function (item) {
+    var rawTrailer = item.trailer_url || item.trailer || item.trailer_link || item.video_url || item.youtube_link || item.trailerUrl || "";
+    var rawStream1 = item.stream_url_1 || item.stream_url || item.stream1 || "";
+    var rawStream2 = item.stream_url_2 || item.stream2 || "";
+    return {
+      id: item.id,
+      title: item.title || "Untitled",
+      year: item.release_year || "",
+      runtime: item.runtime || "",
+      category: item.category || "",
+      type: String(item.content_type || "movie").toLowerCase() === "series" ? "series" : "movie",
+      genre: item.genre || "",
+      poster: item.poster_url || "",
+      description: item.description || "",
+      pinned: item.is_pinned === true,
+      pinLabel: String(item.pin_label || "").trim(),
+      trailer: safeURL(rawTrailer),
+      stream1: safeURL(rawStream1),
+      stream2: safeURL(rawStream2),
+      versions: []
+    };
+  });
 
-      setupYears();
-      renderMovies();
-      renderShowcaseCarousel();
+  setupYears();
+  renderMovies();
+  renderShowcaseCarousel();
 
-      var qid = new URLSearchParams(window.location.search).get("movie");
-      if (qid) showMovieDetails(qid);
+  var qid = new URLSearchParams(window.location.search).get("movie");
+  if (qid) showMovieDetails(qid);
 
-      loadMessages();
+  loadMessages();
 }
 
 var MOVIES_CACHE_KEY = "jj_movies_cache_v1";
@@ -1923,6 +1925,7 @@ createExtraSections();
 loadMovies();
 initNeonFestivalMode();
 // checkApkUpdate();  // update popup disabled
+
 // ---------- 📡 OFFLINE MESSAGE + PULL TO REFRESH ----------
 var OFFLINE_TEXT = "📡 No internet connection. Please turn on your internet and pull down to refresh.";
 
