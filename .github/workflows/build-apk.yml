@@ -303,6 +303,7 @@ jobs:
               act = """        <activity
                       android:name=".VlcPlayerActivity"
                       android:exported="false"
+                      android:screenOrientation="sensorLandscape"
                       android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
                       android:theme="@style/AppTheme.NoActionBar" />
           """
@@ -314,6 +315,7 @@ jobs:
           cat << 'EOF' > android/app/src/main/res/layout/activity_vlc_player.xml
           <?xml version="1.0" encoding="utf-8"?>
           <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/vlc_root"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:background="#000000">
@@ -323,56 +325,216 @@ jobs:
                   android:layout_width="match_parent"
                   android:layout_height="match_parent" />
 
-              <LinearLayout
+              <ProgressBar
+                  android:id="@+id/vlc_loading"
+                  android:layout_width="52dp"
+                  android:layout_height="52dp"
+                  android:layout_centerInParent="true"
+                  android:indeterminateTint="#FF2450" />
+
+              <Button
+                  android:id="@+id/btn_unlock"
                   android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:layout_alignParentTop="true"
-                  android:layout_alignParentEnd="true"
-                  android:layout_margin="12dp"
-                  android:orientation="horizontal">
+                  android:layout_height="44dp"
+                  android:layout_alignParentStart="true"
+                  android:layout_centerVertical="true"
+                  android:layout_marginStart="20dp"
+                  android:background="#CCFF2450"
+                  android:paddingStart="16dp"
+                  android:paddingEnd="16dp"
+                  android:text="🔓 Unlock"
+                  android:textAllCaps="false"
+                  android:textColor="#FFFFFF"
+                  android:textSize="13sp"
+                  android:textStyle="bold"
+                  android:visibility="gone" />
 
-                  <Button
-                      android:id="@+id/btn_audio_tracks"
+              <RelativeLayout
+                  android:id="@+id/controls_overlay"
+                  android:layout_width="match_parent"
+                  android:layout_height="match_parent"
+                  android:background="#66000000">
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_alignParentTop="true"
+                      android:background="#AA000000"
+                      android:gravity="center_vertical"
+                      android:orientation="horizontal"
+                      android:padding="12dp">
+
+                      <Button
+                          android:id="@+id/btn_back"
+                          android:layout_width="44dp"
+                          android:layout_height="40dp"
+                          android:background="#00000000"
+                          android:text="←"
+                          android:textColor="#FFFFFF"
+                          android:textSize="22sp" />
+
+                      <TextView
+                          android:id="@+id/tv_video_title"
+                          android:layout_width="0dp"
+                          android:layout_height="wrap_content"
+                          android:layout_marginStart="8dp"
+                          android:layout_marginEnd="8dp"
+                          android:layout_weight="1"
+                          android:ellipsize="end"
+                          android:maxLines="1"
+                          android:text="JJ Movies"
+                          android:textColor="#FFFFFF"
+                          android:textSize="16sp"
+                          android:textStyle="bold" />
+
+                      <Button
+                          android:id="@+id/btn_audio_tracks"
+                          android:layout_width="wrap_content"
+                          android:layout_height="38dp"
+                          android:background="#44FFFFFF"
+                          android:paddingStart="12dp"
+                          android:paddingEnd="12dp"
+                          android:text="🔊 Audio"
+                          android:textAllCaps="false"
+                          android:textColor="#FFFFFF"
+                          android:textSize="12sp" />
+
+                      <Button
+                          android:id="@+id/btn_sub_tracks"
+                          android:layout_width="wrap_content"
+                          android:layout_height="38dp"
+                          android:layout_marginStart="8dp"
+                          android:background="#44FFFFFF"
+                          android:paddingStart="12dp"
+                          android:paddingEnd="12dp"
+                          android:text="💬 Sub"
+                          android:textAllCaps="false"
+                          android:textColor="#FFFFFF"
+                          android:textSize="12sp" />
+                  </LinearLayout>
+
+                  <LinearLayout
                       android:layout_width="wrap_content"
                       android:layout_height="wrap_content"
-                      android:text="Audio" />
+                      android:layout_centerInParent="true"
+                      android:gravity="center"
+                      android:orientation="horizontal">
 
-                  <Button
-                      android:id="@+id/btn_sub_tracks"
-                      android:layout_width="wrap_content"
+                      <Button
+                          android:id="@+id/btn_seek_back"
+                          android:layout_width="76dp"
+                          android:layout_height="52dp"
+                          android:background="#88000000"
+                          android:text="⏪ 10s"
+                          android:textAllCaps="false"
+                          android:textColor="#FFFFFF"
+                          android:textSize="14sp"
+                          android:textStyle="bold" />
+
+                      <Button
+                          android:id="@+id/btn_play_pause"
+                          android:layout_width="72dp"
+                          android:layout_height="64dp"
+                          android:layout_marginStart="28dp"
+                          android:layout_marginEnd="28dp"
+                          android:background="#CCFF2450"
+                          android:text="⏸"
+                          android:textColor="#FFFFFF"
+                          android:textSize="26sp" />
+
+                      <Button
+                          android:id="@+id/btn_seek_fwd"
+                          android:layout_width="76dp"
+                          android:layout_height="52dp"
+                          android:background="#88000000"
+                          android:text="10s ⏩"
+                          android:textAllCaps="false"
+                          android:textColor="#FFFFFF"
+                          android:textSize="14sp"
+                          android:textStyle="bold" />
+                  </LinearLayout>
+
+                  <LinearLayout
+                      android:layout_width="match_parent"
                       android:layout_height="wrap_content"
-                      android:layout_marginStart="8dp"
-                      android:text="Subtitles" />
-              </LinearLayout>
+                      android:layout_alignParentBottom="true"
+                      android:background="#AA000000"
+                      android:orientation="vertical"
+                      android:paddingStart="16dp"
+                      android:paddingTop="8dp"
+                      android:paddingEnd="16dp"
+                      android:paddingBottom="12dp">
 
-              <LinearLayout
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:layout_alignParentBottom="true"
-                  android:layout_centerHorizontal="true"
-                  android:layout_margin="16dp"
-                  android:orientation="horizontal">
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:gravity="center_vertical"
+                          android:orientation="horizontal">
 
-                  <Button
-                      android:id="@+id/btn_seek_back"
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:text="-10s" />
+                          <TextView
+                              android:id="@+id/tv_current_time"
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="00:00"
+                              android:textColor="#FFFFFF"
+                              android:textSize="12sp"
+                              android:textStyle="bold" />
 
-                  <Button
-                      android:id="@+id/btn_play_pause"
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:layout_marginStart="8dp"
-                      android:text="Play/Pause" />
+                          <SeekBar
+                              android:id="@+id/vlc_seekbar"
+                              android:layout_width="0dp"
+                              android:layout_height="wrap_content"
+                              android:layout_marginStart="10dp"
+                              android:layout_marginEnd="10dp"
+                              android:layout_weight="1"
+                              android:progressTint="#FF2450"
+                              android:thumbTint="#FF2450" />
 
-                  <Button
-                      android:id="@+id/btn_seek_fwd"
-                      android:layout_width="wrap_content"
-                      android:layout_height="wrap_content"
-                      android:layout_marginStart="8dp"
-                      android:text="+10s" />
-              </LinearLayout>
+                          <TextView
+                              android:id="@+id/tv_total_time"
+                              android:layout_width="wrap_content"
+                              android:layout_height="wrap_content"
+                              android:text="00:00"
+                              android:textColor="#CBD5E1"
+                              android:textSize="12sp"
+                              android:textStyle="bold" />
+                      </LinearLayout>
+
+                      <LinearLayout
+                          android:layout_width="match_parent"
+                          android:layout_height="wrap_content"
+                          android:layout_marginTop="6dp"
+                          android:gravity="end|center_vertical"
+                          android:orientation="horizontal">
+
+                          <Button
+                              android:id="@+id/btn_lock"
+                              android:layout_width="wrap_content"
+                              android:layout_height="34dp"
+                              android:background="#44FFFFFF"
+                              android:paddingStart="12dp"
+                              android:paddingEnd="12dp"
+                              android:text="🔒 Lock"
+                              android:textAllCaps="false"
+                              android:textColor="#FFFFFF"
+                              android:textSize="12sp" />
+
+                          <Button
+                              android:id="@+id/btn_rotate"
+                              android:layout_width="wrap_content"
+                              android:layout_height="34dp"
+                              android:layout_marginStart="10dp"
+                              android:background="#44FFFFFF"
+                              android:paddingStart="12dp"
+                              android:paddingEnd="12dp"
+                              android:text="🔄 Rotate"
+                              android:textAllCaps="false"
+                              android:textColor="#FFFFFF"
+                              android:textSize="12sp" />
+                      </LinearLayout>
+                  </LinearLayout>
+
+              </RelativeLayout>
 
           </RelativeLayout>
           EOF
@@ -381,12 +543,19 @@ jobs:
           package com.jjmovies.app;
 
           import android.app.AlertDialog;
+          import android.content.pm.ActivityInfo;
           import android.net.Uri;
           import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
           import android.view.KeyEvent;
           import android.view.View;
           import android.view.WindowManager;
           import android.widget.Button;
+          import android.widget.ProgressBar;
+          import android.widget.RelativeLayout;
+          import android.widget.SeekBar;
+          import android.widget.TextView;
           import android.widget.Toast;
 
           import androidx.appcompat.app.AppCompatActivity;
@@ -397,6 +566,7 @@ jobs:
           import org.videolan.libvlc.util.VLCVideoLayout;
 
           import java.util.ArrayList;
+          import java.util.Locale;
 
           public class VlcPlayerActivity extends AppCompatActivity {
 
@@ -406,31 +576,185 @@ jobs:
               private LibVLC libVLC;
               private MediaPlayer mediaPlayer;
               private VLCVideoLayout videoLayout;
+              private RelativeLayout controlsOverlay;
+              private ProgressBar loadingSpinner;
+              private SeekBar seekBar;
+              private TextView tvCurrentTime, tvTotalTime, tvTitle;
+              private Button btnPlayPause, btnUnlock;
+
+              private final Handler handler = new Handler(Looper.getMainLooper());
+              private boolean isUserSeeking = false;
+              private boolean controlsVisible = true;
+              private boolean isLocked = false;
+              private boolean isLandscape = true;
+
+              private final Runnable hideControlsRunnable = () -> {
+                  if (controlsOverlay != null && mediaPlayer != null && mediaPlayer.isPlaying()) {
+                      controlsOverlay.setVisibility(View.GONE);
+                      controlsVisible = false;
+                      hideSystemUi();
+                  }
+              };
+
+              private final Runnable hideUnlockRunnable = () -> {
+                  if (btnUnlock != null) {
+                      btnUnlock.setVisibility(View.GONE);
+                      hideSystemUi();
+                  }
+              };
+
+              private final Runnable progressUpdater = new Runnable() {
+                  @Override
+                  public void run() {
+                      if (mediaPlayer != null && !isUserSeeking) {
+                          long total = mediaPlayer.getLength();
+                          long current = mediaPlayer.getTime();
+                          if (total > 0) {
+                              seekBar.setMax((int) total);
+                              seekBar.setProgress((int) Math.max(0, current));
+                              tvCurrentTime.setText(formatTime(current));
+                              tvTotalTime.setText(formatTime(total));
+                          }
+                      }
+                      handler.postDelayed(this, 500);
+                  }
+              };
+
+              private void hideSystemUi() {
+                  getWindow().getDecorView().setSystemUiVisibility(
+                      View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                      | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                      | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                      | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                      | View.SYSTEM_UI_FLAG_FULLSCREEN
+                      | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                  );
+              }
+
+              private void showControls() {
+                  if (isLocked) return;
+                  if (controlsOverlay != null) {
+                      controlsOverlay.setVisibility(View.VISIBLE);
+                      controlsVisible = true;
+                  }
+                  scheduleHideControls();
+              }
+
+              private void toggleControls() {
+                  if (isLocked) {
+                      if (btnUnlock != null) {
+                          btnUnlock.setVisibility(View.VISIBLE);
+                          handler.removeCallbacks(hideUnlockRunnable);
+                          handler.postDelayed(hideUnlockRunnable, 3000);
+                      }
+                      return;
+                  }
+                  if (controlsVisible) {
+                      handler.removeCallbacks(hideControlsRunnable);
+                      controlsOverlay.setVisibility(View.GONE);
+                      controlsVisible = false;
+                      hideSystemUi();
+                  } else {
+                      showControls();
+                  }
+              }
+
+              private void lockScreen() {
+                  isLocked = true;
+                  handler.removeCallbacks(hideControlsRunnable);
+                  if (controlsOverlay != null) {
+                      controlsOverlay.setVisibility(View.GONE);
+                      controlsVisible = false;
+                  }
+                  if (btnUnlock != null) {
+                      btnUnlock.setVisibility(View.VISIBLE);
+                      handler.removeCallbacks(hideUnlockRunnable);
+                      handler.postDelayed(hideUnlockRunnable, 3000);
+                  }
+                  hideSystemUi();
+                  Toast.makeText(this, "Screen Locked", Toast.LENGTH_SHORT).show();
+              }
+
+              private void unlockScreen() {
+                  isLocked = false;
+                  handler.removeCallbacks(hideUnlockRunnable);
+                  if (btnUnlock != null) {
+                      btnUnlock.setVisibility(View.GONE);
+                  }
+                  showControls();
+                  Toast.makeText(this, "Screen Unlocked", Toast.LENGTH_SHORT).show();
+              }
+
+              private void toggleRotation() {
+                  if (isLandscape) {
+                      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                      isLandscape = false;
+                      Toast.makeText(this, "Portrait Mode", Toast.LENGTH_SHORT).show();
+                  } else {
+                      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                      isLandscape = true;
+                      Toast.makeText(this, "Landscape Mode", Toast.LENGTH_SHORT).show();
+                  }
+                  scheduleHideControls();
+              }
+
+              private void scheduleHideControls() {
+                  handler.removeCallbacks(hideControlsRunnable);
+                  handler.postDelayed(hideControlsRunnable, 4000);
+              }
+
+              private String formatTime(long ms) {
+                  if (ms <= 0) return "00:00";
+                  long totalSec = ms / 1000;
+                  long hours = totalSec / 3600;
+                  long mins = (totalSec % 3600) / 60;
+                  long secs = totalSec % 60;
+                  if (hours > 0) {
+                      return String.format(Locale.US, "%d:%02d:%02d", hours, mins, secs);
+                  }
+                  return String.format(Locale.US, "%02d:%02d", mins, secs);
+              }
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                  getWindow().getDecorView().setSystemUiVisibility(
-                      View.SYSTEM_UI_FLAG_FULLSCREEN
-                      | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                      | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                  );
+                  hideSystemUi();
                   setContentView(R.layout.activity_vlc_player);
 
                   String videoUrl = getIntent().getStringExtra(EXTRA_VIDEO_URL);
+                  String videoTitle = getIntent().getStringExtra(EXTRA_VIDEO_TITLE);
                   if (videoUrl == null || videoUrl.trim().isEmpty()) {
                       Toast.makeText(this, "Invalid video URL", Toast.LENGTH_SHORT).show();
                       finish();
                       return;
                   }
 
+                  RelativeLayout root = findViewById(R.id.vlc_root);
                   videoLayout = findViewById(R.id.vlc_video_layout);
+                  controlsOverlay = findViewById(R.id.controls_overlay);
+                  loadingSpinner = findViewById(R.id.vlc_loading);
+                  seekBar = findViewById(R.id.vlc_seekbar);
+                  tvCurrentTime = findViewById(R.id.tv_current_time);
+                  tvTotalTime = findViewById(R.id.tv_total_time);
+                  tvTitle = findViewById(R.id.tv_video_title);
+                  btnPlayPause = findViewById(R.id.btn_play_pause);
+                  btnUnlock = findViewById(R.id.btn_unlock);
+
+                  Button btnBack = findViewById(R.id.btn_back);
                   Button btnAudio = findViewById(R.id.btn_audio_tracks);
                   Button btnSubs = findViewById(R.id.btn_sub_tracks);
                   Button btnSeekBack = findViewById(R.id.btn_seek_back);
-                  Button btnPlayPause = findViewById(R.id.btn_play_pause);
                   Button btnSeekFwd = findViewById(R.id.btn_seek_fwd);
+                  Button btnLock = findViewById(R.id.btn_lock);
+                  Button btnRotate = findViewById(R.id.btn_rotate);
+
+                  if (tvTitle != null && videoTitle != null && !videoTitle.trim().isEmpty()) {
+                      tvTitle.setText(videoTitle.trim());
+                  }
+
+                  root.setOnClickListener(v -> toggleControls());
+                  controlsOverlay.setOnClickListener(v -> toggleControls());
 
                   ArrayList<String> options = new ArrayList<>();
                   options.add("--aout=opensles");
@@ -443,6 +767,26 @@ jobs:
                   mediaPlayer = new MediaPlayer(libVLC);
                   mediaPlayer.attachViews(videoLayout, null, false, false);
 
+                  mediaPlayer.setEventListener(event -> runOnUiThread(() -> {
+                      if (event.type == MediaPlayer.Event.Playing) {
+                          loadingSpinner.setVisibility(View.GONE);
+                          btnPlayPause.setText("⏸");
+                          scheduleHideControls();
+                      } else if (event.type == MediaPlayer.Event.Paused) {
+                          btnPlayPause.setText("▶");
+                          showControls();
+                      } else if (event.type == MediaPlayer.Event.Buffering) {
+                          if (event.getBuffering() >= 100f) {
+                              loadingSpinner.setVisibility(View.GONE);
+                          } else {
+                              loadingSpinner.setVisibility(View.VISIBLE);
+                          }
+                      } else if (event.type == MediaPlayer.Event.EncounteredError) {
+                          loadingSpinner.setVisibility(View.GONE);
+                          Toast.makeText(this, "Playback error. Try another server.", Toast.LENGTH_LONG).show();
+                      }
+                  }));
+
                   Media media = new Media(libVLC, Uri.parse(videoUrl.trim()));
                   media.setHWDecoderEnabled(true, false);
                   media.addOption(":network-caching=2500");
@@ -452,18 +796,51 @@ jobs:
                   media.release();
 
                   mediaPlayer.play();
+                  handler.post(progressUpdater);
+                  scheduleHideControls();
 
-                  if (btnAudio != null) btnAudio.setOnClickListener(v -> showAudioTrackDialog());
-                  if (btnSubs != null) btnSubs.setOnClickListener(v -> showSubtitleTrackDialog());
-                  if (btnPlayPause != null) btnPlayPause.setOnClickListener(v -> togglePlayPause());
-                  if (btnSeekBack != null) btnSeekBack.setOnClickListener(v -> seekBy(-10000L));
-                  if (btnSeekFwd != null) btnSeekFwd.setOnClickListener(v -> seekBy(10000L));
+                  if (btnBack != null) btnBack.setOnClickListener(v -> finish());
+                  if (btnAudio != null) btnAudio.setOnClickListener(v -> { showControls(); showAudioTrackDialog(); });
+                  if (btnSubs != null) btnSubs.setOnClickListener(v -> { showControls(); showSubtitleTrackDialog(); });
+                  if (btnPlayPause != null) btnPlayPause.setOnClickListener(v -> { togglePlayPause(); scheduleHideControls(); });
+                  if (btnSeekBack != null) btnSeekBack.setOnClickListener(v -> { seekBy(-10000L); scheduleHideControls(); });
+                  if (btnSeekFwd != null) btnSeekFwd.setOnClickListener(v -> { seekBy(10000L); scheduleHideControls(); });
+                  if (btnLock != null) btnLock.setOnClickListener(v -> lockScreen());
+                  if (btnUnlock != null) btnUnlock.setOnClickListener(v -> unlockScreen());
+                  if (btnRotate != null) btnRotate.setOnClickListener(v -> toggleRotation());
+
+                  seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override
+                      public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                          if (fromUser) {
+                              tvCurrentTime.setText(formatTime(progress));
+                          }
+                      }
+                      @Override
+                      public void onStartTrackingTouch(SeekBar sb) {
+                          isUserSeeking = true;
+                          handler.removeCallbacks(hideControlsRunnable);
+                      }
+                      @Override
+                      public void onStopTrackingTouch(SeekBar sb) {
+                          isUserSeeking = false;
+                          if (mediaPlayer != null) {
+                              mediaPlayer.setTime(sb.getProgress());
+                          }
+                          scheduleHideControls();
+                      }
+                  });
               }
 
               private void togglePlayPause() {
                   if (mediaPlayer == null) return;
-                  if (mediaPlayer.isPlaying()) mediaPlayer.pause();
-                  else mediaPlayer.play();
+                  if (mediaPlayer.isPlaying()) {
+                      mediaPlayer.pause();
+                      btnPlayPause.setText("▶");
+                  } else {
+                      mediaPlayer.play();
+                      btnPlayPause.setText("⏸");
+                  }
               }
 
               private void seekBy(long deltaMs) {
@@ -527,18 +904,30 @@ jobs:
               }
 
               @Override
+              public void onBackPressed() {
+                  if (isLocked) {
+                      toggleControls();
+                      return;
+                  }
+                  super.onBackPressed();
+              }
+
+              @Override
               public boolean onKeyDown(int keyCode, KeyEvent event) {
-                  if (mediaPlayer != null) {
+                  if (mediaPlayer != null && !isLocked) {
                       if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
                           togglePlayPause();
+                          showControls();
                           return true;
                       }
                       if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD) {
                           seekBy(10000L);
+                          showControls();
                           return true;
                       }
                       if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND) {
                           seekBy(-10000L);
+                          showControls();
                           return true;
                       }
                   }
@@ -554,6 +943,7 @@ jobs:
               @Override
               protected void onDestroy() {
                   super.onDestroy();
+                  handler.removeCallbacksAndMessages(null);
                   if (mediaPlayer != null) {
                       mediaPlayer.detachViews();
                       mediaPlayer.release();
