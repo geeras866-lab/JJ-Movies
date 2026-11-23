@@ -5,7 +5,7 @@ var TMDB_API_KEY = "200b7daf6101f22010cdd5eccea4a119";
 
 // Cloudflare Private Stream Worker Config
 var STREAM_WORKER_URL = "https://jj-movies-stream.geeras800.workers.dev";
-var STREAM_APP_SECRET = "NEE_CLOUDFLARE_APP_SECRET_IKKADA";
+var STREAM_APP_SECRET = "JJ_Movies_2026_Jyoshna";
 
 // Build workflow auto-injects window.JJ_BUILD_VERSION inside APK
 var CURRENT_APK_VERSION = window.JJ_BUILD_VERSION || "1.0.0";
