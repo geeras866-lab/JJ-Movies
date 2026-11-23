@@ -275,17 +275,21 @@ function showTextPlaceholder(imgElement, movieTitle) {
 
 window.handleMissingPoster = handleMissingPoster;
 
-// ---------- 🎬 FULL NATIVE VLC PLAYER + PIXELDRAIN + B2 WORKER TOKEN BRIDGE ----------
+// ---------- 🎬 FULL NATIVE VLC PLAYER + PIXELDRAIN + DYNAMIC B2 WORKER TOKEN BRIDGE ----------
 function isDirectVideoFile(url) {
   if (!url) return false;
   return /\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(url);
 }
 
+function isB2PrefixedFile(val) {
+  return /^[a-zA-Z0-9_-]+\/.+\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(String(val || "").trim());
+}
+
 function safeStreamValue(value) {
   var val = String(value || "").trim();
   if (!val) return "";
-  if (!/^https?:\/\//i.test(val) && val.indexOf("/") === -1 && isDirectVideoFile(val)) {
-    return val; // Plain Backblaze filename
+  if (!/^https?:\/\//i.test(val) && (isB2PrefixedFile(val) || (val.indexOf("/") === -1 && isDirectVideoFile(val)))) {
+    return val; // Dynamic B2 ID/filename or plain Backblaze filename
   }
   return safeURL(val);
 }
@@ -303,7 +307,7 @@ function extractWorkerFileName(rawUrl) {
     }
   }
 
-  if (!/^https?:\/\//i.test(val) && val.indexOf("/") === -1 && isDirectVideoFile(val)) {
+  if (!/^https?:\/\//i.test(val) && (isB2PrefixedFile(val) || (val.indexOf("/") === -1 && isDirectVideoFile(val)))) {
     return val;
   }
 
