@@ -5,7 +5,7 @@ var TMDB_API_KEY = "200b7daf6101f22010cdd5eccea4a119";
 
 // Cloudflare Private Stream Worker Config
 var STREAM_WORKER_URL = "https://jj-movies-stream.geeras800.workers.dev";
-var STREAM_APP_SECRET = "JJ_Movies_2026_Jyoshna";
+var STREAM_APP_SECRET = "JJ_Movies_2026_Jyoshna143";
 
 // Build workflow auto-injects window.JJ_BUILD_VERSION inside APK
 var CURRENT_APK_VERSION = window.JJ_BUILD_VERSION || "1.0.0";
@@ -544,7 +544,7 @@ async function openServerSelection(title, s1, s2) {
         launchNativeVlc(signedOrDirectUrl, cleanTitle);
       } catch (err) {
         console.error("Stream token error:", err);
-        alert("Unable to start stream. Please check internet and try again.");
+        alert("Stream Error: " + err.message);
       }
       return;
     }
@@ -593,7 +593,7 @@ async function playMovieStream(rawUrl, title) {
     url = await resolvePlayableUrl(raw);
   } catch (err) {
     console.error("Stream resolve error:", err);
-    stage.innerHTML = '<div style="color:#f87171;padding:20px;text-align:center;font-size:13px;">Secure stream load avvaledu. Please try again.</div>';
+    stage.innerHTML = '<div style="color:#f87171;padding:20px;text-align:center;font-size:13px;">Stream Error: ' + escapeHTML(err.message) + '</div>';
     return;
   }
 
