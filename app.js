@@ -484,7 +484,7 @@ function ensureInAppPlayerModal() {
       <div class="jj-player-modal-box">
         <div class="jj-player-header">
           <div class="jj-player-title-wrap">
-            <span class="jj-vlc-badge">VLC PLAYER</span>
+            <span class="jj-vlc-badge">▶ IN-APP PLAYER</span>
             <h3 id="modalMovieTitle" class="jj-player-title">Playing Movie</h3>
           </div>
           <div class="jj-player-header-actions">
@@ -649,6 +649,7 @@ async function playMovieStream(rawUrl, title) {
     iframe.allowFullscreen = true;
     iframe.setAttribute("webkitallowfullscreen", "true");
     iframe.setAttribute("mozallowfullscreen", "true");
+    iframe.setAttribute("referrerpolicy", "no-referrer");
     iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media; screen-wake-lock; gyroscope; accelerometer");
     iframe.style.width = "100%";
     iframe.style.height = "100%";
