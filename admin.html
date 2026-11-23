@@ -139,13 +139,13 @@ hr{border-color:#303a50;margin:24px 0}
         <!-- 🎬 OPTIONAL IN-APP STREAMING LINKS -->
         <div class="stream-box" id="movieStreamBox">
           <h3 style="color:#ff3867; margin-bottom:6px;">▶ Watch Online - Streaming Servers (Optional)</h3>
-          <p class="muted" style="margin-top:0;">Pixeldrain (<code>https://pixeldrain.com/u/...</code>), Streamlare, Filemoon, Byse.sx leda Direct (<code>.mp4</code>/<code>.mkv</code>/<code>.m3u8</code>) links ivvandi. Khali ga vadilesthe aa movie ki Watch Online button kanipinchadu.</p>
+          <p class="muted" style="margin-top:0;">Backblaze B2 filename (<code>Movie_2026_1080p.mkv</code>), Worker URL, Pixeldrain (<code>https://pixeldrain.com/u/...</code>), leda Direct (<code>.mp4</code>/<code>.mkv</code>/<code>.m3u8</code>) links ivvandi. Khali ga vadilesthe Watch Online button kanipinchadu.</p>
 
-          <label for="streamUrl1">⚡ Server 1 URL (Main Link)</label>
-          <input id="streamUrl1" type="url" placeholder="https://pixeldrain.com/u/hbiZkCJD or https://.../movie.mp4">
+          <label for="streamUrl1">⚡ Server 1 (B2 Filename or Stream URL)</label>
+          <input id="streamUrl1" type="text" placeholder="Movie_2026_1080p.mkv or https://pixeldrain.com/u/...">
 
-          <label for="streamUrl2">🚀 Server 2 URL (Backup Link)</label>
-          <input id="streamUrl2" type="url" placeholder="https://pixeldrain.com/u/... or backup link">
+          <label for="streamUrl2">🚀 Server 2 (Backup Filename or URL)</label>
+          <input id="streamUrl2" type="text" placeholder="Backup filename.mkv or https://pixeldrain.com/u/...">
         </div>
 
         <label for="description">Description</label>
@@ -217,11 +217,11 @@ hr{border-color:#303a50;margin:24px 0}
         <label for="episodeTitle">Episode Title (Optional)</label>
         <input id="episodeTitle" type="text" maxlength="150" placeholder="e.g. The Beginning">
 
-        <label for="episodeStream1">⚡ Server 1 URL</label>
-        <input id="episodeStream1" type="url" placeholder="https://pixeldrain.com/u/... or https://.../ep1.mkv">
+        <label for="episodeStream1">⚡ Server 1 (B2 Filename or URL)</label>
+        <input id="episodeStream1" type="text" placeholder="Series_S01E01_1080p.mkv or https://pixeldrain.com/u/...">
 
-        <label for="episodeStream2">🚀 Server 2 URL (Optional)</label>
-        <input id="episodeStream2" type="url" placeholder="https://pixeldrain.com/u/... or backup link">
+        <label for="episodeStream2">🚀 Server 2 (Optional Filename or URL)</label>
+        <input id="episodeStream2" type="text" placeholder="Backup filename.mkv or https://pixeldrain.com/u/...">
 
         <button type="submit" id="saveEpisodeBtn">Save Episode</button>
         <button type="button" id="cancelEpisodeBtn" class="secondary hidden">Cancel Edit</button>
@@ -229,8 +229,8 @@ hr{border-color:#303a50;margin:24px 0}
 
       <hr>
       <h3>⚡ Bulk Add (many episodes at once)</h3>
-      <p class="muted">Prathi line ki okka episode: <code>episode_no | server1 | server2(optional)</code>. Season number paina input nundi teesukuntundi.</p>
-      <textarea id="episodeBulkInput" placeholder="1 | https://pixeldrain.com/u/aaa | https://pixeldrain.com/u/bbb&#10;2 | https://pixeldrain.com/u/ccc&#10;3 | https://pixeldrain.com/u/ddd"></textarea>
+      <p class="muted">Prathi line ki okka episode: <code>episode_no | server1_filename_or_url | server2(optional)</code>. Season number paina input nundi teesukuntundi.</p>
+      <textarea id="episodeBulkInput" placeholder="1 | VisionQuest_S01E01.mkv | https://pixeldrain.com/u/bbb&#10;2 | VisionQuest_S01E02.mkv&#10;3 | VisionQuest_S01E03.mkv"></textarea>
       <button type="button" id="bulkEpisodeBtn">Add All Episodes</button>
 
       <hr>
@@ -241,16 +241,16 @@ hr{border-color:#303a50;margin:24px 0}
     <!-- QUICK STREAM SERVER MANAGER PANEL -->
     <div class="panel" style="border: 1px solid #ff3867;">
       <h2 style="color:#ff3867;">▶ Quick Online Stream Manager (Server 1 & Server 2)</h2>
-      <p class="muted">Edaina movie select chesi direct ga Server 1 & Server 2 links add leda remove cheyochu.</p>
+      <p class="muted">Edaina movie select chesi direct ga Backblaze B2 filename (<code>movie.mkv</code>) leda Server 1 & Server 2 links add/remove cheyochu.</p>
       <form id="quickStreamForm">
         <label for="streamMovieSelect">Select Movie *</label>
         <select id="streamMovieSelect" required><option value="">Loading movies...</option></select>
 
-        <label for="quickStream1Input">⚡ Server 1 URL (Optional)</label>
-        <input id="quickStream1Input" type="url" placeholder="https://pixeldrain.com/u/hbiZkCJD">
+        <label for="quickStream1Input">⚡ Server 1 (B2 Filename or URL)</label>
+        <input id="quickStream1Input" type="text" placeholder="SAMPLE_O_M_2026_1080p.mkv or https://pixeldrain.com/u/...">
 
-        <label for="quickStream2Input">🚀 Server 2 URL (Optional)</label>
-        <input id="quickStream2Input" type="url" placeholder="https://pixeldrain.com/u/...">
+        <label for="quickStream2Input">🚀 Server 2 (Backup Filename or URL)</label>
+        <input id="quickStream2Input" type="text" placeholder="Backup filename.mkv or https://pixeldrain.com/u/...">
 
         <button type="submit" id="saveQuickStreamBtn">Save Stream Links</button>
         <button type="button" id="clearQuickStreamBtn" class="secondary">Clear Both Links</button>
@@ -398,9 +398,18 @@ hr{border-color:#303a50;margin:24px 0}
 
   function showMessage(text) { message.textContent = text; }
 
+  function isDirectVideoFile(val) {
+    return /\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(val);
+  }
+
   function normalizeStreamInputUrl(value) {
     var raw = String(value || "").trim();
     if (!raw) return "";
+    // Plain Backblaze B2 filename (e.g. Movie_2026_1080p.mkv) -> save as-is
+    if (!/^https?:\/\//i.test(raw) && raw.indexOf("/") === -1 && isDirectVideoFile(raw)) {
+      return raw;
+    }
+    // Plain Pixeldrain ID
     if (/^[A-Za-z0-9_-]{6,20}$/.test(raw)) {
       return "https://pixeldrain.com/u/" + raw;
     }
