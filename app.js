@@ -275,7 +275,7 @@ function showTextPlaceholder(imgElement, movieTitle) {
 
 window.handleMissingPoster = handleMissingPoster;
 
-// ---------- CUSTOM IN-APP PLAYER + PIXELDRAIN + DYNAMIC B2 WORKER TOKEN BRIDGE ----------
+// ---------- VLC PLAYER BRIDGE + PIXELDRAIN + DYNAMIC B2 WORKER TOKEN BRIDGE ----------
 function isDirectVideoFile(url) {
   if (!url) return false;
   return /\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(url);
@@ -377,6 +377,22 @@ function normalizeStreamUrl(url) {
   return u.replace(/streamlare\.com\/(v|d)\//, "streamlare.com/e/");
 }
 
+function hasNativeVlcBridge() {
+  return Boolean(window.AndroidVlc && typeof window.AndroidVlc.playVideo === "function");
+}
+
+function launchNativeVlc(playableUrl, title) {
+  var activeTitle = title ||
+    currentActiveMovieTitle ||
+    (document.getElementById("modalMovieTitle") && document.getElementById("modalMovieTitle").textContent) ||
+    "JJ Movies";
+  if (hasNativeVlcBridge()) {
+    window.AndroidVlc.playVideo(String(playableUrl || ""), String(activeTitle));
+    return true;
+  }
+  return false;
+}
+
 function loadHls(cb) {
   if (window.Hls) return cb();
   var s = document.createElement("script");
@@ -465,7 +481,7 @@ function ensureInAppPlayerModal() {
       <div class="jj-player-modal-box">
         <div class="jj-player-header">
           <div class="jj-player-title-wrap">
-            <span class="jj-vlc-badge">▶ IN-APP PLAYER</span>
+            <span class="jj-vlc-badge">VLC PLAYER</span>
             <h3 id="modalMovieTitle" class="jj-player-title">Playing Movie</h3>
           </div>
           <div class="jj-player-header-actions">
@@ -518,6 +534,25 @@ async function openServerSelection(title, s1, s2) {
   if (s2) servers.push({ name: "🚀 Server 2", url: s2 });
   if (!servers.length) return;
 
+  if (hasNativeVlcBridge()) {
+    var vlcServer = servers.find(function (srv) {
+      var resolved = normalizeStreamUrl(srv.url);
+      return isWorkerStreamLink(srv.url) || isPixeldrainLink(srv.url) || isDirectVideoFile(resolved);
+    });
+
+    if (vlcServer) {
+      try {
+        var playableUrl = await resolvePlayableUrl(vlcServer.url);
+        currentActiveStreamUrl = playableUrl;
+        launchNativeVlc(playableUrl, cleanTitle);
+      } catch (err) {
+        console.error("Stream token error:", err);
+        alert("Stream Error: " + err.message);
+      }
+      return;
+    }
+  }
+
   ensureInAppPlayerModal();
   var modal = document.getElementById("inAppVideoModal");
   var titleElem = document.getElementById("modalMovieTitle");
@@ -554,7 +589,7 @@ async function playMovieStream(rawUrl, title) {
   var raw = String(rawUrl || "").trim();
   if (title) currentActiveMovieTitle = title;
 
-  stage.innerHTML = '<div style="color:#cbd5e1;padding:30px;text-align:center;font-size:13px;">⚡ Loading video into custom player...</div>';
+  stage.innerHTML = '<div style="color:#cbd5e1;padding:30px;text-align:center;font-size:13px;">⚡ Loading stream...</div>';
 
   var url = "";
   try {
@@ -568,9 +603,13 @@ async function playMovieStream(rawUrl, title) {
   currentActiveStreamUrl = url;
   stage.innerHTML = "";
 
-  var treatAsDirect = isDirectVideoFile(url) || isWorkerStreamLink(raw) || isPixeldrainLink(raw);
+  if (hasNativeVlcBridge() && (isWorkerStreamLink(raw) || isPixeldrainLink(raw) || isDirectVideoFile(url))) {
+    closeInAppPlayer();
+    launchNativeVlc(url, currentActiveMovieTitle);
+    return;
+  }
 
-  if (treatAsDirect) {
+  if (isDirectVideoFile(url)) {
     var video = document.createElement("video");
     video.id = "vlcInAppPlayer";
     video.controls = true;
@@ -645,6 +684,7 @@ window.openServerSelection = openServerSelection;
 window.playMovieStream = playMovieStream;
 window.closeInAppPlayer = closeInAppPlayer;
 window.togglePlayerFullscreen = togglePlayerFullscreen;
+window.launchNativeVlc = launchNativeVlc;
 
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
