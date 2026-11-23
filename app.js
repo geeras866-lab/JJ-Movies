@@ -7,6 +7,9 @@ var TMDB_API_KEY = "200b7daf6101f22010cdd5eccea4a119";
 var STREAM_WORKER_URL = "https://jj-movies-stream.geeras800.workers.dev";
 var STREAM_APP_SECRET = "JJ_Movies_2026_Jyoshna143";
 
+// GitHub Release APK URL
+var JJ_RELEASE_APK_URL = "https://github.com/geeras866-lab/JJ-Movies/releases/download/jj-movies.apk/jj-movies.apk";
+
 // Build workflow auto-injects window.JJ_BUILD_VERSION inside APK
 var CURRENT_APK_VERSION = window.JJ_BUILD_VERSION || "1.0.0";
 
@@ -1919,7 +1922,7 @@ async function checkApkUpdate() {
     var latestVersion = cfg.version || "1.0.0";
 
     if (isVersionOlder(CURRENT_APK_VERSION, latestVersion)) {
-      showAppUpdateModal(latestVersion, cfg.apk_url || "./jj-movies.apk", cfg.notes, cfg.force === true);
+      showAppUpdateModal(latestVersion, cfg.apk_url || JJ_RELEASE_APK_URL, cfg.notes, cfg.force === true);
     }
   } catch (err) {
     console.warn("App update check skipped:", err);
@@ -1962,12 +1965,28 @@ function showAppUpdateModal(latestVer, apkUrl, notes, isForce) {
   }
 }
 
-// ---------- HIDE APK DOWNLOAD BUTTONS INSIDE ANDROID APP ----------
-(function hideApkButtonsInApp() {
+// ---------- RELEASE APK BUTTON LINK + HIDE INSIDE ANDROID APP ----------
+(function configureApkDownloadButtons() {
+  var selectors = '.nav-download-app, .footer-app-link, a[href*="jj-movies.apk"]';
+
   if (isRunningInsideApk()) {
     var st = document.createElement("style");
-    st.textContent = '.nav-download-app, .footer-app-link, a[href*="jj-movies.apk"] { display: none !important; }';
+    st.textContent = selectors + " { display: none !important; }";
     document.head.appendChild(st);
+    return;
+  }
+
+  function applyReleaseLink() {
+    document.querySelectorAll(selectors).forEach(function (el) {
+      el.setAttribute("href", JJ_RELEASE_APK_URL);
+      el.setAttribute("download", "jj-movies.apk");
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", applyReleaseLink);
+  } else {
+    applyReleaseLink();
   }
 })();
 
