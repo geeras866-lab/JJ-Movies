@@ -275,7 +275,7 @@ function showTextPlaceholder(imgElement, movieTitle) {
 
 window.handleMissingPoster = handleMissingPoster;
 
-// ---------- 🎬 FULL NATIVE VLC PLAYER + PIXELDRAIN + DYNAMIC B2 WORKER TOKEN BRIDGE ----------
+// ---------- CUSTOM IN-APP PLAYER + PIXELDRAIN + DYNAMIC B2 WORKER TOKEN BRIDGE ----------
 function isDirectVideoFile(url) {
   if (!url) return false;
   return /\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(url);
@@ -289,7 +289,7 @@ function safeStreamValue(value) {
   var val = String(value || "").trim();
   if (!val) return "";
   if (!/^https?:\/\//i.test(val) && (isB2PrefixedFile(val) || (val.indexOf("/") === -1 && isDirectVideoFile(val)))) {
-    return val; // Dynamic B2 ID/filename or plain Backblaze filename
+    return val;
   }
   return safeURL(val);
 }
@@ -377,22 +377,6 @@ function normalizeStreamUrl(url) {
   return u.replace(/streamlare\.com\/(v|d)\//, "streamlare.com/e/");
 }
 
-function hasNativeVlcBridge() {
-  return Boolean(window.AndroidVlc && typeof window.AndroidVlc.playVideo === "function");
-}
-
-function launchNativeVlc(playableUrl, title) {
-  var activeTitle = title ||
-    currentActiveMovieTitle ||
-    (document.getElementById("modalMovieTitle") && document.getElementById("modalMovieTitle").textContent) ||
-    "JJ Movies";
-  if (hasNativeVlcBridge()) {
-    window.AndroidVlc.playVideo(String(playableUrl || ""), String(activeTitle));
-    return true;
-  }
-  return false;
-}
-
 function loadHls(cb) {
   if (window.Hls) return cb();
   var s = document.createElement("script");
@@ -401,7 +385,7 @@ function loadHls(cb) {
   document.head.appendChild(s);
 }
 
-// ---------- NATIVE FULLSCREEN (Chrome-like, works on all phones) ----------
+// ---------- FULLSCREEN + LANDSCAPE LOCK ----------
 function lockLandscape() {
   try {
     var P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenOrientation;
@@ -423,7 +407,7 @@ function unlockOrientation() {
 }
 
 function jjFsTarget() {
-  return document.getElementById("vlcInAppIframe") || document.getElementById("vlcInAppPlayer");
+  return document.getElementById("vlcInAppIframe") || document.getElementById("vlcInAppPlayer") || document.getElementById("jjPlayerStage");
 }
 
 function isInFullscreen() {
@@ -481,7 +465,7 @@ function ensureInAppPlayerModal() {
       <div class="jj-player-modal-box">
         <div class="jj-player-header">
           <div class="jj-player-title-wrap">
-            <span class="jj-vlc-badge">VLC PLAYER</span>
+            <span class="jj-vlc-badge">▶ IN-APP PLAYER</span>
             <h3 id="modalMovieTitle" class="jj-player-title">Playing Movie</h3>
           </div>
           <div class="jj-player-header-actions">
@@ -534,26 +518,6 @@ async function openServerSelection(title, s1, s2) {
   if (s2) servers.push({ name: "🚀 Server 2", url: s2 });
   if (!servers.length) return;
 
-  // Backblaze Worker / Pixeldrain / Direct Video -> Direct Native LibVLC lo play avuthundi
-  if (hasNativeVlcBridge()) {
-    var vlcServer = servers.find(function (srv) {
-      var resolved = normalizeStreamUrl(srv.url);
-      return isWorkerStreamLink(srv.url) || isPixeldrainLink(srv.url) || isDirectVideoFile(resolved);
-    });
-
-    if (vlcServer) {
-      try {
-        var signedOrDirectUrl = await resolvePlayableUrl(vlcServer.url);
-        currentActiveStreamUrl = signedOrDirectUrl;
-        launchNativeVlc(signedOrDirectUrl, cleanTitle);
-      } catch (err) {
-        console.error("Stream token error:", err);
-        alert("Stream Error: " + err.message);
-      }
-      return;
-    }
-  }
-
   ensureInAppPlayerModal();
   var modal = document.getElementById("inAppVideoModal");
   var titleElem = document.getElementById("modalMovieTitle");
@@ -590,7 +554,7 @@ async function playMovieStream(rawUrl, title) {
   var raw = String(rawUrl || "").trim();
   if (title) currentActiveMovieTitle = title;
 
-  stage.innerHTML = '<div style="color:#cbd5e1;padding:30px;text-align:center;font-size:13px;">⚡ Generating secure stream...</div>';
+  stage.innerHTML = '<div style="color:#cbd5e1;padding:30px;text-align:center;font-size:13px;">⚡ Loading video into custom player...</div>';
 
   var url = "";
   try {
@@ -604,13 +568,9 @@ async function playMovieStream(rawUrl, title) {
   currentActiveStreamUrl = url;
   stage.innerHTML = "";
 
-  if (hasNativeVlcBridge() && (isWorkerStreamLink(raw) || isPixeldrainLink(raw) || isDirectVideoFile(url))) {
-    closeInAppPlayer();
-    launchNativeVlc(url, currentActiveMovieTitle);
-    return;
-  }
+  var treatAsDirect = isDirectVideoFile(url) || isWorkerStreamLink(raw) || isPixeldrainLink(raw);
 
-  if (isDirectVideoFile(url)) {
+  if (treatAsDirect) {
     var video = document.createElement("video");
     video.id = "vlcInAppPlayer";
     video.controls = true;
@@ -685,7 +645,6 @@ window.openServerSelection = openServerSelection;
 window.playMovieStream = playMovieStream;
 window.closeInAppPlayer = closeInAppPlayer;
 window.togglePlayerFullscreen = togglePlayerFullscreen;
-window.launchNativeVlc = launchNativeVlc;
 
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
@@ -1565,7 +1524,7 @@ function clearLiveSearch() {
   }
 }
 
-// ---------- 📺 SERIES EPISODES ----------
+// ---------- SERIES EPISODES ----------
 async function loadEpisodes(movie) {
   var box = document.getElementById("modalEpisodesContainer");
   if (!box) return;
@@ -1886,7 +1845,7 @@ function ensureSearchBar() {
   if (cb) cb.addEventListener("click", clearLiveSearch);
 }
 
-// ---------- 📲 APK UPDATE POPUP (DISABLED) ----------
+// ---------- APK UPDATE POPUP (DISABLED) ----------
 function isRunningInsideApk() {
   var ua = navigator.userAgent || "";
   var isCap = Boolean(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -1963,7 +1922,7 @@ function showAppUpdateModal(latestVer, apkUrl, notes, isForce) {
   }
 }
 
-// ---------- 🙈 HIDE APK DOWNLOAD BUTTONS INSIDE ANDROID APP ----------
+// ---------- HIDE APK DOWNLOAD BUTTONS INSIDE ANDROID APP ----------
 (function hideApkButtonsInApp() {
   if (isRunningInsideApk()) {
     var st = document.createElement("style");
@@ -1998,7 +1957,7 @@ loadMovies();
 initNeonFestivalMode();
 // checkApkUpdate();  // update popup disabled
 
-// ---------- 📡 OFFLINE MESSAGE + PULL TO REFRESH ----------
+// ---------- OFFLINE MESSAGE + PULL TO REFRESH ----------
 var OFFLINE_TEXT = "📡 No internet connection. Please turn on your internet and pull down to refresh.";
 
 function showOfflineBar() {
