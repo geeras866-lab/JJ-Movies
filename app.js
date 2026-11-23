@@ -537,6 +537,7 @@ async function openServerSelection(title, s1, s2) {
   if (s2) servers.push({ name: "🚀 Server 2", url: s2 });
   if (!servers.length) return;
 
+  // Direct video / B2 worker / Pixeldrain aithe matrame native VLC try chesthundi; embed links custom modal lo play avthayi
   if (hasNativeVlcBridge()) {
     var vlcServer = servers.find(function (srv) {
       var resolved = normalizeStreamUrl(srv.url);
@@ -563,6 +564,9 @@ async function openServerSelection(title, s1, s2) {
 
   if (titleElem) titleElem.textContent = cleanTitle;
   modal.style.display = "flex";
+  modal.style.visibility = "visible";
+  modal.style.opacity = "1";
+  modal.style.zIndex = "99999";
 
   try {
     history.pushState({ jjPlayerOpen: true }, "", window.location.href);
