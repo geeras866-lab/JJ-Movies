@@ -1,7 +1,11 @@
- var SUPABASE_URL = "https://tswyabgdldbsaopipvug.supabase.co";
+var SUPABASE_URL = "https://tswyabgdldbsaopipvug.supabase.co";
 var SUPABASE_KEY = "sb_publishable_902itkUPAUe272Q4B4jF0w_OEKDNuxr";
 var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 var TMDB_API_KEY = "200b7daf6101f22010cdd5eccea4a119";
+
+// Cloudflare Private Stream Worker Config
+var STREAM_WORKER_URL = "https://jj-movies-stream.geeras800.workers.dev";
+var STREAM_APP_SECRET = "NEE_CLOUDFLARE_APP_SECRET_IKKADA";
 
 // Build workflow auto-injects window.JJ_BUILD_VERSION inside APK
 var CURRENT_APK_VERSION = window.JJ_BUILD_VERSION || "1.0.0";
@@ -271,10 +275,58 @@ function showTextPlaceholder(imgElement, movieTitle) {
 
 window.handleMissingPoster = handleMissingPoster;
 
-// ---------- 🎬 FULL NATIVE VLC PLAYER + PIXELDRAIN BRIDGE ----------
+// ---------- 🎬 FULL NATIVE VLC PLAYER + PIXELDRAIN + B2 WORKER TOKEN BRIDGE ----------
 function isDirectVideoFile(url) {
   if (!url) return false;
   return /\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(url);
+}
+
+function safeStreamValue(value) {
+  var val = String(value || "").trim();
+  if (!val) return "";
+  if (!/^https?:\/\//i.test(val) && val.indexOf("/") === -1 && isDirectVideoFile(val)) {
+    return val; // Plain Backblaze filename
+  }
+  return safeURL(val);
+}
+
+function extractWorkerFileName(rawUrl) {
+  var val = String(rawUrl || "").trim();
+  if (!val) return "";
+
+  if (val.indexOf(STREAM_WORKER_URL) === 0) {
+    try {
+      var u = new URL(val);
+      return decodeURIComponent(u.pathname.replace(/^\/+/, ""));
+    } catch (e) {
+      return val.slice(STREAM_WORKER_URL.length).replace(/^\/+/, "").split("?")[0];
+    }
+  }
+
+  if (!/^https?:\/\//i.test(val) && val.indexOf("/") === -1 && isDirectVideoFile(val)) {
+    return val;
+  }
+
+  return "";
+}
+
+function isWorkerStreamLink(rawUrl) {
+  return Boolean(extractWorkerFileName(rawUrl));
+}
+
+async function resolvePlayableUrl(rawUrl) {
+  var workerFile = extractWorkerFileName(rawUrl);
+  if (workerFile) {
+    var res = await fetch(
+      STREAM_WORKER_URL + "/get-token?file=" + encodeURIComponent(workerFile),
+      { headers: { "X-App-Key": STREAM_APP_SECRET } }
+    );
+    if (!res.ok) throw new Error("Token failed: " + res.status);
+    var data = await res.json();
+    if (!data || !data.url) throw new Error("Invalid token response");
+    return data.url;
+  }
+  return normalizeStreamUrl(rawUrl);
 }
 
 function extractPixeldrainId(rawUrl) {
@@ -469,7 +521,7 @@ function openMoviePlayerById(movieId) {
   openServerSelection(movie.title, movie.stream1, movie.stream2);
 }
 
-function openServerSelection(title, s1, s2) {
+async function openServerSelection(title, s1, s2) {
   var cleanTitle = title || "Playing Movie";
   currentActiveMovieTitle = cleanTitle;
 
@@ -478,17 +530,22 @@ function openServerSelection(title, s1, s2) {
   if (s2) servers.push({ name: "🚀 Server 2", url: s2 });
   if (!servers.length) return;
 
-  // Server 1 or Server 2 — ekkada Pixeldrain / direct video link unna direct ga landscape VLC lo play avuthundi
+  // Backblaze Worker / Pixeldrain / Direct Video -> Direct Native LibVLC lo play avuthundi
   if (hasNativeVlcBridge()) {
     var vlcServer = servers.find(function (srv) {
       var resolved = normalizeStreamUrl(srv.url);
-      return isPixeldrainLink(srv.url) || isDirectVideoFile(resolved);
+      return isWorkerStreamLink(srv.url) || isPixeldrainLink(srv.url) || isDirectVideoFile(resolved);
     });
 
     if (vlcServer) {
-      var directUrl = normalizeStreamUrl(vlcServer.url);
-      currentActiveStreamUrl = directUrl;
-      launchNativeVlc(directUrl, cleanTitle);
+      try {
+        var signedOrDirectUrl = await resolvePlayableUrl(vlcServer.url);
+        currentActiveStreamUrl = signedOrDirectUrl;
+        launchNativeVlc(signedOrDirectUrl, cleanTitle);
+      } catch (err) {
+        console.error("Stream token error:", err);
+        alert("Unable to start stream. Please check internet and try again.");
+      }
       return;
     }
   }
@@ -523,16 +580,27 @@ function openServerSelection(title, s1, s2) {
   playMovieStream(servers[0].url, cleanTitle);
 }
 
-function playMovieStream(rawUrl, title) {
+async function playMovieStream(rawUrl, title) {
   var stage = document.getElementById("jjPlayerStage");
   if (!stage) return;
   var raw = String(rawUrl || "").trim();
-  var url = normalizeStreamUrl(raw);
-  currentActiveStreamUrl = url;
   if (title) currentActiveMovieTitle = title;
+
+  stage.innerHTML = '<div style="color:#cbd5e1;padding:30px;text-align:center;font-size:13px;">⚡ Generating secure stream...</div>';
+
+  var url = "";
+  try {
+    url = await resolvePlayableUrl(raw);
+  } catch (err) {
+    console.error("Stream resolve error:", err);
+    stage.innerHTML = '<div style="color:#f87171;padding:20px;text-align:center;font-size:13px;">Secure stream load avvaledu. Please try again.</div>';
+    return;
+  }
+
+  currentActiveStreamUrl = url;
   stage.innerHTML = "";
 
-  if (hasNativeVlcBridge() && (isPixeldrainLink(raw) || isDirectVideoFile(url))) {
+  if (hasNativeVlcBridge() && (isWorkerStreamLink(raw) || isPixeldrainLink(raw) || isDirectVideoFile(url))) {
     closeInAppPlayer();
     launchNativeVlc(url, currentActiveMovieTitle);
     return;
@@ -1176,8 +1244,8 @@ function applyMoviesData(data) {
       pinned: item.is_pinned === true,
       pinLabel: String(item.pin_label || "").trim(),
       trailer: safeURL(rawTrailer),
-      stream1: safeURL(rawStream1),
-      stream2: safeURL(rawStream2),
+      stream1: safeStreamValue(rawStream1),
+      stream2: safeStreamValue(rawStream2),
       versions: []
     };
   });
@@ -1564,7 +1632,7 @@ function renderEpisodes(movie, eps, box) {
         var ep = eps.find(function (x) { return String(x.id) === b.getAttribute("data-ep"); });
         if (!ep) return;
         var label = movie.title + " • S" + (Number(ep.season_number) || 1) + " • Episode " + ep.episode_number;
-        openServerSelection(label, safeURL(ep.stream_url_1), safeURL(ep.stream_url_2));
+        openServerSelection(label, safeStreamValue(ep.stream_url_1), safeStreamValue(ep.stream_url_2));
       });
     });
   }
