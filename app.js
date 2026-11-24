@@ -53,20 +53,32 @@ async function fetchFromApi(type, params) {
   return res.json();
 }
 
-async function resolvePlayableUrl(rawUrl) {
-  var workerFile = extractWorkerFileName(rawUrl);
-  if (workerFile) {
-    var res = await fetch(API_BASE + "/get-token?file=" + encodeURIComponent(workerFile), {
-      method: "GET",
-      credentials: "same-origin",
-      cache: "no-store"
-    });
-    if (!res.ok) throw new Error("Token failed: " + res.status);
-    var data = await res.json();
-    if (!data || !data.url) throw new Error("Invalid token response");
-    return data.url;
+// Token-only stream resolver: permanent direct URLs are never returned raw
+async function resolveTokenStreamUrl(rawUrl, linkType, meta) {
+  var mode = String(linkType || "token").toLowerCase().trim();
+  if (mode !== "token") {
+    throw new Error("Only token-protected streams are allowed.");
   }
-  return normalizeStreamUrl(rawUrl);
+
+  var workerFile = extractWorkerFileName(rawUrl);
+  var queryParams = new URLSearchParams();
+  if (workerFile) {
+    queryParams.set("file", workerFile);
+  } else if (rawUrl) {
+    queryParams.set("ref", String(rawUrl).trim());
+  }
+  if (meta && meta.id) queryParams.set("id", String(meta.id));
+  if (meta && meta.episodeId) queryParams.set("episode_id", String(meta.episodeId));
+
+  var res = await fetch(API_BASE + "/get-token?" + queryParams.toString(), {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "no-store"
+  });
+  if (!res.ok) throw new Error("Token generation failed: " + res.status);
+  var data = await res.json();
+  if (!data || !data.url) throw new Error("Invalid token stream response");
+  return String(data.url).trim();
 }
 
 // ---------- Basic Helpers ----------
@@ -139,7 +151,7 @@ function handleMissingPoster(imgElement, movieTitle) {
 }
 window.handleMissingPoster = handleMissingPoster;
 
-// ---------- Stream Helpers (App Only) ----------
+// ---------- Stream Helpers (Token-Enforced App Only) ----------
 function isDirectVideoFile(url) {
   if (!url) return false;
   return /\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(url);
@@ -149,7 +161,7 @@ function isB2PrefixedFile(val) {
   return /^[a-zA-Z0-9_-]+\/.+\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(String(val || "").trim());
 }
 
-function safeStreamValue(value) {
+function safeTokenRefValue(value) {
   var val = String(value || "").trim();
   if (!val) return "";
   if (!/^https?:\/\//i.test(val) && (isB2PrefixedFile(val) || (val.indexOf("/") === -1 && isDirectVideoFile(val)))) {
@@ -178,37 +190,9 @@ function extractWorkerFileName(rawUrl) {
   return "";
 }
 
-function isWorkerStreamLink(rawUrl) {
-  return Boolean(extractWorkerFileName(rawUrl));
-}
-
-function extractPixeldrainId(rawUrl) {
-  var val = String(rawUrl || "").trim();
-  if (!val) return "";
-  var uMatch = val.match(/(?:https?:\/\/)?(?:www\.)?pixeldrain\.com\/u\/([A-Za-z0-9_-]+)/i);
-  if (uMatch && uMatch[1]) return uMatch[1];
-  var apiMatch = val.match(/(?:https?:\/\/)?(?:www\.)?pixeldrain\.com\/api\/file\/([A-Za-z0-9_-]+)/i);
-  if (apiMatch && apiMatch[1]) return apiMatch[1];
-  if (/^[A-Za-z0-9_-]{6,20}$/.test(val)) return val;
-  return "";
-}
-
-function isPixeldrainLink(rawUrl) {
-  return Boolean(extractPixeldrainId(rawUrl));
-}
-
-function normalizeStreamUrl(url) {
-  var raw = String(url || "").trim();
-  if (!raw) return "";
-  if (isPixeldrainLink(raw)) {
-    return "https://pixeldrain.com/api/file/" + extractPixeldrainId(raw);
-  }
-  var u = safeURL(raw);
-  if (!u || isDirectVideoFile(u)) return u;
-  if (u.indexOf("/e/") !== -1) return u;
-  var m = u.match(/^(https?:\/\/[^\/]+)\/(?:d|v)\/([A-Za-z0-9]+)(\?.*)?$/i);
-  if (m) return m[1] + "/e/" + m[2] + (m[3] || "");
-  return u;
+function isTokenEligibleLink(rawUrl, linkType) {
+  var mode = String(linkType || "token").toLowerCase().trim();
+  return mode === "token" && Boolean(String(rawUrl || "").trim());
 }
 
 function launchNativeVlc(playableUrl, title) {
@@ -216,8 +200,8 @@ function launchNativeVlc(playableUrl, title) {
     currentActiveMovieTitle ||
     (document.getElementById("modalMovieTitle") && document.getElementById("modalMovieTitle").textContent) ||
     "JJ Movies";
-  if (hasNativeVlcBridge()) {
-    window.AndroidVlc.playVideo(String(playableUrl || ""), String(activeTitle));
+  if (hasNativeVlcBridge() && playableUrl) {
+    window.AndroidVlc.playVideo(String(playableUrl), String(activeTitle));
     return true;
   }
   return false;
@@ -347,34 +331,34 @@ function openMoviePlayerById(movieId) {
   if (!isRunningInsideApk()) return;
   var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
   if (!movie) return;
-  openServerSelection(movie.title, movie.stream1, movie.stream2);
+  openServerSelection(movie.title, movie.stream1, movie.stream2, movie.linkType, { id: movie.id });
 }
 
-async function openServerSelection(title, s1, s2) {
+async function openServerSelection(title, s1, s2, linkType, meta) {
   if (!isRunningInsideApk()) return;
   var cleanTitle = title || "Playing Movie";
+  var mode = String(linkType || "token").toLowerCase().trim();
   currentActiveMovieTitle = cleanTitle;
 
+  if (mode !== "token") {
+    alert("Only token-protected links are enabled for playback.");
+    return;
+  }
+
   var servers = [];
-  if (s1) servers.push({ name: "⚡ Server 1", url: s1 });
-  if (s2) servers.push({ name: "🚀 Server 2", url: s2 });
+  if (s1) servers.push({ name: "⚡ Server 1 (Token)", url: s1, linkType: mode });
+  if (s2) servers.push({ name: "🚀 Server 2 (Token)", url: s2, linkType: mode });
   if (!servers.length) return;
 
   if (hasNativeVlcBridge()) {
-    var vlcServer = servers.find(function (srv) {
-      var resolved = normalizeStreamUrl(srv.url);
-      return isWorkerStreamLink(srv.url) || isPixeldrainLink(srv.url) || isDirectVideoFile(resolved);
-    });
-    if (vlcServer) {
-      try {
-        var playableUrl = await resolvePlayableUrl(vlcServer.url);
-        currentActiveStreamUrl = playableUrl;
-        launchNativeVlc(playableUrl, cleanTitle);
-      } catch (err) {
-        alert("Stream Error: " + err.message);
-      }
-      return;
+    try {
+      var playableUrl = await resolveTokenStreamUrl(servers[0].url, servers[0].linkType, meta);
+      currentActiveStreamUrl = playableUrl;
+      launchNativeVlc(playableUrl, cleanTitle);
+    } catch (err) {
+      alert("Token Stream Error: " + err.message);
     }
+    return;
   }
 
   ensureInAppPlayerModal();
@@ -400,35 +384,35 @@ async function openServerSelection(title, s1, s2) {
     btn.addEventListener("click", function () {
       serverContainer.querySelectorAll(".jj-server-btn").forEach(function (b) { b.classList.remove("active"); });
       btn.classList.add("active");
-      playMovieStream(srv.url, cleanTitle);
+      playMovieStream(srv.url, cleanTitle, srv.linkType, meta);
     });
     serverContainer.appendChild(btn);
   });
 
-  playMovieStream(servers[0].url, cleanTitle);
+  playMovieStream(servers[0].url, cleanTitle, servers[0].linkType, meta);
 }
 
-async function playMovieStream(rawUrl, title) {
+async function playMovieStream(rawUrl, title, linkType, meta) {
   if (!isRunningInsideApk()) return;
   var stage = document.getElementById("jjPlayerStage");
   if (!stage) return;
   var raw = String(rawUrl || "").trim();
   if (title) currentActiveMovieTitle = title;
 
-  stage.innerHTML = '<div style="color:#cbd5e1;padding:30px;text-align:center;font-size:13px;">⚡ Loading stream...</div>';
+  stage.innerHTML = '<div style="color:#cbd5e1;padding:30px;text-align:center;font-size:13px;">🔐 Generating temporary token link...</div>';
 
   var url = "";
   try {
-    url = await resolvePlayableUrl(raw);
+    url = await resolveTokenStreamUrl(raw, linkType, meta);
   } catch (err) {
-    stage.innerHTML = '<div style="color:#f87171;padding:20px;text-align:center;font-size:13px;">Stream Error: ' + escapeHTML(err.message) + '</div>';
+    stage.innerHTML = '<div style="color:#f87171;padding:20px;text-align:center;font-size:13px;">Token Error: ' + escapeHTML(err.message) + '</div>';
     return;
   }
 
   currentActiveStreamUrl = url;
   stage.innerHTML = "";
 
-  if (hasNativeVlcBridge() && (isWorkerStreamLink(raw) || isPixeldrainLink(raw) || isDirectVideoFile(url))) {
+  if (hasNativeVlcBridge()) {
     closeInAppPlayer();
     launchNativeVlc(url, currentActiveMovieTitle);
     return;
@@ -447,7 +431,7 @@ async function playMovieStream(rawUrl, title) {
     video.style.objectFit = "contain";
 
     video.addEventListener("error", function () {
-      stage.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;font-size:13px;">Video play avvatledu. Server 2 try cheyyandi.</div>';
+      stage.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;font-size:13px;">Token stream expired or failed. Please reopen video.</div>';
     });
 
     if (/\.m3u8(\?.*)?$/i.test(url) && !video.canPlayType("application/vnd.apple.mpegurl")) {
@@ -699,6 +683,7 @@ function applyMoviesData(data) {
     var rawTrailer = item.trailer_url || item.trailer || item.trailer_link || item.video_url || item.youtube_link || item.trailerUrl || "";
     var rawStream1 = item.stream_url_1 || item.stream_url || item.stream1 || "";
     var rawStream2 = item.stream_url_2 || item.stream2 || "";
+    var linkType = String(item.link_type || item.stream_type || "token").toLowerCase().trim();
     return {
       id: item.id,
       title: item.title || "Untitled",
@@ -711,9 +696,10 @@ function applyMoviesData(data) {
       description: item.description || "",
       pinned: item.is_pinned === true,
       pinLabel: String(item.pin_label || "").trim(),
+      linkType: linkType,
       trailer: safeURL(rawTrailer),
-      stream1: safeStreamValue(rawStream1),
-      stream2: safeStreamValue(rawStream2),
+      stream1: safeTokenRefValue(rawStream1),
+      stream2: safeTokenRefValue(rawStream2),
       versions: []
     };
   });
@@ -780,7 +766,7 @@ function renderShowcaseCarousel() {
     var isCurrent = index === 0 ? "active" : "";
     var tagBadge = getMoviePinLabel(movie) || "POPULAR";
     var posterSrc = getAdaptivePosterUrl(movie.poster);
-    var hasStream = inApp && !isSeries(movie) && Boolean(movie.stream1 || movie.stream2);
+    var hasTokenStream = inApp && !isSeries(movie) && movie.linkType === "token" && Boolean(movie.stream1 || movie.stream2);
 
     return (
       '<div class="banner-slide ' + isCurrent + '">' +
@@ -798,7 +784,7 @@ function renderShowcaseCarousel() {
           '<p class="banner-desc">' + escapeHTML(movie.description || "Explore details and available formats.") + '</p>' +
           '<div class="banner-action-row">' +
             '<button onclick="showMovieDetails(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-primary">' + (isSeries(movie) ? "⚡ View Series Details" : "⚡ View Movie Details") + '</button>' +
-            (hasStream ? '<button onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : '') +
+            (hasTokenStream ? '<button onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : '') +
             (movie.trailer ? '<a href="' + escapeHTML(movie.trailer) + '" target="_blank" rel="noopener noreferrer" class="btn-banner-secondary">▶ Trailer</a>' : '') +
           '</div>' +
         '</div>' +
@@ -915,7 +901,7 @@ function createMovieCard(movie) {
   button.className = "details-button";
   button.type = "button";
   button.textContent = inApp
-    ? (isSeries(movie) || movie.stream1 || movie.stream2 ? "▶ Watch Now" : "View Details")
+    ? (isSeries(movie) || (movie.linkType === "token" && (movie.stream1 || movie.stream2)) ? "▶ Watch Now" : "View Details")
     : "⚡ View Details";
   button.addEventListener("click", function () { showMovieDetails(movie.id); });
 
@@ -998,7 +984,7 @@ function clearLiveSearch() {
 }
 window.clearLiveSearch = clearLiveSearch;
 
-// ---------- Series Episodes (App Only) ----------
+// ---------- Series Episodes (Token-Enforced App Only) ----------
 async function loadEpisodes(movie) {
   if (!isRunningInsideApk()) return;
   var box = document.getElementById("modalEpisodesContainer");
@@ -1039,7 +1025,8 @@ function renderEpisodes(movie, eps, box) {
 
     var list = eps.filter(function (e) { return (Number(e.season_number) || 1) === activeSeason; });
     var grid = list.map(function (e) {
-      var playable = Boolean(e.stream_url_1 || e.stream_url_2);
+      var epLinkType = String(e.link_type || e.stream_type || movie.linkType || "token").toLowerCase().trim();
+      var playable = epLinkType === "token" && Boolean(e.stream_url_1 || e.stream_url_2);
       var sub = e.title ? '<span class="jj-ep-sub">' + escapeHTML(e.title) + '</span>' : "";
       return '<button type="button" class="jj-ep-btn' + (playable ? "" : " disabled") + '" data-ep="' + escapeHTML(e.id) + '"' + (playable ? "" : " disabled") + '>' +
         '<span class="jj-ep-num">▶ Episode ' + escapeHTML(e.episode_number) + '</span>' + sub + '</button>';
@@ -1054,8 +1041,15 @@ function renderEpisodes(movie, eps, box) {
       b.addEventListener("click", function () {
         var ep = eps.find(function (x) { return String(x.id) === b.getAttribute("data-ep"); });
         if (!ep) return;
+        var epLinkType = String(ep.link_type || ep.stream_type || movie.linkType || "token").toLowerCase().trim();
         var label = movie.title + " • S" + (Number(ep.season_number) || 1) + " • Episode " + ep.episode_number;
-        openServerSelection(label, safeStreamValue(ep.stream_url_1), safeStreamValue(ep.stream_url_2));
+        openServerSelection(
+          label,
+          safeTokenRefValue(ep.stream_url_1),
+          safeTokenRefValue(ep.stream_url_2),
+          epLinkType,
+          { id: movie.id, episodeId: ep.id }
+        );
       });
     });
   }
@@ -1073,16 +1067,17 @@ async function showMovieDetails(movieId) {
   var trailerLink = movie.trailer || ("https://www.youtube.com/results?search_query=" + encodeURIComponent(movie.title + " Telugu trailer"));
   var modalPosterSrc = getAdaptivePosterUrl(movie.poster);
   var seriesMode = isSeries(movie);
+  var hasTokenStream = movie.linkType === "token" && Boolean(movie.stream1 || movie.stream2);
 
-  // Watch Online & Episodes: ONLY in App (hidden on Website)
+  // Watch Online & Episodes: ONLY in App for token-protected streams
   var episodesSectionHTML = (inApp && seriesMode)
-    ? '<div class="jj-episodes-wrap"><div class="jj-episodes-head">▶ WATCH ONLINE <span class="jj-episodes-sub">⚡ Direct In-App Streaming</span></div><div id="modalEpisodesContainer"><p class="jj-ep-empty">Loading episodes...</p></div></div>'
+    ? '<div class="jj-episodes-wrap"><div class="jj-episodes-head">▶ WATCH ONLINE <span class="jj-episodes-sub">🔐 Token-Protected In-App Streaming</span></div><div id="modalEpisodesContainer"><p class="jj-ep-empty">Loading episodes...</p></div></div>'
     : "";
 
-  var bigWatchOnlineSectionHTML = (inApp && !seriesMode && Boolean(movie.stream1 || movie.stream2))
+  var bigWatchOnlineSectionHTML = (inApp && !seriesMode && hasTokenStream)
     ? '<div class="jj-watch-online-hero-wrap">' +
         '<button type="button" onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-big-watch-online"><span>▶</span> WATCH ONLINE (INSTANT HD PLAYER)</button>' +
-        '<div class="jj-watch-subtext">⚡ Direct In-App Streaming • No Download Required</div>' +
+        '<div class="jj-watch-subtext">🔐 Temporary Token Stream • No Download Required</div>' +
       '</div>'
     : "";
 
