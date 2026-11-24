@@ -26,10 +26,6 @@
       <a href="./jj-movies.apk" class="nav-download-app" download>
         <span>App</span>
       </a>
-      <!-- TV APK button -->
-      <a href="./jj-movies-tv.apk" class="nav-download-app" download>
-        <span>📺 TV App</span>
-      </a>
     </div>
   </header>
 
@@ -51,8 +47,6 @@
           <div class="banner-action-row">
             <a href="#collection" class="btn-banner-primary">⚡ Explore collection</a>
             <a href="./jj-movies.apk" class="btn-banner-secondary" download>⬇ Android App</a>
-            <!-- TV APK button -->
-            <a href="./jj-movies-tv.apk" class="btn-banner-secondary" download>📺 TV App</a>
           </div>
         </div>
       </div>
@@ -129,13 +123,6 @@
     <a href="./jj-movies.apk" class="footer-app-link" download>
       Download Android App
     </a>
-    <!-- TV APK button -->
-    <a href="./jj-movies-tv.apk" class="footer-app-link" download>
-      📺 Download Android TV App
-    </a>
-    <p style="font-size:12px;opacity:.7;margin-top:8px;">
-      TV lo install: Downloader app open chesi <b>jj-movies.pages.dev/tv</b> kottandi
-    </p>
   </footer>
 
   <!-- OTT Dark Blur Modal -->
@@ -146,22 +133,7 @@
     </div>
   </div>
 
-  <!-- 🎬 In-App VLC / Multi-Server Video Player Modal -->
-  <div id="inAppVideoModal" class="jj-player-modal-overlay" style="display:none;">
-    <div class="jj-player-modal-box">
-      <div class="jj-player-header">
-        <div class="jj-player-title-wrap">
-          <span class="jj-vlc-badge">▶ IN-APP PLAYER</span>
-          <h3 id="modalMovieTitle" class="jj-player-title">Playing Movie</h3>
-        </div>
-        <button type="button" class="jj-player-close" onclick="closeInAppPlayer()" aria-label="Close">&times;</button>
-      </div>
-      <div id="serverSwitchContainer" class="jj-server-bar"></div>
-      <div id="jjPlayerStage" class="jj-player-stage"></div>
-    </div>
-  </div>
-
-  <script src="app.js"></script>
+  <script src="app.js?v=2"></script>
   <script src="tv.js"></script>
   <script>
     function filterByCustomCategory(category, btnElement) {
