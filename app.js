@@ -3,9 +3,13 @@ var SUPABASE_KEY = "sb_publishable_902itkUPAUe272Q4B4jF0w_OEKDNuxr";
 var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 var TMDB_API_KEY = "200b7daf6101f22010cdd5eccea4a119";
 
-// Cloudflare Private Stream Worker Config
-var STREAM_WORKER_URL = "https://jj-movies-stream.geeras800.workers.dev";
+// Cloudflare Private Stream Worker Config (Fallback)
+var STREAM_WORKER_URL = "https://jj-movies-stream-1.geeras802.workers.dev";
 var STREAM_APP_SECRET = "JJ_Movies_2026_Jyoshna143";
+
+// Master Vault (Dynamic Active Stream Worker)
+var VAULT_SUPABASE_URL = "https://rdtixlacnhvnsyqmrrlv.supabase.co";
+var VAULT_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdGl4bGFjbmh2bnN5cW1ycmx2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU0MjI5OTEsImV4cCI6MjExMDk5ODk5MX0.Ask_nXWZHoQVfhsYmY9vAZrjwrUn_RLSOVMen_ZCg_E";
 
 // GitHub Release APK URL
 var JJ_RELEASE_APK_URL = "https://github.com/geeras866-lab/JJ-Movies/releases/download/jj-movies.apk/jj-movies.apk";
@@ -297,16 +301,41 @@ function safeStreamValue(value) {
   return safeURL(val);
 }
 
+var activeWorkerPromise = null;
+
+async function loadActiveStreamWorker() {
+  try {
+    var res = await fetch(VAULT_SUPABASE_URL + "/rest/v1/rpc/get_active_stream_url", {
+      method: "POST",
+      headers: {
+        apikey: VAULT_ANON_KEY,
+        Authorization: "Bearer " + VAULT_ANON_KEY,
+        "Content-Type": "application/json"
+      }
+    });
+    if (res.ok) {
+      var activeUrl = await res.json();
+      if (activeUrl && typeof activeUrl === "string") {
+        STREAM_WORKER_URL = activeUrl.trim().replace(/\/+$/, "");
+        console.log("Active Stream Worker:", STREAM_WORKER_URL);
+      }
+    }
+  } catch (e) {
+    console.warn("Vault worker fetch failed, using fallback:", STREAM_WORKER_URL);
+  }
+  return STREAM_WORKER_URL;
+}
+
 function extractWorkerFileName(rawUrl) {
   var val = String(rawUrl || "").trim();
   if (!val) return "";
 
-  if (val.indexOf(STREAM_WORKER_URL) === 0) {
+  if (val.indexOf(STREAM_WORKER_URL) === 0 || /^https?:\/\/[^\/]+\.workers\.dev\//i.test(val)) {
     try {
       var u = new URL(val);
       return decodeURIComponent(u.pathname.replace(/^\/+/, ""));
     } catch (e) {
-      return val.slice(STREAM_WORKER_URL.length).replace(/^\/+/, "").split("?")[0];
+      return val.replace(/^https?:\/\/[^\/]+/i, "").replace(/^\/+/, "").split("?")[0];
     }
   }
 
@@ -324,6 +353,9 @@ function isWorkerStreamLink(rawUrl) {
 async function resolvePlayableUrl(rawUrl) {
   var workerFile = extractWorkerFileName(rawUrl);
   if (workerFile) {
+    if (!activeWorkerPromise) activeWorkerPromise = loadActiveStreamWorker();
+    await activeWorkerPromise;
+
     var res = await fetch(
       STREAM_WORKER_URL + "/get-token?file=" + encodeURIComponent(workerFile),
       { headers: { "X-App-Key": STREAM_APP_SECRET } }
@@ -2017,6 +2049,7 @@ document.addEventListener("keydown", function (event) {
 });
 
 createExtraSections();
+activeWorkerPromise = loadActiveStreamWorker();
 loadMovies();
 initNeonFestivalMode();
 // checkApkUpdate();  // update popup disabled
@@ -2042,7 +2075,7 @@ function hideOfflineBar() {
 }
 
 window.addEventListener("offline", showOfflineBar);
-window.addEventListener("online", function () { hideOfflineBar(); loadMovies(); });
+window.addEventListener("online", function () { hideOfflineBar(); activeWorkerPromise = loadActiveStreamWorker(); loadMovies(); });
 if (navigator.onLine === false) showOfflineBar();
 
 (function initPullToRefresh() {
