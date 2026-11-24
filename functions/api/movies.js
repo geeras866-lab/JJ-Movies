@@ -4,8 +4,8 @@ export async function onRequestGet(context) {
   const type = url.searchParams.get("type") || "movies";
   const movieId = url.searchParams.get("movie_id");
 
-  const supabaseUrl = env.SUPABASE_URL;
-  const supabaseKey = env.SUPABASE_KEY;
+  const supabaseUrl = (env.SUPABASE_URL || "").trim().replace(/\/+$/, "");
+  const supabaseKey = (env.SUPABASE_KEY || "").trim();
 
   if (!supabaseUrl || !supabaseKey) {
     return new Response(JSON.stringify({ error: "Server config missing" }), {
@@ -34,17 +34,20 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const res = await fetch(endpoint, {
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
-        "Content-Type": "application/json"
-      }
-    });
+    const headers = {
+      apikey: supabaseKey,
+      "Content-Type": "application/json"
+    };
 
-    const data = await res.json();
+    // Only send Bearer token for legacy JWT keys (not sb_publishable_ keys)
+    if (supabaseKey.startsWith("eyJ")) {
+      headers.Authorization = `Bearer ${supabaseKey}`;
+    }
 
-    return new Response(JSON.stringify(data), {
+    const res = await fetch(endpoint, { headers });
+    const data = await res.text();
+
+    return new Response(data, {
       status: res.status,
       headers: {
         "Content-Type": "application/json",
@@ -52,7 +55,7 @@ export async function onRequestGet(context) {
       }
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: "Failed to fetch data" }), {
+    return new Response(JSON.stringify({ error: "Failed to fetch data", details: err.message }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
