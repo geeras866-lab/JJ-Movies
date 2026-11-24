@@ -1,18 +1,3 @@
-async function signToken(secret, message) {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(message));
-  return Array.from(new Uint8Array(signature))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 async function getActiveWorkerUrl(env) {
   if (env.VAULT_SUPABASE_URL && env.VAULT_ANON_KEY) {
     try {
@@ -66,18 +51,32 @@ export async function onRequestGet(context) {
     });
   }
 
-  // 10 minutes expiry
-  const exp = Math.floor(Date.now() / 1000) + 600;
-  const payload = `${file}:${exp}`;
-  const token = await signToken(secret, payload);
+  try {
+    // Nee existing worker.js /get-token endpoint ni server-side nundi call chesthundi
+    const workerRes = await fetch(
+      `${workerUrl}/get-token?file=${encodeURIComponent(file)}`,
+      {
+        method: "GET",
+        headers: {
+          "X-App-Key": secret,
+          "Origin": "https://jj-movies.pages.dev"
+        }
+      }
+    );
 
-  const streamUrl = `${workerUrl}/stream?file=${encodeURIComponent(file)}&exp=${exp}&token=${token}`;
+    const data = await workerRes.text();
 
-  return new Response(JSON.stringify({ url: streamUrl, exp }), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "no-store"
-    }
-  });
+    return new Response(data, {
+      status: workerRes.status,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store"
+      }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Failed to reach stream worker" }), {
+      status: 502,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
 }
