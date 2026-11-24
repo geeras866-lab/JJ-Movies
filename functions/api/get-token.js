@@ -1,38 +1,38 @@
 async function getActiveWorkerUrl(env) {
+  // 1. Try active cf_accounts row from Supabase if configured
   if (env.VAULT_SUPABASE_URL && env.VAULT_ANON_KEY) {
     try {
       const res = await fetch(
-        `${env.VAULT_SUPABASE_URL}/rest/v1/rpc/get_active_stream_url`,
+        `${env.VAULT_SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/cf_accounts?select=stream_url&is_active=eq.true&limit=1`,
         {
-          method: "POST",
           headers: {
             apikey: env.VAULT_ANON_KEY,
-            Authorization: `Bearer ${env.VAULT_ANON_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({})
+            Authorization: `Bearer ${env.VAULT_ANON_KEY}`
+          }
         }
       );
 
       if (res.ok) {
-        const data = await res.json();
-        const activeUrl = typeof data === "string" ? data : data?.url || data?.worker_url;
+        const rows = await res.json();
+        const activeUrl = rows?.[0]?.stream_url ? String(rows[0].stream_url).trim() : "";
         if (activeUrl && activeUrl.startsWith("http")) {
           return activeUrl.replace(/\/+$/, "");
         }
       }
     } catch (_) {
-      // Fallback to env.STREAM_WORKER_URL below
+      // Fallback below
     }
   }
 
-  return (env.STREAM_WORKER_URL || "").replace(/\/+$/, "");
+  // 2. Fallback to STREAM_WORKER_URL env var
+  return String(env.STREAM_WORKER_URL || "").trim().replace(/\/+$/, "");
 }
 
 export async function onRequestGet(context) {
   const { env, request } = context;
   const url = new URL(request.url);
-  const file = url.searchParams.get("file") || url.searchParams.get("ref");
+  const rawFile = url.searchParams.get("file") || url.searchParams.get("ref") || "";
+  const file = rawFile.trim().replace(/^\/+/, "");
 
   if (!file) {
     return new Response(JSON.stringify({ error: "Missing file parameter" }), {
@@ -41,7 +41,7 @@ export async function onRequestGet(context) {
     });
   }
 
-  const secret = env.STREAM_APP_SECRET;
+  const secret = String(env.STREAM_APP_SECRET || env.APP_SECRET || "").trim();
   const workerUrl = await getActiveWorkerUrl(env);
 
   if (!secret || !workerUrl) {
