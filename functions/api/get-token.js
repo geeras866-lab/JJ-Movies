@@ -32,7 +32,7 @@ async function getActiveWorkerUrl(env) {
 export async function onRequestGet(context) {
   const { env, request } = context;
   const url = new URL(request.url);
-  const file = url.searchParams.get("file");
+  const file = url.searchParams.get("file") || url.searchParams.get("ref");
 
   if (!file) {
     return new Response(JSON.stringify({ error: "Missing file parameter" }), {
@@ -52,7 +52,6 @@ export async function onRequestGet(context) {
   }
 
   try {
-    // Nee existing worker.js /get-token endpoint ni server-side nundi call chesthundi
     const workerRes = await fetch(
       `${workerUrl}/get-token?file=${encodeURIComponent(file)}`,
       {
