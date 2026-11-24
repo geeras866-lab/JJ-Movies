@@ -20,6 +20,8 @@ export async function onRequestGet(context) {
     endpoint = `${supabaseUrl}/rest/v1/movies?is_published=eq.true&order=created_at.desc`;
   } else if (type === "episodes" && movieId) {
     endpoint = `${supabaseUrl}/rest/v1/episodes?movie_id=eq.${encodeURIComponent(movieId)}&order=episode_number.asc`;
+  } else if (type === "versions" && movieId) {
+    endpoint = `${supabaseUrl}/rest/v1/movie_versions?select=*&movie_id=eq.${encodeURIComponent(movieId)}&order=sort_order.asc`;
   } else if (type === "settings") {
     endpoint = `${supabaseUrl}/rest/v1/site_settings?select=*`;
   } else if (type === "messages") {
