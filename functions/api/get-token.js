@@ -45,10 +45,17 @@ export async function onRequestGet(context) {
   const workerUrl = await getActiveWorkerUrl(env);
 
   if (!secret || !workerUrl) {
-    return new Response(JSON.stringify({ error: "Stream config missing" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(
+      JSON.stringify({
+        error: "Stream config missing",
+        hasSecret: Boolean(secret),
+        hasWorkerUrl: Boolean(workerUrl)
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
   }
 
   try {
@@ -73,9 +80,12 @@ export async function onRequestGet(context) {
       }
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: "Failed to reach stream worker" }), {
-      status: 502,
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(
+      JSON.stringify({ error: "Failed to reach stream worker", details: err.message }),
+      {
+        status: 502,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
   }
 }
