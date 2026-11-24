@@ -1,5 +1,4 @@
 async function getActiveWorkerUrl(env) {
-  // 1. Try active cf_accounts row from Supabase if configured
   if (env.VAULT_SUPABASE_URL && env.VAULT_ANON_KEY) {
     try {
       const res = await fetch(
@@ -20,11 +19,10 @@ async function getActiveWorkerUrl(env) {
         }
       }
     } catch (_) {
-      // Fallback below
+      // Fallback to env.STREAM_WORKER_URL below
     }
   }
 
-  // 2. Fallback to STREAM_WORKER_URL env var
   return String(env.STREAM_WORKER_URL || "").trim().replace(/\/+$/, "");
 }
 
