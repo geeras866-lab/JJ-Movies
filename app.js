@@ -54,20 +54,13 @@ async function fetchFromApi(type, params) {
   return res.json();
 }
 
-// Token-only stream resolver: permanent direct URLs are never returned raw
-async function resolveTokenStreamUrl(rawUrl, linkType, meta) {
-  var mode = String(linkType || "token").toLowerCase().trim();
-  if (mode !== "token") {
-    throw new Error("Only token-protected streams are allowed.");
-  }
+// Direct helper: pass plain fileName (e.g. "418 (2026)...mkv" or "b2_1/418 (2026)...mkv")
+async function fetchSignedUrlByFileName(fileName, meta) {
+  var cleanFile = String(fileName || "").trim().replace(/^\/+/, "");
+  if (!cleanFile) throw new Error("Missing file name");
 
-  var workerFile = extractWorkerFileName(rawUrl);
   var queryParams = new URLSearchParams();
-  if (workerFile) {
-    queryParams.set("file", workerFile);
-  } else if (rawUrl) {
-    queryParams.set("ref", String(rawUrl).trim());
-  }
+  queryParams.set("file", cleanFile);
   if (meta && meta.id) queryParams.set("id", String(meta.id));
   if (meta && meta.episodeId) queryParams.set("episode_id", String(meta.episodeId));
 
@@ -81,6 +74,68 @@ async function resolveTokenStreamUrl(rawUrl, linkType, meta) {
   if (!data || !data.url) throw new Error("Invalid token stream response");
   return String(data.url).trim();
 }
+
+// Token-only stream resolver: permanent direct URLs are never returned raw
+async function resolveTokenStreamUrl(rawUrl, linkType, meta) {
+  var mode = String(linkType || "token").toLowerCase().trim();
+  if (mode !== "token") {
+    throw new Error("Only token-protected streams are allowed.");
+  }
+
+  var workerFile = extractWorkerFileName(rawUrl);
+  if (workerFile) {
+    return fetchSignedUrlByFileName(workerFile, meta);
+  }
+
+  var queryParams = new URLSearchParams();
+  if (rawUrl) queryParams.set("ref", String(rawUrl).trim());
+  if (meta && meta.id) queryParams.set("id", String(meta.id));
+  if (meta && meta.episodeId) queryParams.set("episode_id", String(meta.episodeId));
+
+  var res = await fetch(API_BASE + "/get-token?" + queryParams.toString(), {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "no-store"
+  });
+  if (!res.ok) throw new Error("Token generation failed: " + res.status);
+  var data = await res.json();
+  if (!data || !data.url) throw new Error("Invalid token stream response");
+  return String(data.url).trim();
+}
+
+// Direct function to play directly by passing only fileName
+async function playMovieByFileName(fileName, title) {
+  var cleanFile = String(fileName || "").trim().replace(/^\/+/, "");
+  if (!cleanFile) return;
+
+  var playTitle = title || cleanFile.replace(/\.[^/.]+$/, "");
+  currentActiveMovieTitle = playTitle;
+
+  var signedUrl = await fetchSignedUrlByFileName(cleanFile);
+  currentActiveStreamUrl = signedUrl;
+
+  if (hasNativeVlcBridge()) {
+    launchNativeVlc(signedUrl, playTitle);
+    return signedUrl;
+  }
+
+  ensureInAppPlayerModal();
+  var modal = document.getElementById("inAppVideoModal");
+  var titleElem = document.getElementById("modalMovieTitle");
+  var serverContainer = document.getElementById("serverSwitchContainer");
+  if (titleElem) titleElem.textContent = playTitle;
+  if (serverContainer) serverContainer.innerHTML = "";
+  if (modal) {
+    modal.style.display = "flex";
+    modal.style.visibility = "visible";
+    modal.style.opacity = "1";
+    modal.style.zIndex = "99999";
+  }
+
+  await playMovieStream(signedUrl, playTitle, "token");
+  return signedUrl;
+}
+window.playMovieByFileName = playMovieByFileName;
 
 // ---------- Basic Helpers ----------
 function escapeHTML(value) {
@@ -164,14 +219,17 @@ function isDirectVideoFile(url) {
   return /\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(url);
 }
 
-function isB2PrefixedFile(val) {
-  return /^[a-zA-Z0-9_-]+\/.+\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(String(val || "").trim());
+function isPlainOrB2FileName(val) {
+  var s = String(val || "").trim().replace(/^\/+/, "");
+  if (!s || /^https?:\/\//i.test(s)) return false;
+  // Supports both "movie.mkv" and "b2_1/movie.mkv" (even with spaces, brackets, or plus signs)
+  return /^[a-zA-Z0-9_-]+\/.+$/.test(s) || s.indexOf("/") === -1;
 }
 
 function safeTokenRefValue(value) {
   var val = String(value || "").trim();
   if (!val) return "";
-  if (!/^https?:\/\//i.test(val) && (isB2PrefixedFile(val) || (val.indexOf("/") === -1 && isDirectVideoFile(val)))) {
+  if (isPlainOrB2FileName(val)) {
     return val;
   }
   return safeURL(val);
@@ -190,8 +248,8 @@ function extractWorkerFileName(rawUrl) {
     }
   }
 
-  if (!/^https?:\/\//i.test(val) && (isB2PrefixedFile(val) || (val.indexOf("/") === -1 && isDirectVideoFile(val)))) {
-    return val;
+  if (isPlainOrB2FileName(val)) {
+    return val.replace(/^\/+/, "");
   }
 
   return "";
@@ -405,7 +463,11 @@ async function playMovieStream(rawUrl, title, linkType, meta) {
 
   var url = "";
   try {
-    url = await resolveTokenStreamUrl(raw, linkType, meta);
+    if (/^https?:\/\//i.test(raw) && /[?&]sig=/i.test(raw)) {
+      url = raw;
+    } else {
+      url = await resolveTokenStreamUrl(raw, linkType, meta);
+    }
   } catch (err) {
     stage.innerHTML = '<div style="color:#f87171;padding:20px;text-align:center;font-size:13px;">Token Error: ' + escapeHTML(err.message) + '</div>';
     return;
@@ -433,7 +495,7 @@ async function playMovieStream(rawUrl, title, linkType, meta) {
     video.style.objectFit = "contain";
 
     video.addEventListener("error", function () {
-      stage.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;font-size:13px;">Token stream expired or failed. Please reopen video.</div>';
+      stage.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;font-size:13px;">Unable to decode in browser player (MKV/HEVC/DD+ may require VLC). Please reopen video.</div>';
     });
 
     if (/\.m3u8(\?.*)?$/i.test(url) && !video.canPlayType("application/vnd.apple.mpegurl")) {
