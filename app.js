@@ -1,5 +1,6 @@
 // Zero external URLs, zero API keys, zero secrets, zero GitHub references
 var API_BASE = "./api";
+var TELEGRAM_BOT_USERNAME = "jj_files_bot";
 
 var movies = [];
 var movieGrid = document.getElementById("movieGrid");
@@ -104,6 +105,12 @@ function safeURL(value) {
   return val;
 }
 
+function buildTelegramBotStartUrl(versionOrId) {
+  var payload = String(versionOrId == null ? "" : versionOrId).trim();
+  if (!payload) return "https://t.me/" + TELEGRAM_BOT_USERNAME;
+  return "https://t.me/" + TELEGRAM_BOT_USERNAME + "?start=" + encodeURIComponent(payload);
+}
+
 function isSeries(movie) {
   return Boolean(movie && movie.type === "series");
 }
@@ -188,11 +195,6 @@ function extractWorkerFileName(rawUrl) {
   }
 
   return "";
-}
-
-function isTokenEligibleLink(rawUrl, linkType) {
-  var mode = String(linkType || "token").toLowerCase().trim();
-  return mode === "token" && Boolean(String(rawUrl || "").trim());
 }
 
 function launchNativeVlc(playableUrl, title) {
@@ -781,7 +783,7 @@ function renderShowcaseCarousel() {
             (movie.runtime ? '<span class="banner-badge-tag">' + escapeHTML(movie.runtime) + '</span>' : '') +
           '</div>' +
           '<h1 class="banner-title">' + escapeHTML(movie.title) + '</h1>' +
-          '<p class="banner-desc">' + escapeHTML(movie.description || "Explore details and available formats.") + '</p>' +
+          '<p class="banner-desc">' + escapeHTML(movie.description || (inApp ? "Explore details and available formats." : "Grab complete downloads and quality prints on Telegram bot.")) + '</p>' +
           '<div class="banner-action-row">' +
             '<button onclick="showMovieDetails(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-primary">' + (isSeries(movie) ? "⚡ View Series Details" : "⚡ View Movie Details") + '</button>' +
             (hasTokenStream ? '<button onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : '') +
@@ -902,7 +904,7 @@ function createMovieCard(movie) {
   button.type = "button";
   button.textContent = inApp
     ? (isSeries(movie) || (movie.linkType === "token" && (movie.stream1 || movie.stream2)) ? "▶ Watch Now" : "View Details")
-    : "⚡ View Details";
+    : "⚡ Get Files in Bot";
   button.addEventListener("click", function () { showMovieDetails(movie.id); });
 
   info.appendChild(title);
@@ -1081,9 +1083,9 @@ async function showMovieDetails(movieId) {
       '</div>'
     : "";
 
-  // Telegram Downloads / Prints: ONLY on Website (hidden in Normal App)
+  // Telegram Downloads / Prints via jj_files_bot: ONLY on Website (hidden in App)
   var printsSectionHTML = !inApp
-    ? '<div class="prints-header-bar"><span>Available Quality Prints</span><span class="status-dot-active">● Ready</span></div>' +
+    ? '<div class="prints-header-bar"><span>Available Quality Prints</span><span class="status-dot-active">● Ready via @' + escapeHTML(TELEGRAM_BOT_USERNAME) + '</span></div>' +
       '<div id="modalVersionContainer"><p style="color:#64748b;font-size:12px;text-align:center;padding:16px 0;">Loading prints...</p></div>'
     : "";
 
@@ -1133,7 +1135,7 @@ async function showMovieDetails(movieId) {
     shareAnchor.href = "https://api.whatsapp.com/send?text=" + encodeURIComponent(customText);
   }
 
-  // Load prints ONLY on Website
+  // Load prints via jj_files_bot ONLY on Website
   if (!inApp) {
     try {
       var versions = await fetchFromApi("versions", { movie_id: movieId });
@@ -1146,14 +1148,14 @@ async function showMovieDetails(movieId) {
       }
 
       container.innerHTML = '<div class="version-list-grid">' + versions.map(function (v) {
-        var link = v.bot_url || v.viewing_url || "#";
+        var botURL = v.bot_url ? safeURL(v.bot_url) : buildTelegramBotStartUrl(v.id);
         return (
           '<div class="version-tile">' +
             '<div class="version-tile-info">' +
               '<span class="version-quality-title">💾 ' + escapeHTML(v.quality || "Standard") + '</span>' +
               '<span class="version-audio-sub">Audio: ' + escapeHTML(v.audio_language || "Telugu") + '</span>' +
             '</div>' +
-            '<a class="btn-tele-bot" href="' + escapeHTML(link) + '" target="_blank" rel="noopener noreferrer">⚡ Get File</a>' +
+            '<a class="btn-tele-bot" href="' + escapeHTML(botURL) + '" target="_blank" rel="noopener noreferrer">⚡ Get Files in Bot</a>' +
           '</div>'
         );
       }).join("") + '</div>';
