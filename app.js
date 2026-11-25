@@ -159,7 +159,7 @@ function isDirectVideoFile(url) {
 function isPlainOrB2FileName(val) {
   var s = String(val || "").trim().replace(/^\/+/, "");
   if (!s || /^https?:\/\//i.test(s)) return false;
-  if (/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(s)) return false; // ignore domain links like filemoon.sx/...
+  if (/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(s)) return false;
   return /^[a-zA-Z0-9_-]+\/.+$/.test(s) || (s.indexOf("/") === -1 && isDirectVideoFile(s));
 }
 
@@ -173,6 +173,14 @@ function safeTokenRefValue(value) {
 function extractWorkerFileName(rawUrl) {
   var val = String(rawUrl || "").trim();
   if (!val) return "";
+
+  // Fix old DB entries saved as "https://b2_1/filename.mkv"
+  var b2FakeUrl = val.match(/^https?:\/\/(b2_[a-zA-Z0-9_-]+)\/(.+)$/i);
+  if (b2FakeUrl) {
+    var pathPart = b2FakeUrl[2].split("?")[0];
+    try { pathPart = decodeURIComponent(pathPart); } catch (e) {}
+    return b2FakeUrl[1] + "/" + pathPart;
+  }
 
   if (/^https?:\/\/[^\/]+\.workers\.dev\//i.test(val)) {
     try {
