@@ -99,6 +99,19 @@ hr{border-color:#303a50;margin:24px 0}
       <span id="festivalStatusMsg" style="margin-left:10px; font-size:14px; font-weight:bold; color:#00f0ff;"></span>
     </div>
 
+    <!-- WEBSITE APP DOWNLOAD LINK MANAGER -->
+    <div class="panel" style="border: 1px solid #ff3867;">
+      <h2 style="color:#ff3867;">📲 Website App Download Link</h2>
+      <p class="muted">Website lo unna 3 App Download buttons (<code>#navAppDownloadLink</code>, <code>#bannerAppDownloadLink</code>, <code>#footerAppDownloadLink</code>) ki baita nunchi APK link ikkade update cheyandi.</p>
+
+      <label for="appDownloadUrlInput">APK Download URL</label>
+      <input id="appDownloadUrlInput" type="url" placeholder="https://example.com/jj-movies.apk">
+
+      <button type="button" id="btnSaveAppLink">Save App Link</button>
+      <button type="button" id="btnResetAppLink" class="secondary">Reset to ./jj-movies.apk</button>
+      <span id="appLinkStatusMsg" style="margin-left:10px; font-size:14px; font-weight:bold; color:#ff3867;"></span>
+    </div>
+
     <!-- ADD / EDIT MOVIE PANEL -->
     <div class="panel">
       <h2 id="formTitle">Add Movie</h2>
@@ -396,6 +409,12 @@ hr{border-color:#303a50;margin:24px 0}
   var btnSaveFestival = document.getElementById("btnSaveFestival");
   var festivalStatusMsg = document.getElementById("festivalStatusMsg");
 
+  // App Download Link Elements
+  var appDownloadUrlInput = document.getElementById("appDownloadUrlInput");
+  var btnSaveAppLink = document.getElementById("btnSaveAppLink");
+  var btnResetAppLink = document.getElementById("btnResetAppLink");
+  var appLinkStatusMsg = document.getElementById("appLinkStatusMsg");
+
   function showMessage(text) { message.textContent = text; }
 
   function isDirectVideoFile(val) {
@@ -422,6 +441,15 @@ hr{border-color:#303a50;margin:24px 0}
   function safeHttpUrl(value) {
     if (!value) return "";
     try { var p = new URL(value); return p.protocol === "http:" || p.protocol === "https:" ? p.href : ""; } catch(e) { return ""; }
+  }
+
+  function normalizeAppLinkValue(value) {
+    var raw = String(value || "").trim();
+    if (!raw) return "";
+    if (raw === "./jj-movies.apk" || raw === "/jj-movies.apk" || raw === "jj-movies.apk") {
+      return "./jj-movies.apk";
+    }
+    return safeHttpUrl(raw);
   }
 
   function makeElement(tag, className, text) {
@@ -459,6 +487,7 @@ hr{border-color:#303a50;margin:24px 0}
     loadMovies();
     loadAnnouncements();
     loadFestivalSettings();
+    loadAppDownloadLink();
   }
 
   // --- FESTIVAL SETTINGS LOGIC ---
@@ -491,6 +520,49 @@ hr{border-color:#303a50;margin:24px 0}
       festivalStatusMsg.textContent = "✅ Saved Successfully!";
     }
     setTimeout(function () { festivalStatusMsg.textContent = ""; }, 3500);
+  });
+
+  // --- APP DOWNLOAD LINK MANAGER LOGIC ---
+  async function loadAppDownloadLink() {
+    try {
+      var res = await supabase.from("site_settings").select("value").eq("key", "app_download_config").single();
+      if (res.data && res.data.value && res.data.value.url) {
+        appDownloadUrlInput.value = res.data.value.url;
+      }
+    } catch (err) {
+      console.warn("Could not load app download link:", err);
+    }
+  }
+
+  btnSaveAppLink.addEventListener("click", async function () {
+    var cleanUrl = normalizeAppLinkValue(appDownloadUrlInput.value);
+    if (!cleanUrl) {
+      appLinkStatusMsg.textContent = "❌ Valid URL ivvandi.";
+      return;
+    }
+    appLinkStatusMsg.textContent = "Saving...";
+    var res = await supabase.from("site_settings").upsert({
+      key: "app_download_config",
+      value: { url: cleanUrl }
+    });
+    if (res.error) {
+      appLinkStatusMsg.textContent = "❌ Failed: " + res.error.message;
+    } else {
+      appDownloadUrlInput.value = cleanUrl;
+      appLinkStatusMsg.textContent = "✅ Saved Successfully!";
+    }
+    setTimeout(function () { appLinkStatusMsg.textContent = ""; }, 3500);
+  });
+
+  btnResetAppLink.addEventListener("click", async function () {
+    appDownloadUrlInput.value = "./jj-movies.apk";
+    appLinkStatusMsg.textContent = "Saving...";
+    var res = await supabase.from("site_settings").upsert({
+      key: "app_download_config",
+      value: { url: "./jj-movies.apk" }
+    });
+    appLinkStatusMsg.textContent = res.error ? "❌ Failed: " + res.error.message : "✅ Reset to ./jj-movies.apk!";
+    setTimeout(function () { appLinkStatusMsg.textContent = ""; }, 3500);
   });
 
   document.getElementById("loginForm").addEventListener("submit", async function (e) {
