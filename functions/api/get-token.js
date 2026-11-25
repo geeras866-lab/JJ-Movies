@@ -20,8 +20,9 @@ async function resolveWorkerUrl(env) {
         }
       });
 
+      const bodyText = await res.text();
       if (res.ok) {
-        const rows = await res.json();
+        const rows = JSON.parse(bodyText);
         const activeUrl =
           rows && rows[0] && rows[0].stream_url
             ? String(rows[0].stream_url).trim()
@@ -30,17 +31,39 @@ async function resolveWorkerUrl(env) {
           return {
             workerUrl: activeUrl.replace(/\/+$/, ""),
             source: "vault_db",
-            activeId: rows[0].id || null
+            activeId: rows[0].id || null,
+            vaultDebug: { ok: true, status: res.status, count: rows.length }
           };
         }
+        return {
+          workerUrl: fallbackUrl,
+          source: "env_fallback",
+          activeId: null,
+          vaultDebug: { ok: true, status: res.status, count: rows.length, reason: "no_active_row_or_empty_url" }
+        };
       }
-    } catch (_) {}
+
+      return {
+        workerUrl: fallbackUrl,
+        source: "env_fallback",
+        activeId: null,
+        vaultDebug: { ok: false, status: res.status, error: bodyText.slice(0, 120) }
+      };
+    } catch (err) {
+      return {
+        workerUrl: fallbackUrl,
+        source: "env_fallback",
+        activeId: null,
+        vaultDebug: { ok: false, error: err && err.message ? err.message : String(err) }
+      };
+    }
   }
 
   return {
     workerUrl: fallbackUrl,
     source: "env_fallback",
-    activeId: null
+    activeId: null,
+    vaultDebug: { ok: false, reason: "missing_url_or_key" }
   };
 }
 
@@ -58,7 +81,7 @@ export async function onRequestGet(context) {
   }
 
   const secret = String(env.STREAM_APP_SECRET || env.APP_SECRET || "").trim();
-  const { workerUrl, source, activeId } = await resolveWorkerUrl(env);
+  const { workerUrl, source, activeId, vaultDebug } = await resolveWorkerUrl(env);
 
   if (!secret || !workerUrl) {
     return new Response(
@@ -66,7 +89,8 @@ export async function onRequestGet(context) {
         error: "Stream config missing",
         hasSecret: Boolean(secret),
         hasWorkerUrl: Boolean(workerUrl),
-        source
+        source,
+        vault_debug: vaultDebug
       }),
       {
         status: 500,
@@ -94,8 +118,8 @@ export async function onRequestGet(context) {
     try { parsed = JSON.parse(text); } catch (_) {}
 
     const payload = parsed && typeof parsed === "object"
-      ? { ...parsed, source, active_cf_id: activeId }
-      : { raw: text, source, active_cf_id: activeId };
+      ? { ...parsed, source, active_cf_id: activeId, vault_debug: vaultDebug }
+      : { raw: text, source, active_cf_id: activeId, vault_debug: vaultDebug };
 
     return new Response(JSON.stringify(payload), {
       status: workerRes.status,
@@ -106,6 +130,7 @@ export async function onRequestGet(context) {
       JSON.stringify({
         error: "Failed to reach stream worker",
         source,
+        vault_debug: vaultDebug,
         details: err && err.message ? err.message : String(err)
       }),
       {
