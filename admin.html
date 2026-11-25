@@ -139,7 +139,7 @@ hr{border-color:#303a50;margin:24px 0}
         <!-- 🎬 OPTIONAL IN-APP STREAMING LINKS -->
         <div class="stream-box" id="movieStreamBox">
           <h3 style="color:#ff3867; margin-bottom:6px;">▶ Watch Online - Streaming Servers (Optional)</h3>
-          <p class="muted" style="margin-top:0;">Backblaze B2 filename (<code>Movie_2026_1080p.mkv</code>), Worker URL, Pixeldrain (<code>https://pixeldrain.com/u/...</code>), leda Direct (<code>.mp4</code>/<code>.mkv</code>/<code>.m3u8</code>) links ivvandi. Khali ga vadilesthe Watch Online button kanipinchadu.</p>
+          <p class="muted" style="margin-top:0;">Backblaze B2 filename (<code>Movie_2026_1080p.mkv</code> or <code>b2_1/Movie_2026_1080p.mkv</code>), Worker URL, Pixeldrain (<code>https://pixeldrain.com/u/...</code>), leda Direct (<code>.mp4</code>/<code>.mkv</code>/<code>.m3u8</code>) links ivvandi. Khali ga vadilesthe Watch Online button kanipinchadu.</p>
 
           <label for="streamUrl1">⚡ Server 1 (B2 Filename or Stream URL)</label>
           <input id="streamUrl1" type="text" placeholder="Movie_2026_1080p.mkv or https://pixeldrain.com/u/...">
@@ -241,7 +241,7 @@ hr{border-color:#303a50;margin:24px 0}
     <!-- QUICK STREAM SERVER MANAGER PANEL -->
     <div class="panel" style="border: 1px solid #ff3867;">
       <h2 style="color:#ff3867;">▶ Quick Online Stream Manager (Server 1 & Server 2)</h2>
-      <p class="muted">Edaina movie select chesi direct ga Backblaze B2 filename (<code>movie.mkv</code>) leda Server 1 & Server 2 links add/remove cheyochu.</p>
+      <p class="muted">Edaina movie select chesi direct ga Backblaze B2 filename (<code>movie.mkv</code> or <code>b2_1/movie.mkv</code>) leda Server 1 & Server 2 links add/remove cheyochu.</p>
       <form id="quickStreamForm">
         <label for="streamMovieSelect">Select Movie *</label>
         <select id="streamMovieSelect" required><option value="">Loading movies...</option></select>
@@ -405,9 +405,9 @@ hr{border-color:#303a50;margin:24px 0}
   function normalizeStreamInputUrl(value) {
     var raw = String(value || "").trim();
     if (!raw) return "";
-    // Plain Backblaze B2 filename (e.g. Movie_2026_1080p.mkv) -> save as-is
-    if (!/^https?:\/\//i.test(raw) && raw.indexOf("/") === -1 && isDirectVideoFile(raw)) {
-      return raw;
+    // Plain B2 filename ("418...mkv") OR B2 prefixed ("b2_1/418...mkv") -> save as-is
+    if (!/^https?:\/\//i.test(raw) && isDirectVideoFile(raw)) {
+      return raw.replace(/^\/+/, "");
     }
     // Plain Pixeldrain ID
     if (/^[A-Za-z0-9_-]{6,20}$/.test(raw)) {
