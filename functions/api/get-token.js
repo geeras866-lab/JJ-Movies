@@ -1,14 +1,15 @@
-async function getActiveWorkerUrl(env) {
+async function resolveWorkerUrl(env) {
   const vaultUrl = String(env.VAULT_SUPABASE_URL || env.MAIN_SB_URL || "").trim();
   const vaultKey = String(
     env.VAULT_SERVICE_KEY || env.MAIN_SB_KEY || env.VAULT_ANON_KEY || ""
   ).trim();
+  const fallbackUrl = String(env.STREAM_WORKER_URL || "").trim().replace(/\/+$/, "");
 
   if (vaultUrl && vaultKey) {
     try {
       const endpoint =
         vaultUrl.replace(/\/+$/, "") +
-        "/rest/v1/cf_accounts?select=stream_url&is_active=eq.true&limit=1";
+        "/rest/v1/cf_accounts?select=id,is_active,stream_url&is_active=eq.true&limit=1";
 
       const res = await fetch(endpoint, {
         cache: "no-store",
@@ -25,17 +26,22 @@ async function getActiveWorkerUrl(env) {
           rows && rows[0] && rows[0].stream_url
             ? String(rows[0].stream_url).trim()
             : "";
-
         if (activeUrl && /^https?:\/\//i.test(activeUrl)) {
-          return activeUrl.replace(/\/+$/, "");
+          return {
+            workerUrl: activeUrl.replace(/\/+$/, ""),
+            source: "vault_db",
+            activeId: rows[0].id || null
+          };
         }
       }
-    } catch (_) {
-      // Fallback to env.STREAM_WORKER_URL below
-    }
+    } catch (_) {}
   }
 
-  return String(env.STREAM_WORKER_URL || "").trim().replace(/\/+$/, "");
+  return {
+    workerUrl: fallbackUrl,
+    source: "env_fallback",
+    activeId: null
+  };
 }
 
 export async function onRequestGet(context) {
@@ -47,29 +53,24 @@ export async function onRequestGet(context) {
   if (!file) {
     return new Response(JSON.stringify({ error: "Missing file parameter" }), {
       status: 400,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store"
-      }
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }
     });
   }
 
   const secret = String(env.STREAM_APP_SECRET || env.APP_SECRET || "").trim();
-  const workerUrl = await getActiveWorkerUrl(env);
+  const { workerUrl, source, activeId } = await resolveWorkerUrl(env);
 
   if (!secret || !workerUrl) {
     return new Response(
       JSON.stringify({
         error: "Stream config missing",
         hasSecret: Boolean(secret),
-        hasWorkerUrl: Boolean(workerUrl)
+        hasWorkerUrl: Boolean(workerUrl),
+        source
       }),
       {
         status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-store"
-        }
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }
       }
     );
   }
@@ -88,27 +89,28 @@ export async function onRequestGet(context) {
       }
     );
 
-    const data = await workerRes.text();
+    const text = await workerRes.text();
+    let parsed = null;
+    try { parsed = JSON.parse(text); } catch (_) {}
 
-    return new Response(data, {
+    const payload = parsed && typeof parsed === "object"
+      ? { ...parsed, source, active_cf_id: activeId }
+      : { raw: text, source, active_cf_id: activeId };
+
+    return new Response(JSON.stringify(payload), {
       status: workerRes.status,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store"
-      }
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }
     });
   } catch (err) {
     return new Response(
       JSON.stringify({
         error: "Failed to reach stream worker",
+        source,
         details: err && err.message ? err.message : String(err)
       }),
       {
         status: 502,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-store"
-        }
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }
       }
     );
   }
