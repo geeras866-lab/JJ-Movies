@@ -253,11 +253,11 @@ public class VlcPlayerActivity extends AppCompatActivity {
         controlsOverlay.setOnTouchListener(touchListener);
 
         ArrayList<String> options = new ArrayList<>();
-        options.add("--aout=opensles");
         options.add("--audio-time-stretch");
-        options.add("--network-caching=2500");
+        options.add("--network-caching=3000");
         options.add("--file-caching=1500");
-        options.add("--live-caching=2500");
+        options.add("--live-caching=3000");
+        options.add("--http-reconnect");
 
         libVLC = new LibVLC(this, options);
         mediaPlayer = new MediaPlayer(libVLC);
@@ -279,11 +279,16 @@ public class VlcPlayerActivity extends AppCompatActivity {
             }
         }));
 
-        String safeUrl = videoUrl.trim().replace(" ", "%20");
+        String safeUrl = videoUrl.trim()
+                .replace(" ", "%20")
+                .replace("(", "%28")
+                .replace(")", "%29");
+
         Media media = new Media(libVLC, Uri.parse(safeUrl));
-        media.setHWDecoderEnabled(true, false);
-        media.addOption(":network-caching=2500");
+        media.setHWDecoderEnabled(true, true);
+        media.addOption(":network-caching=3000");
         media.addOption(":http-reconnect");
+        media.addOption(":http-user-agent=Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
         mediaPlayer.setMedia(media);
         media.release();
 
