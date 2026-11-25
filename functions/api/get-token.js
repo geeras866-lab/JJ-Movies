@@ -1,21 +1,32 @@
 async function getActiveWorkerUrl(env) {
-  const vaultKey = String(env.VAULT_SERVICE_KEY || env.VAULT_ANON_KEY || "").trim();
-  if (env.VAULT_SUPABASE_URL && vaultKey) {
+  const vaultUrl = String(env.VAULT_SUPABASE_URL || env.MAIN_SB_URL || "").trim();
+  const vaultKey = String(
+    env.VAULT_SERVICE_KEY || env.MAIN_SB_KEY || env.VAULT_ANON_KEY || ""
+  ).trim();
+
+  if (vaultUrl && vaultKey) {
     try {
-      const res = await fetch(
-        `${env.VAULT_SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/cf_accounts?select=stream_url&is_active=eq.true&limit=1`,
-        {
-          headers: {
-            apikey: vaultKey,
-            Authorization: `Bearer ${vaultKey}`
-          }
+      const endpoint =
+        vaultUrl.replace(/\/+$/, "") +
+        "/rest/v1/cf_accounts?select=stream_url&is_active=eq.true&limit=1";
+
+      const res = await fetch(endpoint, {
+        cache: "no-store",
+        headers: {
+          apikey: vaultKey,
+          Authorization: "Bearer " + vaultKey,
+          "Cache-Control": "no-store"
         }
-      );
+      });
 
       if (res.ok) {
         const rows = await res.json();
-        const activeUrl = rows?.[0]?.stream_url ? String(rows[0].stream_url).trim() : "";
-        if (activeUrl && activeUrl.startsWith("http")) {
+        const activeUrl =
+          rows && rows[0] && rows[0].stream_url
+            ? String(rows[0].stream_url).trim()
+            : "";
+
+        if (activeUrl && /^https?:\/\//i.test(activeUrl)) {
           return activeUrl.replace(/\/+$/, "");
         }
       }
@@ -36,7 +47,10 @@ export async function onRequestGet(context) {
   if (!file) {
     return new Response(JSON.stringify({ error: "Missing file parameter" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" }
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store"
+      }
     });
   }
 
@@ -52,19 +66,24 @@ export async function onRequestGet(context) {
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store"
+        }
       }
     );
   }
 
   try {
     const workerRes = await fetch(
-      `${workerUrl}/get-token?file=${encodeURIComponent(file)}`,
+      workerUrl + "/get-token?file=" + encodeURIComponent(file),
       {
         method: "GET",
+        cache: "no-store",
         headers: {
           "X-App-Key": secret,
-          "Origin": "https://jj-movies.pages.dev"
+          "Origin": "https://jj-movies.pages.dev",
+          "Cache-Control": "no-store"
         }
       }
     );
@@ -80,10 +99,16 @@ export async function onRequestGet(context) {
     });
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: "Failed to reach stream worker", details: err.message }),
+      JSON.stringify({
+        error: "Failed to reach stream worker",
+        details: err && err.message ? err.message : String(err)
+      }),
       {
         status: 502,
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store"
+        }
       }
     );
   }
