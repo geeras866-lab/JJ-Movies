@@ -1,5 +1,5 @@
 // JJ Movies service worker: app UI offline lo kuda open avvadaniki
-var CACHE = "jj-shell-v1";
+var CACHE = "jj-shell-v2";
 var IMG_CACHE = "jj-img-v1";
 var IMG_LIMIT = 400;
 
@@ -34,6 +34,11 @@ self.addEventListener("fetch", function (e) {
   var req = e.request;
   if (req.method !== "GET") return;
   var url = new URL(req.url);
+
+  // Never cache API or token endpoints
+  if (url.origin === self.location.origin && /^\/api\//i.test(url.pathname)) {
+    return;
+  }
 
   // Posters / images (any origin): cache first, refresh in background
   if (req.destination === "image") {
