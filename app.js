@@ -68,6 +68,39 @@ function safeURL(value) {
   return val;
 }
 
+function safeAppDownloadURL(value) {
+  var val = String(value || "").trim();
+  if (!val) return "";
+  if (val === "./jj-movies.apk" || val === "/jj-movies.apk" || val === "jj-movies.apk") {
+    return "./jj-movies.apk";
+  }
+  return safeURL(val);
+}
+
+function applyAppDownloadUrlFromSettings(data) {
+  var appCfgRow = Array.isArray(data) ? data.find(function (r) { return r && r.key === "app_download_config"; }) : null;
+  if (!appCfgRow || !appCfgRow.value || !appCfgRow.value.url) return;
+
+  var targetUrl = safeAppDownloadURL(appCfgRow.value.url);
+  if (!targetUrl) return;
+
+  var isExternal = /^https?:\/\//i.test(targetUrl);
+  ["navAppDownloadLink", "bannerAppDownloadLink", "footerAppDownloadLink"].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.setAttribute("href", targetUrl);
+    if (isExternal) {
+      el.removeAttribute("download");
+      el.setAttribute("target", "_blank");
+      el.setAttribute("rel", "noopener noreferrer");
+    } else {
+      el.setAttribute("download", "");
+      el.removeAttribute("target");
+      el.removeAttribute("rel");
+    }
+  });
+}
+
 function buildTelegramBotStartUrl(versionOrId) {
   var payload = String(versionOrId == null ? "" : versionOrId).trim();
   if (!payload) return "https://t.me/" + TELEGRAM_BOT_USERNAME;
@@ -650,7 +683,7 @@ function createExtraSections() {
   ensureInAppPlayerModal();
 }
 
-// ---------- Festival Mode ----------
+// ---------- Festival Mode & App Download Link Sync ----------
 function getSmartCalendarFestival() {
   var now = new Date();
   var m = now.getMonth() + 1, d = now.getDate(), y = now.getFullYear();
@@ -666,9 +699,15 @@ function getSmartCalendarFestival() {
 
 async function initNeonFestivalMode() {
   var activeFestival = null;
+  var settingsData = null;
+
   try {
-    var data = await fetchFromApi("settings");
-    var cfgRow = Array.isArray(data) ? data.find(function (r) { return r.key === "festival_config"; }) : null;
+    settingsData = await fetchFromApi("settings");
+    applyAppDownloadUrlFromSettings(settingsData);
+  } catch (err) {}
+
+  try {
+    var cfgRow = Array.isArray(settingsData) ? settingsData.find(function (r) { return r && r.key === "festival_config"; }) : null;
     if (cfgRow && cfgRow.value) {
       if (cfgRow.value.enabled === false) return;
       if (cfgRow.value.enabled === true) {
@@ -1305,7 +1344,7 @@ function closeMovieModal() {
 (function configureApkDownloadButtons() {
   if (isRunningInsideApk()) {
     var st = document.createElement("style");
-    st.textContent = '.nav-download-app, .footer-app-link, a[href*="jj-movies.apk"] { display: none !important; }';
+    st.textContent = '.jj-apk-btn, .nav-download-app, .footer-app-link, a[href*="jj-movies.apk"] { display: none !important; }';
     document.head.appendChild(st);
   }
 })();
