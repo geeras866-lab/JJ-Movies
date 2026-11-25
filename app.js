@@ -45,98 +45,6 @@ function hasNativeVlcBridge() {
   return Boolean(window.AndroidVlc && typeof window.AndroidVlc.playVideo === "function");
 }
 
-// ---------- Server Proxy Helpers ----------
-async function fetchFromApi(type, params) {
-  var queryObj = Object.assign({ type: type }, params || {});
-  var query = new URLSearchParams(queryObj).toString();
-  var res = await fetch(API_BASE + "/movies?" + query, { cache: "no-store" });
-  if (!res.ok) throw new Error("API request failed: " + res.status);
-  return res.json();
-}
-
-// Direct helper: pass plain fileName (e.g. "418 (2026)...mkv" or "b2_1/418 (2026)...mkv")
-async function fetchSignedUrlByFileName(fileName, meta) {
-  var cleanFile = String(fileName || "").trim().replace(/^\/+/, "");
-  if (!cleanFile) throw new Error("Missing file name");
-
-  var queryParams = new URLSearchParams();
-  queryParams.set("file", cleanFile);
-  if (meta && meta.id) queryParams.set("id", String(meta.id));
-  if (meta && meta.episodeId) queryParams.set("episode_id", String(meta.episodeId));
-
-  var res = await fetch(API_BASE + "/get-token?" + queryParams.toString(), {
-    method: "GET",
-    credentials: "same-origin",
-    cache: "no-store"
-  });
-  if (!res.ok) throw new Error("Token generation failed: " + res.status);
-  var data = await res.json();
-  if (!data || !data.url) throw new Error("Invalid token stream response");
-  return String(data.url).trim();
-}
-
-// Token-only stream resolver: permanent direct URLs are never returned raw
-async function resolveTokenStreamUrl(rawUrl, linkType, meta) {
-  var mode = String(linkType || "token").toLowerCase().trim();
-  if (mode !== "token") {
-    throw new Error("Only token-protected streams are allowed.");
-  }
-
-  var workerFile = extractWorkerFileName(rawUrl);
-  if (workerFile) {
-    return fetchSignedUrlByFileName(workerFile, meta);
-  }
-
-  var queryParams = new URLSearchParams();
-  if (rawUrl) queryParams.set("ref", String(rawUrl).trim());
-  if (meta && meta.id) queryParams.set("id", String(meta.id));
-  if (meta && meta.episodeId) queryParams.set("episode_id", String(meta.episodeId));
-
-  var res = await fetch(API_BASE + "/get-token?" + queryParams.toString(), {
-    method: "GET",
-    credentials: "same-origin",
-    cache: "no-store"
-  });
-  if (!res.ok) throw new Error("Token generation failed: " + res.status);
-  var data = await res.json();
-  if (!data || !data.url) throw new Error("Invalid token stream response");
-  return String(data.url).trim();
-}
-
-// Direct function to play directly by passing only fileName
-async function playMovieByFileName(fileName, title) {
-  var cleanFile = String(fileName || "").trim().replace(/^\/+/, "");
-  if (!cleanFile) return;
-
-  var playTitle = title || cleanFile.replace(/\.[^/.]+$/, "");
-  currentActiveMovieTitle = playTitle;
-
-  var signedUrl = await fetchSignedUrlByFileName(cleanFile);
-  currentActiveStreamUrl = signedUrl;
-
-  if (hasNativeVlcBridge()) {
-    launchNativeVlc(signedUrl, playTitle);
-    return signedUrl;
-  }
-
-  ensureInAppPlayerModal();
-  var modal = document.getElementById("inAppVideoModal");
-  var titleElem = document.getElementById("modalMovieTitle");
-  var serverContainer = document.getElementById("serverSwitchContainer");
-  if (titleElem) titleElem.textContent = playTitle;
-  if (serverContainer) serverContainer.innerHTML = "";
-  if (modal) {
-    modal.style.display = "flex";
-    modal.style.visibility = "visible";
-    modal.style.opacity = "1";
-    modal.style.zIndex = "99999";
-  }
-
-  await playMovieStream(signedUrl, playTitle, "token");
-  return signedUrl;
-}
-window.playMovieByFileName = playMovieByFileName;
-
 // ---------- Basic Helpers ----------
 function escapeHTML(value) {
   return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
@@ -213,7 +121,36 @@ function handleMissingPoster(imgElement, movieTitle) {
 }
 window.handleMissingPoster = handleMissingPoster;
 
-// ---------- Stream Helpers (Website + App) ----------
+// ---------- Server Proxy Helpers ----------
+async function fetchFromApi(type, params) {
+  var queryObj = Object.assign({ type: type }, params || {});
+  var query = new URLSearchParams(queryObj).toString();
+  var res = await fetch(API_BASE + "/movies?" + query, { cache: "no-store" });
+  if (!res.ok) throw new Error("API request failed: " + res.status);
+  return res.json();
+}
+
+async function fetchSignedUrlByFileName(fileName, meta) {
+  var cleanFile = String(fileName || "").trim().replace(/^\/+/, "");
+  if (!cleanFile) throw new Error("Missing file name");
+
+  var queryParams = new URLSearchParams();
+  queryParams.set("file", cleanFile);
+  if (meta && meta.id) queryParams.set("id", String(meta.id));
+  if (meta && meta.episodeId) queryParams.set("episode_id", String(meta.episodeId));
+
+  var res = await fetch(API_BASE + "/get-token?" + queryParams.toString(), {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "no-store"
+  });
+  if (!res.ok) throw new Error("Token generation failed: " + res.status);
+  var data = await res.json();
+  if (!data || !data.url) throw new Error("Invalid token stream response");
+  return String(data.url).trim();
+}
+
+// ---------- Pixeldrain + Filemoon + B2 Worker Helpers ----------
 function isDirectVideoFile(url) {
   if (!url) return false;
   return /\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(url);
@@ -222,15 +159,14 @@ function isDirectVideoFile(url) {
 function isPlainOrB2FileName(val) {
   var s = String(val || "").trim().replace(/^\/+/, "");
   if (!s || /^https?:\/\//i.test(s)) return false;
-  return /^[a-zA-Z0-9_-]+\/.+$/.test(s) || s.indexOf("/") === -1;
+  if (/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(s)) return false; // ignore domain links like filemoon.sx/...
+  return /^[a-zA-Z0-9_-]+\/.+$/.test(s) || (s.indexOf("/") === -1 && isDirectVideoFile(s));
 }
 
 function safeTokenRefValue(value) {
   var val = String(value || "").trim();
   if (!val) return "";
-  if (isPlainOrB2FileName(val)) {
-    return val;
-  }
+  if (isPlainOrB2FileName(val)) return val;
   return safeURL(val);
 }
 
@@ -253,6 +189,94 @@ function extractWorkerFileName(rawUrl) {
 
   return "";
 }
+
+function isWorkerStreamLink(rawUrl) {
+  return Boolean(extractWorkerFileName(rawUrl));
+}
+
+function extractPixeldrainId(rawUrl) {
+  var val = String(rawUrl || "").trim();
+  if (!val) return "";
+  var uMatch = val.match(/(?:https?:\/\/)?(?:www\.)?pixeldrain\.com\/u\/([A-Za-z0-9_-]+)/i);
+  if (uMatch && uMatch[1]) return uMatch[1];
+  var apiMatch = val.match(/(?:https?:\/\/)?(?:www\.)?pixeldrain\.com\/api\/file\/([A-Za-z0-9_-]+)/i);
+  if (apiMatch && apiMatch[1]) return apiMatch[1];
+  if (/^[A-Za-z0-9_-]{6,20}$/.test(val)) return val;
+  return "";
+}
+
+function isPixeldrainLink(rawUrl) {
+  return Boolean(extractPixeldrainId(rawUrl));
+}
+
+function normalizeStreamUrl(url) {
+  var raw = String(url || "").trim();
+  if (!raw) return "";
+
+  if (isPixeldrainLink(raw)) {
+    return "https://pixeldrain.com/api/file/" + extractPixeldrainId(raw);
+  }
+
+  var u = safeURL(raw);
+  if (!u || isDirectVideoFile(u)) return u;
+  if (u.indexOf("/e/") !== -1) return u;
+
+  // Convert filemoon.sx/d/xxx or /v/xxx -> /e/xxx for iframe embed
+  var m = u.match(/^(https?:\/\/[^\/]+)\/(?:d|v)\/([A-Za-z0-9]+)(\?.*)?$/i);
+  if (m) return m[1] + "/e/" + m[2] + (m[3] || "");
+
+  return u.replace(/streamlare\.com\/(v|d)\//, "streamlare.com/e/");
+}
+
+// Smart resolver: B2 files -> /api/get-token; filemoon/pixeldrain/direct -> normalizeStreamUrl
+async function resolveTokenStreamUrl(rawUrl, linkType, meta) {
+  var raw = String(rawUrl || "").trim();
+  if (!raw) throw new Error("Empty stream link");
+
+  if (/^https?:\/\//i.test(raw) && /[?&]sig=/i.test(raw)) {
+    return raw;
+  }
+
+  var workerFile = extractWorkerFileName(raw);
+  if (workerFile) {
+    return fetchSignedUrlByFileName(workerFile, meta);
+  }
+
+  return normalizeStreamUrl(raw);
+}
+
+async function playMovieByFileName(fileName, title) {
+  var cleanFile = String(fileName || "").trim().replace(/^\/+/, "");
+  if (!cleanFile) return;
+
+  var playTitle = title || cleanFile.replace(/\.[^/.]+$/, "");
+  currentActiveMovieTitle = playTitle;
+
+  var signedUrl = await fetchSignedUrlByFileName(cleanFile);
+  currentActiveStreamUrl = signedUrl;
+
+  if (hasNativeVlcBridge()) {
+    launchNativeVlc(signedUrl, playTitle);
+    return signedUrl;
+  }
+
+  ensureInAppPlayerModal();
+  var modal = document.getElementById("inAppVideoModal");
+  var titleElem = document.getElementById("modalMovieTitle");
+  var serverContainer = document.getElementById("serverSwitchContainer");
+  if (titleElem) titleElem.textContent = playTitle;
+  if (serverContainer) serverContainer.innerHTML = "";
+  if (modal) {
+    modal.style.display = "flex";
+    modal.style.visibility = "visible";
+    modal.style.opacity = "1";
+    modal.style.zIndex = "99999";
+  }
+
+  await playMovieStream(signedUrl, playTitle, "token");
+  return signedUrl;
+}
+window.playMovieByFileName = playMovieByFileName;
 
 function launchNativeVlc(playableUrl, title) {
   var activeTitle = title ||
@@ -393,28 +417,29 @@ function openMoviePlayerById(movieId) {
 
 async function openServerSelection(title, s1, s2, linkType, meta) {
   var cleanTitle = title || "Playing Movie";
-  var mode = String(linkType || "token").toLowerCase().trim();
   currentActiveMovieTitle = cleanTitle;
 
-  if (mode !== "token") {
-    alert("Only token-protected links are enabled for playback.");
-    return;
-  }
-
   var servers = [];
-  if (s1) servers.push({ name: "⚡ Server 1 (Token)", url: s1, linkType: mode });
-  if (s2) servers.push({ name: "🚀 Server 2 (Token)", url: s2, linkType: mode });
+  if (s1) servers.push({ name: "⚡ Server 1", url: s1, linkType: linkType });
+  if (s2) servers.push({ name: "🚀 Server 2", url: s2, linkType: linkType });
   if (!servers.length) return;
 
+  // App lo direct B2 / Pixeldrain / video file unte matrame VLC open chey; filemoon/embeds iframe lo open avtayi
   if (hasNativeVlcBridge()) {
-    try {
-      var playableUrl = await resolveTokenStreamUrl(servers[0].url, servers[0].linkType, meta);
-      currentActiveStreamUrl = playableUrl;
-      launchNativeVlc(playableUrl, cleanTitle);
-    } catch (err) {
-      alert("Token Stream Error: " + err.message);
+    var vlcServer = servers.find(function (srv) {
+      var norm = normalizeStreamUrl(srv.url);
+      return isWorkerStreamLink(srv.url) || isPixeldrainLink(srv.url) || isDirectVideoFile(norm);
+    });
+    if (vlcServer) {
+      try {
+        var playableUrl = await resolveTokenStreamUrl(vlcServer.url, vlcServer.linkType, meta);
+        currentActiveStreamUrl = playableUrl;
+        launchNativeVlc(playableUrl, cleanTitle);
+      } catch (err) {
+        alert("Stream Error: " + err.message);
+      }
+      return;
     }
-    return;
   }
 
   ensureInAppPlayerModal();
@@ -454,24 +479,20 @@ async function playMovieStream(rawUrl, title, linkType, meta) {
   var raw = String(rawUrl || "").trim();
   if (title) currentActiveMovieTitle = title;
 
-  stage.innerHTML = '<div style="color:#cbd5e1;padding:30px;text-align:center;font-size:13px;">🔐 Generating temporary token link...</div>';
+  stage.innerHTML = '<div style="color:#cbd5e1;padding:30px;text-align:center;font-size:13px;">⚡ Loading stream...</div>';
 
   var url = "";
   try {
-    if (/^https?:\/\//i.test(raw) && /[?&]sig=/i.test(raw)) {
-      url = raw;
-    } else {
-      url = await resolveTokenStreamUrl(raw, linkType, meta);
-    }
+    url = await resolveTokenStreamUrl(raw, linkType, meta);
   } catch (err) {
-    stage.innerHTML = '<div style="color:#f87171;padding:20px;text-align:center;font-size:13px;">Token Error: ' + escapeHTML(err.message) + '</div>';
+    stage.innerHTML = '<div style="color:#f87171;padding:20px;text-align:center;font-size:13px;">Stream Error: ' + escapeHTML(err.message) + '</div>';
     return;
   }
 
   currentActiveStreamUrl = url;
   stage.innerHTML = "";
 
-  if (hasNativeVlcBridge()) {
+  if (hasNativeVlcBridge() && (isWorkerStreamLink(raw) || isPixeldrainLink(raw) || isDirectVideoFile(url))) {
     closeInAppPlayer();
     launchNativeVlc(url, currentActiveMovieTitle);
     return;
@@ -823,7 +844,7 @@ function renderShowcaseCarousel() {
     var isCurrent = index === 0 ? "active" : "";
     var tagBadge = getMoviePinLabel(movie) || "POPULAR";
     var posterSrc = getAdaptivePosterUrl(movie.poster);
-    var hasTokenStream = !isSeries(movie) && movie.linkType === "token" && Boolean(movie.stream1 || movie.stream2);
+    var hasStream = !isSeries(movie) && Boolean(movie.stream1 || movie.stream2);
 
     return (
       '<div class="banner-slide ' + isCurrent + '">' +
@@ -841,7 +862,7 @@ function renderShowcaseCarousel() {
           '<p class="banner-desc">' + escapeHTML(movie.description || "Watch online or grab complete downloads and quality prints on Telegram bot.") + '</p>' +
           '<div class="banner-action-row">' +
             '<button onclick="showMovieDetails(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-primary">' + (isSeries(movie) ? "⚡ View Series Details" : "⚡ View Movie Details") + '</button>' +
-            (hasTokenStream ? '<button onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : (isSeries(movie) ? '<button onclick="showMovieDetails(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : '')) +
+            (hasStream ? '<button onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : (isSeries(movie) ? '<button onclick="showMovieDetails(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : '')) +
             (movie.trailer ? '<a href="' + escapeHTML(movie.trailer) + '" target="_blank" rel="noopener noreferrer" class="btn-banner-secondary">▶ Trailer</a>' : '') +
           '</div>' +
         '</div>' +
@@ -958,7 +979,7 @@ function createMovieCard(movie) {
   button.type = "button";
   button.textContent = isSeries(movie)
     ? "▶ Watch Online / Downloads"
-    : (movie.linkType === "token" && (movie.stream1 || movie.stream2) ? "▶ Watch / Downloads" : "⚡ Get Downloads");
+    : ((movie.stream1 || movie.stream2) ? "▶ Watch / Downloads" : "⚡ Get Downloads");
   button.addEventListener("click", function () { showMovieDetails(movie.id); });
 
   info.appendChild(title);
@@ -1080,8 +1101,7 @@ function renderEpisodes(movie, eps, box) {
 
     var list = eps.filter(function (e) { return (Number(e.season_number) || 1) === activeSeason; });
     var grid = list.map(function (e) {
-      var epLinkType = String(e.link_type || e.stream_type || movie.linkType || "token").toLowerCase().trim();
-      var playable = epLinkType === "token" && Boolean(e.stream_url_1 || e.stream_url_2);
+      var playable = Boolean(e.stream_url_1 || e.stream_url_2);
       var sub = e.title ? '<span class="jj-ep-sub">' + escapeHTML(e.title) + '</span>' : "";
       return '<button type="button" class="jj-ep-btn' + (playable ? "" : " disabled") + '" data-ep="' + escapeHTML(e.id) + '"' + (playable ? "" : " disabled") + '>' +
         '<span class="jj-ep-num">▶ Episode ' + escapeHTML(e.episode_number) + '</span>' + sub + '</button>';
@@ -1121,16 +1141,16 @@ async function showMovieDetails(movieId) {
   var trailerLink = movie.trailer || ("https://www.youtube.com/results?search_query=" + encodeURIComponent(movie.title + " Telugu trailer"));
   var modalPosterSrc = getAdaptivePosterUrl(movie.poster);
   var seriesMode = isSeries(movie);
-  var hasTokenStream = movie.linkType === "token" && Boolean(movie.stream1 || movie.stream2);
+  var hasStream = Boolean(movie.stream1 || movie.stream2);
 
   var episodesSectionHTML = seriesMode
-    ? '<div class="jj-episodes-wrap"><div class="jj-episodes-head">▶ WATCH ONLINE <span class="jj-episodes-sub">🔐 Token-Protected Streaming • No Download Required</span></div><div id="modalEpisodesContainer"><p class="jj-ep-empty">Loading episodes...</p></div></div>'
+    ? '<div class="jj-episodes-wrap"><div class="jj-episodes-head">▶ WATCH ONLINE <span class="jj-episodes-sub">⚡ Direct Streaming • No Download Required</span></div><div id="modalEpisodesContainer"><p class="jj-ep-empty">Loading episodes...</p></div></div>'
     : "";
 
-  var bigWatchOnlineSectionHTML = (!seriesMode && hasTokenStream)
+  var bigWatchOnlineSectionHTML = (!seriesMode && hasStream)
     ? '<div class="jj-watch-online-hero-wrap">' +
         '<button type="button" onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-big-watch-online"><span>▶</span> WATCH ONLINE (INSTANT HD PLAYER)</button>' +
-        '<div class="jj-watch-subtext">🔐 Temporary Token Stream • No Download Required</div>' +
+        '<div class="jj-watch-subtext">⚡ Direct Streaming • No Download Required</div>' +
       '</div>'
     : "";
 
