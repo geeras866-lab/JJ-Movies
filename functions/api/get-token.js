@@ -1,12 +1,13 @@
 async function getActiveWorkerUrl(env) {
-  if (env.VAULT_SUPABASE_URL && env.VAULT_ANON_KEY) {
+  const vaultKey = String(env.VAULT_SERVICE_KEY || env.VAULT_ANON_KEY || "").trim();
+  if (env.VAULT_SUPABASE_URL && vaultKey) {
     try {
       const res = await fetch(
         `${env.VAULT_SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/cf_accounts?select=stream_url&is_active=eq.true&limit=1`,
         {
           headers: {
-            apikey: env.VAULT_ANON_KEY,
-            Authorization: `Bearer ${env.VAULT_ANON_KEY}`
+            apikey: vaultKey,
+            Authorization: `Bearer ${vaultKey}`
           }
         }
       );
