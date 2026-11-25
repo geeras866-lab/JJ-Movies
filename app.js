@@ -213,7 +213,7 @@ function handleMissingPoster(imgElement, movieTitle) {
 }
 window.handleMissingPoster = handleMissingPoster;
 
-// ---------- Stream Helpers (Token-Enforced App Only) ----------
+// ---------- Stream Helpers (Website + App) ----------
 function isDirectVideoFile(url) {
   if (!url) return false;
   return /\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(url);
@@ -222,7 +222,6 @@ function isDirectVideoFile(url) {
 function isPlainOrB2FileName(val) {
   var s = String(val || "").trim().replace(/^\/+/, "");
   if (!s || /^https?:\/\//i.test(s)) return false;
-  // Supports both "movie.mkv" and "b2_1/movie.mkv" (even with spaces, brackets, or plus signs)
   return /^[a-zA-Z0-9_-]+\/.+$/.test(s) || s.indexOf("/") === -1;
 }
 
@@ -275,7 +274,7 @@ function loadHls(cb) {
   document.head.appendChild(s);
 }
 
-// ---------- Fullscreen & Orientation (App Only) ----------
+// ---------- Fullscreen & Orientation ----------
 function lockLandscape() {
   try {
     var P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenOrientation;
@@ -342,7 +341,6 @@ document.addEventListener("fullscreenchange", handleNativeFullscreenChange);
 document.addEventListener("webkitfullscreenchange", handleNativeFullscreenChange);
 
 function ensureInAppPlayerModal() {
-  if (!isRunningInsideApk()) return;
   var modal = document.getElementById("inAppVideoModal");
   if (!modal) {
     modal = document.createElement("div");
@@ -388,14 +386,12 @@ window.addEventListener("popstate", function () {
 });
 
 function openMoviePlayerById(movieId) {
-  if (!isRunningInsideApk()) return;
   var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
   if (!movie) return;
   openServerSelection(movie.title, movie.stream1, movie.stream2, movie.linkType, { id: movie.id });
 }
 
 async function openServerSelection(title, s1, s2, linkType, meta) {
-  if (!isRunningInsideApk()) return;
   var cleanTitle = title || "Playing Movie";
   var mode = String(linkType || "token").toLowerCase().trim();
   currentActiveMovieTitle = cleanTitle;
@@ -453,7 +449,6 @@ async function openServerSelection(title, s1, s2, linkType, meta) {
 }
 
 async function playMovieStream(rawUrl, title, linkType, meta) {
-  if (!isRunningInsideApk()) return;
   var stage = document.getElementById("jjPlayerStage");
   if (!stage) return;
   var raw = String(rawUrl || "").trim();
@@ -495,7 +490,7 @@ async function playMovieStream(rawUrl, title, linkType, meta) {
     video.style.objectFit = "contain";
 
     video.addEventListener("error", function () {
-      stage.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;font-size:13px;">Unable to decode in browser player (MKV/HEVC/DD+ may require VLC). Please reopen video.</div>';
+      stage.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;font-size:13px;">Video play avvatledu. MP4 (H.264 + AAC) leda Server 2 try cheyandi.</div>';
     });
 
     if (/\.m3u8(\?.*)?$/i.test(url) && !video.canPlayType("application/vnd.apple.mpegurl")) {
@@ -824,13 +819,11 @@ function renderShowcaseCarousel() {
   var showpiece = pinnedList.length > 0 ? pinnedList : movies.slice(0, 3);
   if (!showpiece.length) return;
 
-  var inApp = isRunningInsideApk();
-
   bannerContainer.innerHTML = showpiece.map(function (movie, index) {
     var isCurrent = index === 0 ? "active" : "";
     var tagBadge = getMoviePinLabel(movie) || "POPULAR";
     var posterSrc = getAdaptivePosterUrl(movie.poster);
-    var hasTokenStream = inApp && !isSeries(movie) && movie.linkType === "token" && Boolean(movie.stream1 || movie.stream2);
+    var hasTokenStream = !isSeries(movie) && movie.linkType === "token" && Boolean(movie.stream1 || movie.stream2);
 
     return (
       '<div class="banner-slide ' + isCurrent + '">' +
@@ -845,10 +838,10 @@ function renderShowcaseCarousel() {
             (movie.runtime ? '<span class="banner-badge-tag">' + escapeHTML(movie.runtime) + '</span>' : '') +
           '</div>' +
           '<h1 class="banner-title">' + escapeHTML(movie.title) + '</h1>' +
-          '<p class="banner-desc">' + escapeHTML(movie.description || (inApp ? "Explore details and available formats." : "Grab complete downloads and quality prints on Telegram bot.")) + '</p>' +
+          '<p class="banner-desc">' + escapeHTML(movie.description || "Watch online or grab complete downloads and quality prints on Telegram bot.") + '</p>' +
           '<div class="banner-action-row">' +
             '<button onclick="showMovieDetails(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-primary">' + (isSeries(movie) ? "⚡ View Series Details" : "⚡ View Movie Details") + '</button>' +
-            (hasTokenStream ? '<button onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : '') +
+            (hasTokenStream ? '<button onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : (isSeries(movie) ? '<button onclick="showMovieDetails(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : '')) +
             (movie.trailer ? '<a href="' + escapeHTML(movie.trailer) + '" target="_blank" rel="noopener noreferrer" class="btn-banner-secondary">▶ Trailer</a>' : '') +
           '</div>' +
         '</div>' +
@@ -960,13 +953,12 @@ function createMovieCard(movie) {
   meta.className = "movie-meta";
   meta.textContent = metaParts.length ? metaParts.join(" • ") : (movie.year || "Movie");
 
-  var inApp = isRunningInsideApk();
   var button = document.createElement("button");
   button.className = "details-button";
   button.type = "button";
-  button.textContent = inApp
-    ? (isSeries(movie) || (movie.linkType === "token" && (movie.stream1 || movie.stream2)) ? "▶ Watch Now" : "View Details")
-    : "⚡ Get Files in Bot";
+  button.textContent = isSeries(movie)
+    ? "▶ Watch Online / Downloads"
+    : (movie.linkType === "token" && (movie.stream1 || movie.stream2) ? "▶ Watch / Downloads" : "⚡ Get Downloads");
   button.addEventListener("click", function () { showMovieDetails(movie.id); });
 
   info.appendChild(title);
@@ -1048,9 +1040,8 @@ function clearLiveSearch() {
 }
 window.clearLiveSearch = clearLiveSearch;
 
-// ---------- Series Episodes (Token-Enforced App Only) ----------
+// ---------- Series Episodes (Website + App) ----------
 async function loadEpisodes(movie) {
-  if (!isRunningInsideApk()) return;
   var box = document.getElementById("modalEpisodesContainer");
   if (!box) return;
   try {
@@ -1120,12 +1111,11 @@ function renderEpisodes(movie, eps, box) {
   draw();
 }
 
-// ---------- Movie Details Modal ----------
+// ---------- Movie Details Modal (Website + App Both Show Player & Bot Prints) ----------
 async function showMovieDetails(movieId) {
   var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
   if (!movie) return;
 
-  var inApp = isRunningInsideApk();
   var pinLabel = getMoviePinLabel(movie);
   var pinBadgeHTML = pinLabel ? '<div class="jj-pin-badge" style="margin-bottom:8px;">' + escapeHTML(pinLabel) + '</div>' : '';
   var trailerLink = movie.trailer || ("https://www.youtube.com/results?search_query=" + encodeURIComponent(movie.title + " Telugu trailer"));
@@ -1133,23 +1123,20 @@ async function showMovieDetails(movieId) {
   var seriesMode = isSeries(movie);
   var hasTokenStream = movie.linkType === "token" && Boolean(movie.stream1 || movie.stream2);
 
-  // Watch Online & Episodes: ONLY in App for token-protected streams
-  var episodesSectionHTML = (inApp && seriesMode)
-    ? '<div class="jj-episodes-wrap"><div class="jj-episodes-head">▶ WATCH ONLINE <span class="jj-episodes-sub">🔐 Token-Protected In-App Streaming</span></div><div id="modalEpisodesContainer"><p class="jj-ep-empty">Loading episodes...</p></div></div>'
+  var episodesSectionHTML = seriesMode
+    ? '<div class="jj-episodes-wrap"><div class="jj-episodes-head">▶ WATCH ONLINE <span class="jj-episodes-sub">🔐 Token-Protected Streaming • No Download Required</span></div><div id="modalEpisodesContainer"><p class="jj-ep-empty">Loading episodes...</p></div></div>'
     : "";
 
-  var bigWatchOnlineSectionHTML = (inApp && !seriesMode && hasTokenStream)
+  var bigWatchOnlineSectionHTML = (!seriesMode && hasTokenStream)
     ? '<div class="jj-watch-online-hero-wrap">' +
         '<button type="button" onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-big-watch-online"><span>▶</span> WATCH ONLINE (INSTANT HD PLAYER)</button>' +
         '<div class="jj-watch-subtext">🔐 Temporary Token Stream • No Download Required</div>' +
       '</div>'
     : "";
 
-  // Telegram Downloads / Prints via jj_files_bot: ONLY on Website (hidden in App)
-  var printsSectionHTML = !inApp
-    ? '<div class="prints-header-bar"><span>Available Quality Prints</span><span class="status-dot-active">● Ready via @' + escapeHTML(TELEGRAM_BOT_USERNAME) + '</span></div>' +
-      '<div id="modalVersionContainer"><p style="color:#64748b;font-size:12px;text-align:center;padding:16px 0;">Loading prints...</p></div>'
-    : "";
+  var printsSectionHTML =
+    '<div class="prints-header-bar"><span>Available Quality Prints</span><span class="status-dot-active">● Ready via @' + escapeHTML(TELEGRAM_BOT_USERNAME) + '</span></div>' +
+    '<div id="modalVersionContainer"><p style="color:#64748b;font-size:12px;text-align:center;padding:16px 0;">Loading prints...</p></div>';
 
   modalDetails.innerHTML =
     pinBadgeHTML +
@@ -1188,7 +1175,7 @@ async function showMovieDetails(movieId) {
     try { history.pushState({ jjModalOpen: true }, "", window.location.href); } catch (e) {}
   }
 
-  if (inApp && seriesMode) loadEpisodes(movie);
+  if (seriesMode) loadEpisodes(movie);
 
   var shareAnchor = document.getElementById("btnShareModalWhatsApp");
   if (shareAnchor) {
@@ -1197,34 +1184,32 @@ async function showMovieDetails(movieId) {
     shareAnchor.href = "https://api.whatsapp.com/send?text=" + encodeURIComponent(customText);
   }
 
-  // Load prints via jj_files_bot ONLY on Website
-  if (!inApp) {
-    try {
-      var versions = await fetchFromApi("versions", { movie_id: movieId });
-      var container = document.getElementById("modalVersionContainer");
-      if (!container) return;
+  // Load Telegram bot prints on both Website & App
+  try {
+    var versions = await fetchFromApi("versions", { movie_id: movieId });
+    var container = document.getElementById("modalVersionContainer");
+    if (!container) return;
 
-      if (!Array.isArray(versions) || versions.length === 0) {
-        container.innerHTML = '<p style="color:#64748b;font-size:12px;text-align:center;padding:12px;">No prints added yet.</p>';
-        return;
-      }
-
-      container.innerHTML = '<div class="version-list-grid">' + versions.map(function (v) {
-        var botURL = v.bot_url ? safeURL(v.bot_url) : buildTelegramBotStartUrl(v.id);
-        return (
-          '<div class="version-tile">' +
-            '<div class="version-tile-info">' +
-              '<span class="version-quality-title">💾 ' + escapeHTML(v.quality || "Standard") + '</span>' +
-              '<span class="version-audio-sub">Audio: ' + escapeHTML(v.audio_language || "Telugu") + '</span>' +
-            '</div>' +
-            '<a class="btn-tele-bot" href="' + escapeHTML(botURL) + '" target="_blank" rel="noopener noreferrer">⚡ Get Files in Bot</a>' +
-          '</div>'
-        );
-      }).join("") + '</div>';
-    } catch (err) {
-      var errContainer = document.getElementById("modalVersionContainer");
-      if (errContainer) errContainer.innerHTML = '<p style="color:#ef4444;font-size:12px;text-align:center;">Failed to load prints.</p>';
+    if (!Array.isArray(versions) || versions.length === 0) {
+      container.innerHTML = '<p style="color:#64748b;font-size:12px;text-align:center;padding:12px;">No prints added yet.</p>';
+      return;
     }
+
+    container.innerHTML = '<div class="version-list-grid">' + versions.map(function (v) {
+      var botURL = v.bot_url ? safeURL(v.bot_url) : buildTelegramBotStartUrl(v.id);
+      return (
+        '<div class="version-tile">' +
+          '<div class="version-tile-info">' +
+            '<span class="version-quality-title">💾 ' + escapeHTML(v.quality || "Standard") + '</span>' +
+            '<span class="version-audio-sub">Audio: ' + escapeHTML(v.audio_language || "Telugu") + '</span>' +
+          '</div>' +
+          '<a class="btn-tele-bot" href="' + escapeHTML(botURL) + '" target="_blank" rel="noopener noreferrer">⚡ Get Files in Bot</a>' +
+        '</div>'
+      );
+    }).join("") + '</div>';
+  } catch (err) {
+    var errContainer = document.getElementById("modalVersionContainer");
+    if (errContainer) errContainer.innerHTML = '<p style="color:#ef4444;font-size:12px;text-align:center;">Failed to load prints.</p>';
   }
 }
 window.showMovieDetails = showMovieDetails;
