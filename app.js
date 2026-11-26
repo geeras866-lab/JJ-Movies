@@ -1294,7 +1294,7 @@ async function showMovieDetails(movieId) {
 }
 window.showMovieDetails = showMovieDetails;
 
-// ---------- Startup Notice Popup Modal (Separate for Website vs App + Optional Custom Button) ----------
+// ---------- Startup Notice Popup Modal (100% Custom Message & Link) ----------
 function extractNoticeButton(rawMsg) {
   var text = String(rawMsg || "");
   var match = text.match(/\n?\|\|BTN:\s*([^|\n]+?)\s*\|\s*(https?:\/\/\S+)\s*$/i);
@@ -1330,7 +1330,7 @@ function pickTargetedNotice(messagesList) {
 
   if (!chosen) return null;
   return Object.assign({}, chosen, {
-    title: stripTargetTag(chosen.title) || (inApp ? "New Version - Update Your App" : "Download JJ Movies App"),
+    title: stripTargetTag(chosen.title) || "JJ Movies Notice",
     isAppNotice: inApp
   });
 }
@@ -1363,7 +1363,6 @@ function renderStartupNoticeModal(msgItem) {
       ".jj-notice-body{margin:0 0 14px;font-size:13px;line-height:1.55;color:#cbd5e1;white-space:pre-line;}" +
       ".jj-notice-action{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:linear-gradient(135deg,rgba(255,184,48,.14),rgba(255,107,0,.1));border:1px solid rgba(255,184,48,.38);border-radius:12px;text-decoration:none;margin-bottom:12px;}" +
       ".jj-notice-action-left{display:flex;flex-direction:column;gap:2px;min-width:0;}" +
-      ".jj-notice-action-sub{font-size:9px;font-weight:800;letter-spacing:.8px;color:#eab308;text-transform:uppercase;}" +
       ".jj-notice-action-main{font-size:14px;font-weight:800;color:#fde047;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
       ".jj-notice-action-arrow{width:30px;height:30px;border-radius:8px;background:rgba(255,184,48,.18);color:#fde047;display:flex;align-items:center;justify-content:center;font-weight:900;flex-shrink:0;}" +
       ".jj-notice-foot{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:11px 14px;margin-top:4px;}" +
@@ -1377,13 +1376,12 @@ function renderStartupNoticeModal(msgItem) {
   var directLink = String(msgItem.link_url || "").trim();
   var fallbackUrl = directLink ? safeURL(directLink) : "";
   var finalBtnUrl = parsedMsg.btnUrl || (/^https?:\/\//i.test(fallbackUrl) ? fallbackUrl : "");
-  var finalBtnLabel = parsedMsg.btnLabel || (inApp ? "Update Your App" : "Download App");
+  var finalBtnLabel = parsedMsg.btnLabel || "Open Link";
   var hasCustomBtn = Boolean(finalBtnUrl);
 
   var actionHTML = hasCustomBtn
     ? '<a class="jj-notice-action" href="' + escapeHTML(finalBtnUrl) + '" target="_blank" rel="noopener noreferrer">' +
         '<div class="jj-notice-action-left">' +
-          '<span class="jj-notice-action-sub">' + (inApp ? "APP ACTION" : "OFFICIAL LINK") + '</span>' +
           '<span class="jj-notice-action-main">' + escapeHTML(finalBtnLabel) + '</span>' +
         '</div>' +
         '<span class="jj-notice-action-arrow">→</span>' +
@@ -1397,10 +1395,10 @@ function renderStartupNoticeModal(msgItem) {
   wrap.innerHTML =
     '<div class="jj-notice-card">' +
       '<div class="jj-notice-top">' +
-        '<div class="jj-notice-icon-box">' + (inApp ? "🔄" : "📲") + '</div>' +
+        '<div class="jj-notice-icon-box">📢</div>' +
         '<button type="button" class="jj-notice-x" id="jjNoticeCloseX" aria-label="Close">&times;</button>' +
       '</div>' +
-      '<div class="jj-notice-tag"><span class="jj-notice-dot"></span><span>' + (inApp ? "JJ MOVIES APP UPDATE" : "JJ MOVIES NOTICE") + '</span></div>' +
+      '<div class="jj-notice-tag"><span class="jj-notice-dot"></span><span>JJ MOVIES NOTICE</span></div>' +
       '<h3 class="jj-notice-title">' + escapeHTML(msgItem.title) + '</h3>' +
       (parsedMsg.cleanMessage ? '<p class="jj-notice-body">' + escapeHTML(parsedMsg.cleanMessage) + '</p>' : '') +
       actionHTML +
