@@ -1294,13 +1294,28 @@ async function showMovieDetails(movieId) {
 }
 window.showMovieDetails = showMovieDetails;
 
-// ---------- Startup Notice Popup Modal (Separate for Website vs App) ----------
+// ---------- Startup Notice Popup Modal (Separate for Website vs App + Optional Custom Button) ----------
+function extractNoticeButton(rawMsg) {
+  var text = String(rawMsg || "");
+  var match = text.match(/\n?\|\|BTN:\s*([^|\n]+?)\s*\|\s*(https?:\/\/\S+)\s*$/i);
+  if (!match) {
+    return { cleanMessage: text.trim(), btnLabel: "", btnUrl: "" };
+  }
+  var cleanUrl = safeURL(match[2].trim());
+  var cleanLabel = String(match[1] || "").trim();
+  return {
+    cleanMessage: text.replace(match[0], "").trim(),
+    btnLabel: cleanLabel,
+    btnUrl: /^https?:\/\//i.test(cleanUrl) ? cleanUrl : ""
+  };
+}
+
 function pickTargetedNotice(messagesList) {
   if (!Array.isArray(messagesList) || !messagesList.length) return null;
   var inApp = isRunningInsideApk();
 
   function stripTargetTag(t) {
-    return String(t || "").replace(/^\s*\[(WEB|APP|ALL)\]\s*/i, "").trim();
+    return String(t || "").replace(/^\s*\[(WEB|APP|ALL|NOTICE)\]\s*/i, "").trim();
   }
 
   var targeted = messagesList.find(function (m) {
@@ -1310,7 +1325,7 @@ function pickTargetedNotice(messagesList) {
   });
 
   var chosen = targeted || messagesList.find(function (m) {
-    return !/^\s*\[(WEB|APP)\]/i.test(String(m.title || "").trim());
+    return !/^\s*\[(WEB|APP|NOTICE)\]/i.test(String(m.title || "").trim());
   });
 
   if (!chosen) return null;
@@ -1358,21 +1373,22 @@ function renderStartupNoticeModal(msgItem) {
     document.head.appendChild(st);
   }
 
-  var wrap = document.createElement("div");
-  wrap.id = "jjStartupNoticeModal";
-  wrap.className = "jj-notice-backdrop";
+  var parsedMsg = extractNoticeButton(msgItem.message);
+  var hasCustomBtn = Boolean(parsedMsg.btnLabel && parsedMsg.btnUrl);
 
-  var actionLabel = inApp ? "Update Your App" : "Download App";
-  var actionSub = inApp ? "NEW VERSION AVAILABLE" : "OFFICIAL ANDROID APP";
-  var actionHTML = msgItem.link_url
-    ? '<a class="jj-notice-action" href="' + escapeHTML(safeURL(msgItem.link_url)) + '" target="_blank" rel="noopener noreferrer">' +
+  var actionHTML = hasCustomBtn
+    ? '<a class="jj-notice-action" href="' + escapeHTML(parsedMsg.btnUrl) + '" target="_blank" rel="noopener noreferrer">' +
         '<div class="jj-notice-action-left">' +
-          '<span class="jj-notice-action-sub">' + actionSub + '</span>' +
-          '<span class="jj-notice-action-main">' + actionLabel + '</span>' +
+          '<span class="jj-notice-action-sub">' + (inApp ? "APP ACTION" : "OFFICIAL LINK") + '</span>' +
+          '<span class="jj-notice-action-main">' + escapeHTML(parsedMsg.btnLabel) + '</span>' +
         '</div>' +
         '<span class="jj-notice-action-arrow">→</span>' +
       '</a>'
     : "";
+
+  var wrap = document.createElement("div");
+  wrap.id = "jjStartupNoticeModal";
+  wrap.className = "jj-notice-backdrop";
 
   wrap.innerHTML =
     '<div class="jj-notice-card">' +
@@ -1382,7 +1398,7 @@ function renderStartupNoticeModal(msgItem) {
       '</div>' +
       '<div class="jj-notice-tag"><span class="jj-notice-dot"></span><span>' + (inApp ? "JJ MOVIES APP UPDATE" : "JJ MOVIES NOTICE") + '</span></div>' +
       '<h3 class="jj-notice-title">' + escapeHTML(msgItem.title) + '</h3>' +
-      (msgItem.message ? '<p class="jj-notice-body">' + escapeHTML(msgItem.message) + '</p>' : '') +
+      (parsedMsg.cleanMessage ? '<p class="jj-notice-body">' + escapeHTML(parsedMsg.cleanMessage) + '</p>' : '') +
       actionHTML +
       '<div class="jj-notice-foot">' +
         '<button type="button" class="jj-notice-dismiss" id="jjNoticeDismissBtn">Dismiss</button>' +
@@ -1406,7 +1422,7 @@ function renderStartupNoticeModal(msgItem) {
 }
 window.renderStartupNoticeModal = renderStartupNoticeModal;
 
-// ---------- Notices Ticker (Remaining Messages) ----------
+// ---------- Notices Ticker (Remaining & [NOTICE] Messages) ----------
 function loadMessages() {
   var tickerWrapper = document.getElementById("jjTickerTextWrapper");
   var tickerContainer = document.getElementById("jjAlertsTicker");
@@ -1420,12 +1436,15 @@ function loadMessages() {
         return;
       }
 
-      var popupNotice = pickTargetedNotice(activeMessages);
+      var popupCandidates = activeMessages.filter(function (m) {
+        return !/^\s*\[NOTICE\]/i.test(String(m.title || "").trim());
+      });
+
+      var popupNotice = pickTargetedNotice(popupCandidates);
       if (popupNotice) {
         renderStartupNoticeModal(popupNotice);
       }
 
-      // Remaining messages (excluding the one picked for startup popup) go to NOTICES bar
       var remainingNotices = activeMessages.filter(function (m) {
         return !popupNotice || String(m.id) !== String(popupNotice.id);
       });
@@ -1436,11 +1455,12 @@ function loadMessages() {
       tickerWrapper.innerHTML = "";
 
       barItems.forEach(function (item, index) {
-        var cleanTitle = String(item.title || "").replace(/^\s*\[(WEB|APP|ALL)\]\s*/i, "").trim();
+        var cleanTitle = String(item.title || "").replace(/^\s*\[(WEB|APP|ALL|NOTICE)\]\s*/i, "").trim();
+        var cleanBody = extractNoticeButton(item.message).cleanMessage;
         var slide = document.createElement("span");
         slide.className = "jj-ticker-slide" + (index === 0 ? " active" : "");
         slide.setAttribute("data-link", item.link_url || "");
-        slide.innerHTML = "📢 <strong>" + escapeHTML(cleanTitle) + "</strong>: " + escapeHTML(item.message);
+        slide.innerHTML = "📢 <strong>" + escapeHTML(cleanTitle) + "</strong>: " + escapeHTML(cleanBody);
         tickerWrapper.appendChild(slide);
       });
 
