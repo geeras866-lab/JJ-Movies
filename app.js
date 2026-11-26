@@ -479,7 +479,6 @@ async function openServerSelection(title, s1, s2, linkType, meta) {
   if (s2) servers.push({ name: "🚀 Server 2", url: s2, linkType: linkType });
   if (!servers.length) return;
 
-  // App lo direct B2 / Pixeldrain / video file unte matrame VLC open chey; filemoon/embeds iframe lo open avtayi
   if (hasNativeVlcBridge()) {
     var vlcServer = servers.find(function (srv) {
       var norm = normalizeStreamUrl(srv.url);
@@ -1314,7 +1313,7 @@ function renderStartupNoticeModal(msgItem) {
     var st = document.createElement("style");
     st.id = "jjNoticeModalStyles";
     st.textContent =
-      ".jj-notice-backdrop{position:fixed;inset:0;background:rgba(4,8,16,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:100001;display:flex;align-items:center;justify-content:center;padding:16px;animation:jjNoticeFade .2s ease;}" +
+      ".jj-notice-backdrop{position:fixed;inset:0;background:rgba(4,8,16,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:100001;display:flex;align-items:center;justify-content:center;padding:16px;animation:jjNoticeFade .2s ease;}" +
       "@keyframes jjNoticeFade{from{opacity:0;}to{opacity:1;}}" +
       ".jj-notice-card{width:100%;max-width:400px;background:#111318;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:20px;color:#f8fafc;box-shadow:0 24px 60px rgba(0,0,0,.9);position:relative;}" +
       ".jj-notice-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}" +
