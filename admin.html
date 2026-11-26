@@ -342,13 +342,14 @@ hr{border-color:#303a50;margin:24px 0}
     <!-- CREATE / EDIT JJ MESSAGE & STARTUP POPUP -->
     <div class="panel">
       <h2 id="messageFormTitle">Create JJ Message / Startup Update Popup</h2>
-      <p class="muted">Website lo <b>Download App</b> popup mari App lo <b>New Version - Update Your App</b> popup veru veru ga set cheyochu. Migilina messages NOTICES bar loki pothayi.</p>
+      <p class="muted">Website lo <b>Download App</b> popup mari App lo <b>New Version - Update Your App</b> popup veru veru ga set cheyochu. Migilina messages & <b>Notices Bar Only</b> items NOTICES bar loki pothayi.</p>
       <form id="announcementForm">
         <label for="announcementTarget">Popup Target *</label>
         <select id="announcementTarget">
           <option value="WEB">🌐 Website Only — Download App Popup</option>
           <option value="APP">📱 Android App Only — Update Your App Popup</option>
           <option value="ALL">📢 Both Website & App</option>
+          <option value="NOTICE">📌 Notices Bar Only (No Startup Popup)</option>
         </select>
 
         <label for="announcementTitle">Message Title *</label>
@@ -458,7 +459,7 @@ hr{border-color:#303a50;margin:24px 0}
 
   function parseMessageTargetAndTitle(rawTitle) {
     var str = String(rawTitle || "").trim();
-    var m = str.match(/^\s*\[(WEB|APP|ALL)\]\s*(.*)$/i);
+    var m = str.match(/^\s*\[(WEB|APP|ALL|NOTICE)\]\s*(.*)$/i);
     if (m) {
       return {
         target: m[1].toUpperCase(),
@@ -469,9 +470,9 @@ hr{border-color:#303a50;margin:24px 0}
   }
 
   function formatTargetedTitle(target, title) {
-    var clean = String(title || "").replace(/^\s*\[(WEB|APP|ALL)\]\s*/i, "").trim();
+    var clean = String(title || "").replace(/^\s*\[(WEB|APP|ALL|NOTICE)\]\s*/i, "").trim();
     var t = String(target || "ALL").toUpperCase();
-    if (t === "WEB" || t === "APP") return "[" + t + "] " + clean;
+    if (t === "WEB" || t === "APP" || t === "NOTICE") return "[" + t + "] " + clean;
     return clean;
   }
 
@@ -1192,7 +1193,11 @@ hr{border-color:#303a50;margin:24px 0}
     if (!msgs.length) { announcementList.textContent = "No messages yet."; return; }
     msgs.forEach(function(m) {
       var parsed = parseMessageTargetAndTitle(m.title);
-      var targetBadge = parsed.target === "WEB" ? "[Website Only] " : (parsed.target === "APP" ? "[App Only] " : "[Web + App] ");
+      var targetBadge = parsed.target === "WEB"
+        ? "[Website Only] "
+        : (parsed.target === "APP"
+          ? "[App Only] "
+          : (parsed.target === "NOTICE" ? "[Notices Bar] " : "[Web + App] "));
       var row = makeElement("div", "announcement-row");
       row.appendChild(makeElement("h3", "", targetBadge + parsed.cleanTitle));
       row.appendChild(makeElement("p", "", m.message));
