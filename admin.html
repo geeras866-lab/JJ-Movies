@@ -342,16 +342,23 @@ hr{border-color:#303a50;margin:24px 0}
     <!-- CREATE / EDIT JJ MESSAGE & STARTUP POPUP -->
     <div class="panel">
       <h2 id="messageFormTitle">Create JJ Message / Startup Update Popup</h2>
-      <p class="muted">Publish chesina latest message website/app open cheyagane popup modal lo kanipistundi.</p>
+      <p class="muted">Website lo <b>Download App</b> popup mari App lo <b>New Version - Update Your App</b> popup veru veru ga set cheyochu. Migilina messages NOTICES bar loki pothayi.</p>
       <form id="announcementForm">
+        <label for="announcementTarget">Popup Target *</label>
+        <select id="announcementTarget">
+          <option value="WEB">🌐 Website Only — Download App Popup</option>
+          <option value="APP">📱 Android App Only — Update Your App Popup</option>
+          <option value="ALL">📢 Both Website & App</option>
+        </select>
+
         <label for="announcementTitle">Message Title *</label>
-        <input id="announcementTitle" maxlength="200" required placeholder="Example: New App Update v2.0 Available">
+        <input id="announcementTitle" maxlength="200" required placeholder="e.g. Download JJ Movies App or New Version Available">
 
         <label for="announcementText">Message *</label>
         <textarea id="announcementText" required placeholder="Write update or notice details..."></textarea>
 
-        <label for="announcementLink">Optional Link (Popup Button)</label>
-        <input id="announcementLink" type="url" placeholder="https://t.me/... or https://example.com/app.apk">
+        <label for="announcementLink">Action Button Link (APK / Update URL)</label>
+        <input id="announcementLink" type="url" placeholder="https://example.com/jj-movies.apk">
 
         <label class="checkline">
           <input id="announcementPublished" type="checkbox" checked> Publish on website
@@ -404,13 +411,11 @@ hr{border-color:#303a50;margin:24px 0}
   var selectedMovieCardContainer = document.getElementById("selectedMovieCardContainer");
   var announcementList = document.getElementById("announcementList");
 
-  // Festival Elements
   var festivalToggle = document.getElementById("festivalToggle");
   var festivalNameInput = document.getElementById("festivalNameInput");
   var btnSaveFestival = document.getElementById("btnSaveFestival");
   var festivalStatusMsg = document.getElementById("festivalStatusMsg");
 
-  // App Download Link Elements
   var appDownloadUrlInput = document.getElementById("appDownloadUrlInput");
   var btnSaveAppLink = document.getElementById("btnSaveAppLink");
   var btnResetAppLink = document.getElementById("btnResetAppLink");
@@ -451,6 +456,25 @@ hr{border-color:#303a50;margin:24px 0}
     return safeHttpUrl(raw);
   }
 
+  function parseMessageTargetAndTitle(rawTitle) {
+    var str = String(rawTitle || "").trim();
+    var m = str.match(/^\s*\[(WEB|APP|ALL)\]\s*(.*)$/i);
+    if (m) {
+      return {
+        target: m[1].toUpperCase(),
+        cleanTitle: m[2].trim()
+      };
+    }
+    return { target: "ALL", cleanTitle: str };
+  }
+
+  function formatTargetedTitle(target, title) {
+    var clean = String(title || "").replace(/^\s*\[(WEB|APP|ALL)\]\s*/i, "").trim();
+    var t = String(target || "ALL").toUpperCase();
+    if (t === "WEB" || t === "APP") return "[" + t + "] " + clean;
+    return clean;
+  }
+
   function makeElement(tag, className, text) {
     var el = document.createElement(tag);
     if (className) el.className = className;
@@ -489,7 +513,6 @@ hr{border-color:#303a50;margin:24px 0}
     loadAppDownloadLink();
   }
 
-  // --- FESTIVAL SETTINGS LOGIC ---
   async function loadFestivalSettings() {
     try {
       var res = await supabase.from("site_settings").select("value").eq("key", "festival_config").single();
@@ -521,7 +544,6 @@ hr{border-color:#303a50;margin:24px 0}
     setTimeout(function () { festivalStatusMsg.textContent = ""; }, 3500);
   });
 
-  // --- APP DOWNLOAD LINK MANAGER LOGIC ---
   async function loadAppDownloadLink() {
     try {
       var res = await supabase.from("site_settings").select("value").eq("key", "app_download_config").single();
@@ -1127,10 +1149,22 @@ hr{border-color:#303a50;margin:24px 0}
   versionMovie.addEventListener("change", loadVersions);
   document.getElementById("refreshVersionsBtn").addEventListener("click", loadVersions);
 
+  function resetAnnouncementForm() {
+    editingAnnouncementId = null;
+    document.getElementById("announcementForm").reset();
+    document.getElementById("announcementTarget").value = "WEB";
+    document.getElementById("announcementPublished").checked = true;
+    document.getElementById("messageFormTitle").textContent = "Create JJ Message / Startup Update Popup";
+    document.getElementById("saveAnnouncementBtn").textContent = "Save Message";
+    document.getElementById("cancelAnnouncementBtn").classList.add("hidden");
+  }
+
   document.getElementById("announcementForm").addEventListener("submit", async function(e) {
     e.preventDefault();
+    var targetVal = document.getElementById("announcementTarget").value || "ALL";
+    var rawTitle = document.getElementById("announcementTitle").value.trim();
     var msgData = {
-      title: document.getElementById("announcementTitle").value.trim(),
+      title: formatTargetedTitle(targetVal, rawTitle),
       message: document.getElementById("announcementText").value.trim(),
       link_url: safeHttpUrl(document.getElementById("announcementLink").value.trim()) || null,
       is_published: document.getElementById("announcementPublished").checked
@@ -1144,21 +1178,11 @@ hr{border-color:#303a50;margin:24px 0}
     }
     if (res.error) { showMessage("Error: " + res.error.message); return; }
     showMessage("JJ Message saved successfully!");
-    document.getElementById("announcementForm").reset();
-    editingAnnouncementId = null;
-    document.getElementById("messageFormTitle").textContent = "Create JJ Message / Startup Update Popup";
-    document.getElementById("saveAnnouncementBtn").textContent = "Save Message";
-    document.getElementById("cancelAnnouncementBtn").classList.add("hidden");
+    resetAnnouncementForm();
     loadAnnouncements();
   });
 
-  document.getElementById("cancelAnnouncementBtn").addEventListener("click", function() {
-    editingAnnouncementId = null;
-    document.getElementById("announcementForm").reset();
-    document.getElementById("messageFormTitle").textContent = "Create JJ Message / Startup Update Popup";
-    document.getElementById("saveAnnouncementBtn").textContent = "Save Message";
-    document.getElementById("cancelAnnouncementBtn").classList.add("hidden");
-  });
+  document.getElementById("cancelAnnouncementBtn").addEventListener("click", resetAnnouncementForm);
 
   async function loadAnnouncements() {
     if (!announcementList) return;
@@ -1167,8 +1191,10 @@ hr{border-color:#303a50;margin:24px 0}
     var msgs = res.data || [];
     if (!msgs.length) { announcementList.textContent = "No messages yet."; return; }
     msgs.forEach(function(m) {
+      var parsed = parseMessageTargetAndTitle(m.title);
+      var targetBadge = parsed.target === "WEB" ? "[Website Only] " : (parsed.target === "APP" ? "[App Only] " : "[Web + App] ");
       var row = makeElement("div", "announcement-row");
-      row.appendChild(makeElement("h3", "", m.title));
+      row.appendChild(makeElement("h3", "", targetBadge + parsed.cleanTitle));
       row.appendChild(makeElement("p", "", m.message));
       if (m.link_url) {
         var a = makeElement("a", "", m.link_url);
@@ -1189,7 +1215,8 @@ hr{border-color:#303a50;margin:24px 0}
       editBtn.style.margin = "0";
       editBtn.addEventListener("click", function() {
         editingAnnouncementId = m.id;
-        document.getElementById("announcementTitle").value = m.title || "";
+        document.getElementById("announcementTarget").value = parsed.target;
+        document.getElementById("announcementTitle").value = parsed.cleanTitle;
         document.getElementById("announcementText").value = m.message || "";
         document.getElementById("announcementLink").value = m.link_url || "";
         document.getElementById("announcementPublished").checked = !!m.is_published;
