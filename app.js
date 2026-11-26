@@ -235,6 +235,15 @@ function isWorkerStreamLink(rawUrl) {
   return Boolean(extractWorkerFileName(rawUrl));
 }
 
+function isB2FileStream(rawUrl) {
+  var val = String(rawUrl || "").trim();
+  if (!val) return false;
+  if (/^(?:https?:\/\/)?b2_[a-zA-Z0-9_-]+\//i.test(val)) return true;
+  if (/^https?:\/\/[^\/]+\.workers\.dev\//i.test(val)) return true;
+  if (!/^https?:\/\//i.test(val) && isPlainOrB2FileName(val)) return true;
+  return false;
+}
+
 function extractPixeldrainId(rawUrl) {
   var val = String(rawUrl || "").trim();
   if (!val) return "";
@@ -1189,6 +1198,10 @@ async function showMovieDetails(movieId) {
   var modalPosterSrc = getAdaptivePosterUrl(movie.poster);
   var seriesMode = isSeries(movie);
   var hasStream = Boolean(movie.stream1 || movie.stream2);
+  var isB2Linked = Boolean(isB2FileStream(movie.stream1) || isB2FileStream(movie.stream2));
+  var watchSubText = isB2Linked
+    ? "⚡ Direct Streaming • Dolby 5.1 Audio"
+    : "⚡ Direct Streaming • No Download Required";
 
   var episodesSectionHTML = seriesMode
     ? '<div class="jj-episodes-wrap"><div class="jj-episodes-head">▶ WATCH ONLINE <span class="jj-episodes-sub">⚡ Direct Streaming • No Download Required</span></div><div id="modalEpisodesContainer"><p class="jj-ep-empty">Loading episodes...</p></div></div>'
@@ -1197,7 +1210,7 @@ async function showMovieDetails(movieId) {
   var bigWatchOnlineSectionHTML = (!seriesMode && hasStream)
     ? '<div class="jj-watch-online-hero-wrap">' +
         '<button type="button" onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-big-watch-online"><span>▶</span> WATCH ONLINE (INSTANT HD PLAYER)</button>' +
-        '<div class="jj-watch-subtext">⚡ Direct Streaming • No Download Required</div>' +
+        '<div class="jj-watch-subtext">' + watchSubText + '</div>' +
       '</div>'
     : "";
 
