@@ -444,6 +444,11 @@ function ensureInAppPlayerModal() {
 }
 
 window.addEventListener("popstate", function () {
+  var noticeModal = document.getElementById("jjStartupNoticeModal");
+  if (noticeModal) {
+    noticeModal.remove();
+    return;
+  }
   var vModal = document.getElementById("inAppVideoModal");
   if (vModal && vModal.style.display === "flex") {
     if (isInFullscreen()) {
@@ -1294,18 +1299,107 @@ async function showMovieDetails(movieId) {
 }
 window.showMovieDetails = showMovieDetails;
 
+// ---------- Startup Notice Popup Modal ----------
+function renderStartupNoticeModal(msgItem) {
+  if (!msgItem || !msgItem.title) return;
+  var hideKey = "jj_notice_hide_until_" + String(msgItem.id || msgItem.title);
+  try {
+    var hiddenUntil = Number(localStorage.getItem(hideKey) || 0);
+    if (hiddenUntil && Date.now() < hiddenUntil) return;
+  } catch (e) {}
+
+  if (document.getElementById("jjStartupNoticeModal")) return;
+
+  if (!document.getElementById("jjNoticeModalStyles")) {
+    var st = document.createElement("style");
+    st.id = "jjNoticeModalStyles";
+    st.textContent =
+      ".jj-notice-backdrop{position:fixed;inset:0;background:rgba(4,8,16,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:100001;display:flex;align-items:center;justify-content:center;padding:16px;animation:jjNoticeFade .2s ease;}" +
+      "@keyframes jjNoticeFade{from{opacity:0;}to{opacity:1;}}" +
+      ".jj-notice-card{width:100%;max-width:400px;background:#111318;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:20px;color:#f8fafc;box-shadow:0 24px 60px rgba(0,0,0,.9);position:relative;}" +
+      ".jj-notice-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}" +
+      ".jj-notice-icon-box{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:17px;}" +
+      ".jj-notice-x{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);color:#cbd5e1;width:32px;height:32px;border-radius:10px;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;}" +
+      ".jj-notice-x:hover{background:#ff2450;color:#fff;border-color:#ff2450;}" +
+      ".jj-notice-tag{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:1px;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;}" +
+      ".jj-notice-dot{width:6px;height:6px;border-radius:50%;background:#ff4166;display:inline-block;}" +
+      ".jj-notice-title{margin:0 0 8px;font-size:19px;font-weight:800;line-height:1.3;color:#fff;}" +
+      ".jj-notice-body{margin:0 0 14px;font-size:13px;line-height:1.55;color:#cbd5e1;white-space:pre-line;}" +
+      ".jj-notice-action{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:linear-gradient(135deg,rgba(255,184,48,.14),rgba(255,107,0,.1));border:1px solid rgba(255,184,48,.38);border-radius:12px;text-decoration:none;margin-bottom:12px;}" +
+      ".jj-notice-action-left{display:flex;flex-direction:column;gap:2px;min-width:0;}" +
+      ".jj-notice-action-sub{font-size:9px;font-weight:800;letter-spacing:.8px;color:#eab308;text-transform:uppercase;}" +
+      ".jj-notice-action-main{font-size:14px;font-weight:800;color:#fde047;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+      ".jj-notice-action-arrow{width:30px;height:30px;border-radius:8px;background:rgba(255,184,48,.18);color:#fde047;display:flex;align-items:center;justify-content:center;font-weight:900;flex-shrink:0;}" +
+      ".jj-notice-foot{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:11px 14px;margin-top:4px;}" +
+      ".jj-notice-dismiss{background:none;border:none;color:#e2e8f0;font-weight:700;font-size:13px;cursor:pointer;padding:0;}" +
+      ".jj-notice-dismiss:hover{color:#ff4166;}" +
+      ".jj-notice-hide-tag{font-size:11px;color:#64748b;font-weight:600;}";
+    document.head.appendChild(st);
+  }
+
+  var wrap = document.createElement("div");
+  wrap.id = "jjStartupNoticeModal";
+  wrap.className = "jj-notice-backdrop";
+
+  var actionHTML = msgItem.link_url
+    ? '<a class="jj-notice-action" href="' + escapeHTML(safeURL(msgItem.link_url)) + '" target="_blank" rel="noopener noreferrer">' +
+        '<div class="jj-notice-action-left">' +
+          '<span class="jj-notice-action-sub">OFFICIAL UPDATE</span>' +
+          '<span class="jj-notice-action-main">Tap to Open Link</span>' +
+        '</div>' +
+        '<span class="jj-notice-action-arrow">→</span>' +
+      '</a>'
+    : "";
+
+  wrap.innerHTML =
+    '<div class="jj-notice-card">' +
+      '<div class="jj-notice-top">' +
+        '<div class="jj-notice-icon-box">📢</div>' +
+        '<button type="button" class="jj-notice-x" id="jjNoticeCloseX" aria-label="Close">&times;</button>' +
+      '</div>' +
+      '<div class="jj-notice-tag"><span class="jj-notice-dot"></span><span>JJ MOVIES NOTICE</span></div>' +
+      '<h3 class="jj-notice-title">' + escapeHTML(msgItem.title) + '</h3>' +
+      (msgItem.message ? '<p class="jj-notice-body">' + escapeHTML(msgItem.message) + '</p>' : '') +
+      actionHTML +
+      '<div class="jj-notice-foot">' +
+        '<button type="button" class="jj-notice-dismiss" id="jjNoticeDismissBtn">Dismiss</button>' +
+        '<span class="jj-notice-hide-tag">hide for 7d</span>' +
+      '</div>' +
+    '</div>';
+
+  function closeNotice(hide7d) {
+    if (hide7d) {
+      try { localStorage.setItem(hideKey, String(Date.now() + 7 * 24 * 3600 * 1000)); } catch (e) {}
+    }
+    if (wrap && wrap.parentNode) wrap.remove();
+  }
+
+  document.body.appendChild(wrap);
+  document.getElementById("jjNoticeCloseX").addEventListener("click", function () { closeNotice(false); });
+  document.getElementById("jjNoticeDismissBtn").addEventListener("click", function () { closeNotice(true); });
+  wrap.addEventListener("click", function (e) {
+    if (e.target === wrap) closeNotice(false);
+  });
+}
+window.renderStartupNoticeModal = renderStartupNoticeModal;
+
 // ---------- Messages Ticker ----------
 function loadMessages() {
   var tickerWrapper = document.getElementById("jjTickerTextWrapper");
   var tickerContainer = document.getElementById("jjAlertsTicker");
   var actionArea = document.getElementById("jjTickerActionArea");
-  if (!tickerWrapper || !tickerContainer) return;
 
   fetchFromApi("messages")
     .then(function (data) {
       var activeMessages = Array.isArray(data) ? data : [];
-      if (!activeMessages.length) { tickerContainer.style.display = "none"; return; }
+      if (!activeMessages.length) {
+        if (tickerContainer) tickerContainer.style.display = "none";
+        return;
+      }
 
+      renderStartupNoticeModal(activeMessages[0]);
+
+      if (!tickerWrapper || !tickerContainer) return;
       tickerContainer.style.display = "flex";
       tickerWrapper.innerHTML = "";
 
@@ -1378,6 +1472,8 @@ if (movieModal) {
 
 document.addEventListener("keydown", function (event) {
   if (event.key === "Escape") {
+    var noticeModal = document.getElementById("jjStartupNoticeModal");
+    if (noticeModal) noticeModal.remove();
     closeInAppPlayer();
     closeMovieModal();
   }
