@@ -1338,7 +1338,7 @@ function pickTargetedNotice(messagesList) {
 function renderStartupNoticeModal(msgItem) {
   if (!msgItem || !msgItem.title) return;
   var inApp = Boolean(msgItem.isAppNotice != null ? msgItem.isAppNotice : isRunningInsideApk());
-  var hideKey = "jj_notice_hide_until_" + (inApp ? "app_" : "web_") + String(msgItem.id || msgItem.title);
+  var hideKey = "jj_notice_hide_until_" + (inApp ? "app_" : "web_") + String(msgItem.id || "") + "_" + String(msgItem.title || "").slice(0, 20) + "_" + String(msgItem.link_url || "").slice(-10);
   try {
     var hiddenUntil = Number(localStorage.getItem(hideKey) || 0);
     if (hiddenUntil && Date.now() < hiddenUntil) return;
