@@ -324,7 +324,7 @@ hr{border-color:#303a50;margin:24px 0}
     <div class="panel">
       <h2>Quick Movie Manager (Search, Select, Edit & Delete)</h2>
       <p class="muted">Search cheyandi leda kinda select dropdown nundi movie choose cheskondi.</p>
-      
+
       <label for="managerSearchInput">Search Movie</label>
       <input id="managerSearchInput" placeholder="Type movie name (e.g. Jurassic)..." autocomplete="off">
       <div id="suggestionsBox"></div>
@@ -339,18 +339,19 @@ hr{border-color:#303a50;margin:24px 0}
       </div>
     </div>
 
-    <!-- CREATE / EDIT JJ MESSAGE -->
+    <!-- CREATE / EDIT JJ MESSAGE & STARTUP POPUP -->
     <div class="panel">
-      <h2 id="messageFormTitle">Create JJ Message / Update</h2>
+      <h2 id="messageFormTitle">Create JJ Message / Startup Update Popup</h2>
+      <p class="muted">Publish chesina latest message website/app open cheyagane popup modal lo kanipistundi.</p>
       <form id="announcementForm">
         <label for="announcementTitle">Message Title *</label>
-        <input id="announcementTitle" maxlength="200" required placeholder="Example: New Marvel movies added">
+        <input id="announcementTitle" maxlength="200" required placeholder="Example: New App Update v2.0 Available">
 
         <label for="announcementText">Message *</label>
-        <textarea id="announcementText" required placeholder="Write update details..."></textarea>
+        <textarea id="announcementText" required placeholder="Write update or notice details..."></textarea>
 
-        <label for="announcementLink">Optional Link</label>
-        <input id="announcementLink" type="url" placeholder="https://t.me/...">
+        <label for="announcementLink">Optional Link (Popup Button)</label>
+        <input id="announcementLink" type="url" placeholder="https://t.me/... or https://example.com/app.apk">
 
         <label class="checkline">
           <input id="announcementPublished" type="checkbox" checked> Publish on website
@@ -424,11 +425,9 @@ hr{border-color:#303a50;margin:24px 0}
   function normalizeStreamInputUrl(value) {
     var raw = String(value || "").trim();
     if (!raw) return "";
-    // Plain B2 filename ("418...mkv") OR B2 prefixed ("b2_1/418...mkv") -> save as-is
     if (!/^https?:\/\//i.test(raw) && isDirectVideoFile(raw)) {
       return raw.replace(/^\/+/, "");
     }
-    // Plain Pixeldrain ID
     if (/^[A-Za-z0-9_-]{6,20}$/.test(raw)) {
       return "https://pixeldrain.com/u/" + raw;
     }
@@ -874,7 +873,7 @@ hr{border-color:#303a50;margin:24px 0}
 
     movies.forEach(function (movie) {
       var label = movie.title + (movie.release_year ? " (" + movie.release_year + ")" : "");
-      
+
       var opt1 = document.createElement("option");
       opt1.value = String(movie.id);
       opt1.textContent = label;
@@ -1147,7 +1146,7 @@ hr{border-color:#303a50;margin:24px 0}
     showMessage("JJ Message saved successfully!");
     document.getElementById("announcementForm").reset();
     editingAnnouncementId = null;
-    document.getElementById("messageFormTitle").textContent = "Create JJ Message / Update";
+    document.getElementById("messageFormTitle").textContent = "Create JJ Message / Startup Update Popup";
     document.getElementById("saveAnnouncementBtn").textContent = "Save Message";
     document.getElementById("cancelAnnouncementBtn").classList.add("hidden");
     loadAnnouncements();
@@ -1156,7 +1155,7 @@ hr{border-color:#303a50;margin:24px 0}
   document.getElementById("cancelAnnouncementBtn").addEventListener("click", function() {
     editingAnnouncementId = null;
     document.getElementById("announcementForm").reset();
-    document.getElementById("messageFormTitle").textContent = "Create JJ Message / Update";
+    document.getElementById("messageFormTitle").textContent = "Create JJ Message / Startup Update Popup";
     document.getElementById("saveAnnouncementBtn").textContent = "Save Message";
     document.getElementById("cancelAnnouncementBtn").classList.add("hidden");
   });
