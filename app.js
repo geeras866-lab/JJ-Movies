@@ -1374,13 +1374,17 @@ function renderStartupNoticeModal(msgItem) {
   }
 
   var parsedMsg = extractNoticeButton(msgItem.message);
-  var hasCustomBtn = Boolean(parsedMsg.btnLabel && parsedMsg.btnUrl);
+  var directLink = String(msgItem.link_url || "").trim();
+  var fallbackUrl = directLink ? safeURL(directLink) : "";
+  var finalBtnUrl = parsedMsg.btnUrl || (/^https?:\/\//i.test(fallbackUrl) ? fallbackUrl : "");
+  var finalBtnLabel = parsedMsg.btnLabel || (inApp ? "Update Your App" : "Download App");
+  var hasCustomBtn = Boolean(finalBtnUrl);
 
   var actionHTML = hasCustomBtn
-    ? '<a class="jj-notice-action" href="' + escapeHTML(parsedMsg.btnUrl) + '" target="_blank" rel="noopener noreferrer">' +
+    ? '<a class="jj-notice-action" href="' + escapeHTML(finalBtnUrl) + '" target="_blank" rel="noopener noreferrer">' +
         '<div class="jj-notice-action-left">' +
           '<span class="jj-notice-action-sub">' + (inApp ? "APP ACTION" : "OFFICIAL LINK") + '</span>' +
-          '<span class="jj-notice-action-main">' + escapeHTML(parsedMsg.btnLabel) + '</span>' +
+          '<span class="jj-notice-action-main">' + escapeHTML(finalBtnLabel) + '</span>' +
         '</div>' +
         '<span class="jj-notice-action-arrow">→</span>' +
       '</a>'
