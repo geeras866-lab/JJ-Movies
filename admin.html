@@ -358,8 +358,14 @@ hr{border-color:#303a50;margin:24px 0}
         <label for="announcementText">Message *</label>
         <textarea id="announcementText" required placeholder="Write update or notice details..."></textarea>
 
-        <label for="announcementLink">Action Button Link (APK / Update URL)</label>
-        <input id="announcementLink" type="url" placeholder="https://example.com/jj-movies.apk">
+        <label for="announcementLink">Ticker / General Link (Optional)</label>
+        <input id="announcementLink" type="url" placeholder="https://example.com/...">
+
+        <label for="announcementBtnLabel">Optional Popup Button Name (e.g. Get TV App)</label>
+        <input id="announcementBtnLabel" type="text" maxlength="50" placeholder="Leave empty if no popup button needed">
+
+        <label for="announcementBtnUrl">Optional Popup Button Link (e.g. TV App URL)</label>
+        <input id="announcementBtnUrl" type="url" placeholder="https://example.com/jj-tv.apk">
 
         <label class="checkline">
           <input id="announcementPublished" type="checkbox" checked> Publish on website
@@ -474,6 +480,27 @@ hr{border-color:#303a50;margin:24px 0}
     var t = String(target || "ALL").toUpperCase();
     if (t === "WEB" || t === "APP" || t === "NOTICE") return "[" + t + "] " + clean;
     return clean;
+  }
+
+  function parseMessageWithButton(rawText) {
+    var text = String(rawText || "");
+    var match = text.match(/\n?\|\|BTN:\s*([^|\n]+?)\s*\|\s*(https?:\/\/\S+)\s*$/i);
+    if (!match) {
+      return { body: text.trim(), btnLabel: "", btnUrl: "" };
+    }
+    return {
+      body: text.replace(match[0], "").trim(),
+      btnLabel: match[1].trim(),
+      btnUrl: safeHttpUrl(match[2].trim())
+    };
+  }
+
+  function composeMessageWithButton(bodyText, btnLabel, btnUrl) {
+    var cleanBody = String(bodyText || "").trim();
+    var label = String(btnLabel || "").trim();
+    var url = safeHttpUrl(String(btnUrl || "").trim());
+    if (!label || !url) return cleanBody;
+    return cleanBody + "\n||BTN: " + label + " | " + url;
   }
 
   function makeElement(tag, className, text) {
@@ -1154,6 +1181,8 @@ hr{border-color:#303a50;margin:24px 0}
     editingAnnouncementId = null;
     document.getElementById("announcementForm").reset();
     document.getElementById("announcementTarget").value = "WEB";
+    document.getElementById("announcementBtnLabel").value = "";
+    document.getElementById("announcementBtnUrl").value = "";
     document.getElementById("announcementPublished").checked = true;
     document.getElementById("messageFormTitle").textContent = "Create JJ Message / Startup Update Popup";
     document.getElementById("saveAnnouncementBtn").textContent = "Save Message";
@@ -1164,9 +1193,13 @@ hr{border-color:#303a50;margin:24px 0}
     e.preventDefault();
     var targetVal = document.getElementById("announcementTarget").value || "ALL";
     var rawTitle = document.getElementById("announcementTitle").value.trim();
+    var rawBody = document.getElementById("announcementText").value.trim();
+    var btnLabel = document.getElementById("announcementBtnLabel").value.trim();
+    var btnUrl = document.getElementById("announcementBtnUrl").value.trim();
+
     var msgData = {
       title: formatTargetedTitle(targetVal, rawTitle),
-      message: document.getElementById("announcementText").value.trim(),
+      message: composeMessageWithButton(rawBody, btnLabel, btnUrl),
       link_url: safeHttpUrl(document.getElementById("announcementLink").value.trim()) || null,
       is_published: document.getElementById("announcementPublished").checked
     };
@@ -1193,6 +1226,7 @@ hr{border-color:#303a50;margin:24px 0}
     if (!msgs.length) { announcementList.textContent = "No messages yet."; return; }
     msgs.forEach(function(m) {
       var parsed = parseMessageTargetAndTitle(m.title);
+      var parsedMsg = parseMessageWithButton(m.message);
       var targetBadge = parsed.target === "WEB"
         ? "[Website Only] "
         : (parsed.target === "APP"
@@ -1200,7 +1234,10 @@ hr{border-color:#303a50;margin:24px 0}
           : (parsed.target === "NOTICE" ? "[Notices Bar] " : "[Web + App] "));
       var row = makeElement("div", "announcement-row");
       row.appendChild(makeElement("h3", "", targetBadge + parsed.cleanTitle));
-      row.appendChild(makeElement("p", "", m.message));
+      row.appendChild(makeElement("p", "", parsedMsg.body));
+      if (parsedMsg.btnLabel && parsedMsg.btnUrl) {
+        row.appendChild(makeElement("p", "muted", "Popup Button: " + parsedMsg.btnLabel + " → " + parsedMsg.btnUrl));
+      }
       if (m.link_url) {
         var a = makeElement("a", "", m.link_url);
         a.href = m.link_url;
@@ -1222,7 +1259,9 @@ hr{border-color:#303a50;margin:24px 0}
         editingAnnouncementId = m.id;
         document.getElementById("announcementTarget").value = parsed.target;
         document.getElementById("announcementTitle").value = parsed.cleanTitle;
-        document.getElementById("announcementText").value = m.message || "";
+        document.getElementById("announcementText").value = parsedMsg.body;
+        document.getElementById("announcementBtnLabel").value = parsedMsg.btnLabel;
+        document.getElementById("announcementBtnUrl").value = parsedMsg.btnUrl;
         document.getElementById("announcementLink").value = m.link_url || "";
         document.getElementById("announcementPublished").checked = !!m.is_published;
         document.getElementById("messageFormTitle").textContent = "Edit JJ Message";
