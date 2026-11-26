@@ -207,7 +207,6 @@ function extractWorkerFileName(rawUrl) {
   var val = String(rawUrl || "").trim();
   if (!val) return "";
 
-  // Fix old DB entries saved as "https://b2_1/filename.mkv"
   var b2FakeUrl = val.match(/^https?:\/\/(b2_[a-zA-Z0-9_-]+)\/(.+)$/i);
   if (b2FakeUrl) {
     var pathPart = b2FakeUrl[2].split("?")[0];
@@ -271,14 +270,12 @@ function normalizeStreamUrl(url) {
   if (!u || isDirectVideoFile(u)) return u;
   if (u.indexOf("/e/") !== -1) return u;
 
-  // Convert filemoon.sx/d/xxx or /v/xxx -> /e/xxx for iframe embed
   var m = u.match(/^(https?:\/\/[^\/]+)\/(?:d|v)\/([A-Za-z0-9]+)(\?.*)?$/i);
   if (m) return m[1] + "/e/" + m[2] + (m[3] || "");
 
   return u.replace(/streamlare\.com\/(v|d)\//, "streamlare.com/e/");
 }
 
-// Smart resolver: B2 files -> /api/get-token; filemoon/pixeldrain/direct -> normalizeStreamUrl
 async function resolveTokenStreamUrl(rawUrl, linkType, meta) {
   var raw = String(rawUrl || "").trim();
   if (!raw) throw new Error("Empty stream link");
@@ -616,7 +613,7 @@ window.closeInAppPlayer = closeInAppPlayer;
 window.togglePlayerFullscreen = togglePlayerFullscreen;
 window.launchNativeVlc = launchNativeVlc;
 
-// ---------- UI Styles & Updates Ticker ----------
+// ---------- UI Styles & Notices Ticker ----------
 function createExtraSections() {
   if (!document.getElementById("jjExtraStyles")) {
     var style = document.createElement("style");
@@ -685,7 +682,7 @@ function createExtraSections() {
     updates.innerHTML =
       '<div id="jjAlertsTicker" class="jj-alert-ticker-container" style="display:none;">' +
         '<div class="jj-alert-ticker-content">' +
-          '<span class="jj-ticker-badge">UPDATES</span>' +
+          '<span class="jj-ticker-badge">NOTICES</span>' +
           '<div id="jjTickerTextWrapper" class="jj-ticker-text-wrapper"></div>' +
         '</div>' +
         '<div id="jjTickerActionArea"></div>' +
@@ -1268,7 +1265,6 @@ async function showMovieDetails(movieId) {
     shareAnchor.href = "https://api.whatsapp.com/send?text=" + encodeURIComponent(customText);
   }
 
-  // Load Telegram bot prints on both Website & App
   try {
     var versions = await fetchFromApi("versions", { movie_id: movieId });
     var container = document.getElementById("modalVersionContainer");
@@ -1298,10 +1294,36 @@ async function showMovieDetails(movieId) {
 }
 window.showMovieDetails = showMovieDetails;
 
-// ---------- Startup Notice Popup Modal ----------
+// ---------- Startup Notice Popup Modal (Separate for Website vs App) ----------
+function pickTargetedNotice(messagesList) {
+  if (!Array.isArray(messagesList) || !messagesList.length) return null;
+  var inApp = isRunningInsideApk();
+
+  function stripTargetTag(t) {
+    return String(t || "").replace(/^\s*\[(WEB|APP|ALL)\]\s*/i, "").trim();
+  }
+
+  var targeted = messagesList.find(function (m) {
+    var rawTitle = String(m.title || "").trim();
+    if (inApp) return /^\s*\[APP\]/i.test(rawTitle);
+    return /^\s*\[WEB\]/i.test(rawTitle);
+  });
+
+  var chosen = targeted || messagesList.find(function (m) {
+    return !/^\s*\[(WEB|APP)\]/i.test(String(m.title || "").trim());
+  });
+
+  if (!chosen) return null;
+  return Object.assign({}, chosen, {
+    title: stripTargetTag(chosen.title) || (inApp ? "New Version - Update Your App" : "Download JJ Movies App"),
+    isAppNotice: inApp
+  });
+}
+
 function renderStartupNoticeModal(msgItem) {
   if (!msgItem || !msgItem.title) return;
-  var hideKey = "jj_notice_hide_until_" + String(msgItem.id || msgItem.title);
+  var inApp = Boolean(msgItem.isAppNotice != null ? msgItem.isAppNotice : isRunningInsideApk());
+  var hideKey = "jj_notice_hide_until_" + (inApp ? "app_" : "web_") + String(msgItem.id || msgItem.title);
   try {
     var hiddenUntil = Number(localStorage.getItem(hideKey) || 0);
     if (hiddenUntil && Date.now() < hiddenUntil) return;
@@ -1315,7 +1337,7 @@ function renderStartupNoticeModal(msgItem) {
     st.textContent =
       ".jj-notice-backdrop{position:fixed;inset:0;background:rgba(4,8,16,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:100001;display:flex;align-items:center;justify-content:center;padding:16px;animation:jjNoticeFade .2s ease;}" +
       "@keyframes jjNoticeFade{from{opacity:0;}to{opacity:1;}}" +
-      ".jj-notice-card{width:100%;max-width:400px;background:#111318;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:20px;color:#f8fafc;box-shadow:0 24px 60px rgba(0,0,0,.9);position:relative;}" +
+      ".jj-notice-card{width:100%;max-width:400px;background:#111318;border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:20px;color:#f8fafc;box-shadow:0 24px 60px rgba(0,0,0,.9);position:relative;}" +
       ".jj-notice-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}" +
       ".jj-notice-icon-box{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:17px;}" +
       ".jj-notice-x{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);color:#cbd5e1;width:32px;height:32px;border-radius:10px;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;}" +
@@ -1340,11 +1362,13 @@ function renderStartupNoticeModal(msgItem) {
   wrap.id = "jjStartupNoticeModal";
   wrap.className = "jj-notice-backdrop";
 
+  var actionLabel = inApp ? "Update Your App" : "Download App";
+  var actionSub = inApp ? "NEW VERSION AVAILABLE" : "OFFICIAL ANDROID APP";
   var actionHTML = msgItem.link_url
     ? '<a class="jj-notice-action" href="' + escapeHTML(safeURL(msgItem.link_url)) + '" target="_blank" rel="noopener noreferrer">' +
         '<div class="jj-notice-action-left">' +
-          '<span class="jj-notice-action-sub">OFFICIAL UPDATE</span>' +
-          '<span class="jj-notice-action-main">Tap to Open Link</span>' +
+          '<span class="jj-notice-action-sub">' + actionSub + '</span>' +
+          '<span class="jj-notice-action-main">' + actionLabel + '</span>' +
         '</div>' +
         '<span class="jj-notice-action-arrow">→</span>' +
       '</a>'
@@ -1353,10 +1377,10 @@ function renderStartupNoticeModal(msgItem) {
   wrap.innerHTML =
     '<div class="jj-notice-card">' +
       '<div class="jj-notice-top">' +
-        '<div class="jj-notice-icon-box">📢</div>' +
+        '<div class="jj-notice-icon-box">' + (inApp ? "🔄" : "📲") + '</div>' +
         '<button type="button" class="jj-notice-x" id="jjNoticeCloseX" aria-label="Close">&times;</button>' +
       '</div>' +
-      '<div class="jj-notice-tag"><span class="jj-notice-dot"></span><span>JJ MOVIES NOTICE</span></div>' +
+      '<div class="jj-notice-tag"><span class="jj-notice-dot"></span><span>' + (inApp ? "JJ MOVIES APP UPDATE" : "JJ MOVIES NOTICE") + '</span></div>' +
       '<h3 class="jj-notice-title">' + escapeHTML(msgItem.title) + '</h3>' +
       (msgItem.message ? '<p class="jj-notice-body">' + escapeHTML(msgItem.message) + '</p>' : '') +
       actionHTML +
@@ -1382,7 +1406,7 @@ function renderStartupNoticeModal(msgItem) {
 }
 window.renderStartupNoticeModal = renderStartupNoticeModal;
 
-// ---------- Messages Ticker ----------
+// ---------- Notices Ticker (Remaining Messages) ----------
 function loadMessages() {
   var tickerWrapper = document.getElementById("jjTickerTextWrapper");
   var tickerContainer = document.getElementById("jjAlertsTicker");
@@ -1396,17 +1420,27 @@ function loadMessages() {
         return;
       }
 
-      renderStartupNoticeModal(activeMessages[0]);
+      var popupNotice = pickTargetedNotice(activeMessages);
+      if (popupNotice) {
+        renderStartupNoticeModal(popupNotice);
+      }
+
+      // Remaining messages (excluding the one picked for startup popup) go to NOTICES bar
+      var remainingNotices = activeMessages.filter(function (m) {
+        return !popupNotice || String(m.id) !== String(popupNotice.id);
+      });
+      var barItems = remainingNotices.length ? remainingNotices : activeMessages;
 
       if (!tickerWrapper || !tickerContainer) return;
       tickerContainer.style.display = "flex";
       tickerWrapper.innerHTML = "";
 
-      activeMessages.forEach(function (item, index) {
+      barItems.forEach(function (item, index) {
+        var cleanTitle = String(item.title || "").replace(/^\s*\[(WEB|APP|ALL)\]\s*/i, "").trim();
         var slide = document.createElement("span");
         slide.className = "jj-ticker-slide" + (index === 0 ? " active" : "");
         slide.setAttribute("data-link", item.link_url || "");
-        slide.innerHTML = "📢 <strong>" + escapeHTML(item.title) + "</strong>: " + escapeHTML(item.message);
+        slide.innerHTML = "📢 <strong>" + escapeHTML(cleanTitle) + "</strong>: " + escapeHTML(item.message);
         tickerWrapper.appendChild(slide);
       });
 
