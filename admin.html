@@ -112,6 +112,38 @@ hr{border-color:#303a50;margin:24px 0}
       <span id="appLinkStatusMsg" style="margin-left:10px; font-size:14px; font-weight:bold; color:#ff3867;"></span>
     </div>
 
+    <!-- APP MAINTENANCE & STRICT VERSION CONTROL -->
+    <div class="panel" style="border: 1px solid #f59e0b;">
+      <h2 style="color:#f59e0b;">🛡️ App Maintenance & Strict Version Control</h2>
+      <p class="muted">Maintenance ON chesthe Android App open avvagane block avtundi. Min Version Code penchithe old APKs anni block ayyi Update New App popup chupistayi.</p>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin:14px 0; padding:12px; background:#090d18; border-radius:8px; border:1px solid #35405a;">
+        <span style="font-weight:bold; font-size:15px;">Under Maintenance Mode (App Only):</span>
+        <label class="switch-label">
+          <input type="checkbox" id="appMaintenanceToggle">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
+      <label for="appMaintenanceMsg">Maintenance Message</label>
+      <textarea id="appMaintenanceMsg" placeholder="This app is currently under maintenance. Please check back soon."></textarea>
+
+      <label for="appMinVersionCode">Minimum Required Version Code (Integer: 1, 2, 3...)</label>
+      <input id="appMinVersionCode" type="number" min="1" value="1" placeholder="e.g. 2">
+
+      <label for="appUpdateTitle">Update Popup Title</label>
+      <input id="appUpdateTitle" type="text" placeholder="Update New App">
+
+      <label for="appUpdateMsg">Update Popup Message</label>
+      <textarea id="appUpdateMsg" placeholder="A new version of JJ Movies is available. Please update to continue watching."></textarea>
+
+      <label for="appUpdateUrl">Update APK Download Link</label>
+      <input id="appUpdateUrl" type="url" placeholder="https://example.com/jj-movies.apk">
+
+      <button type="button" id="btnSaveAppControl">Save App Control Settings</button>
+      <span id="appControlStatusMsg" style="margin-left:10px; font-size:14px; font-weight:bold; color:#f59e0b;"></span>
+    </div>
+
     <!-- ADD / EDIT MOVIE PANEL -->
     <div class="panel">
       <h2 id="formTitle">Add Movie</h2>
@@ -428,6 +460,15 @@ hr{border-color:#303a50;margin:24px 0}
   var btnResetAppLink = document.getElementById("btnResetAppLink");
   var appLinkStatusMsg = document.getElementById("appLinkStatusMsg");
 
+  var appMaintenanceToggle = document.getElementById("appMaintenanceToggle");
+  var appMaintenanceMsg = document.getElementById("appMaintenanceMsg");
+  var appMinVersionCode = document.getElementById("appMinVersionCode");
+  var appUpdateTitle = document.getElementById("appUpdateTitle");
+  var appUpdateMsg = document.getElementById("appUpdateMsg");
+  var appUpdateUrl = document.getElementById("appUpdateUrl");
+  var btnSaveAppControl = document.getElementById("btnSaveAppControl");
+  var appControlStatusMsg = document.getElementById("appControlStatusMsg");
+
   function showMessage(text) { message.textContent = text; }
 
   function isDirectVideoFile(val) {
@@ -539,6 +580,7 @@ hr{border-color:#303a50;margin:24px 0}
     loadAnnouncements();
     loadFestivalSettings();
     loadAppDownloadLink();
+    loadAppControlConfig();
   }
 
   async function loadFestivalSettings() {
@@ -612,6 +654,42 @@ hr{border-color:#303a50;margin:24px 0}
     });
     appLinkStatusMsg.textContent = res.error ? "❌ Failed: " + res.error.message : "✅ Reset to ./jj-movies.apk!";
     setTimeout(function () { appLinkStatusMsg.textContent = ""; }, 3500);
+  });
+
+  async function loadAppControlConfig() {
+    try {
+      var res = await supabase.from("site_settings").select("value").eq("key", "app_control_config").single();
+      if (res.data && res.data.value) {
+        var v = res.data.value;
+        appMaintenanceToggle.checked = v.maintenance === true;
+        appMaintenanceMsg.value = v.maintenance_message || "";
+        appMinVersionCode.value = v.min_version_code || 1;
+        appUpdateTitle.value = v.update_title || "Update New App";
+        appUpdateMsg.value = v.update_message || "";
+        appUpdateUrl.value = v.update_url || "";
+      }
+    } catch (err) {
+      console.warn("Could not load app control config:", err);
+    }
+  }
+
+  btnSaveAppControl.addEventListener("click", async function () {
+    appControlStatusMsg.textContent = "Saving...";
+    var minVer = Math.max(1, parseInt(appMinVersionCode.value, 10) || 1);
+    var payload = {
+      key: "app_control_config",
+      value: {
+        maintenance: appMaintenanceToggle.checked,
+        maintenance_message: (appMaintenanceMsg.value || "This app is currently under maintenance. Please check back soon.").trim(),
+        min_version_code: minVer,
+        update_title: (appUpdateTitle.value || "Update New App").trim(),
+        update_message: (appUpdateMsg.value || "A new version of JJ Movies is available. Please update to continue.").trim(),
+        update_url: normalizeAppLinkValue(appUpdateUrl.value) || ""
+      }
+    };
+    var res = await supabase.from("site_settings").upsert(payload);
+    appControlStatusMsg.textContent = res.error ? "❌ Failed: " + res.error.message : "✅ Saved Successfully!";
+    setTimeout(function () { appControlStatusMsg.textContent = ""; }, 3500);
   });
 
   document.getElementById("loginForm").addEventListener("submit", async function (e) {
