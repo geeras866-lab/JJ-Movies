@@ -112,13 +112,13 @@ hr{border-color:#303a50;margin:24px 0}
       <span id="appLinkStatusMsg" style="margin-left:10px; font-size:14px; font-weight:bold; color:#ff3867;"></span>
     </div>
 
-    <!-- APP MAINTENANCE & STRICT VERSION CONTROL -->
+    <!-- MOBILE APP MAINTENANCE & STRICT VERSION CONTROL -->
     <div class="panel" style="border: 1px solid #f59e0b;">
-      <h2 style="color:#f59e0b;">🛡️ App Maintenance & Strict Version Control</h2>
-      <p class="muted">Maintenance ON chesthe Android App open avvagane block avtundi. Min Version Code penchithe old APKs anni block ayyi Update New App popup chupistayi.</p>
+      <h2 style="color:#f59e0b;">🛡️ Mobile App Maintenance & Strict Version Control</h2>
+      <p class="muted">Idi kevalam <b>Mobile Android App</b> kosam. Maintenance ON chesthe Mobile App block avtundi. Min Version Code penchithe old Mobile APKs ki Update popup vastundi.</p>
 
       <div style="display:flex; justify-content:space-between; align-items:center; margin:14px 0; padding:12px; background:#090d18; border-radius:8px; border:1px solid #35405a;">
-        <span style="font-weight:bold; font-size:15px;">Under Maintenance Mode (App Only):</span>
+        <span style="font-weight:bold; font-size:15px;">Under Maintenance Mode (Mobile App Only):</span>
         <label class="switch-label">
           <input type="checkbox" id="appMaintenanceToggle">
           <span class="switch-slider"></span>
@@ -137,11 +137,51 @@ hr{border-color:#303a50;margin:24px 0}
       <label for="appUpdateMsg">Update Popup Message</label>
       <textarea id="appUpdateMsg" placeholder="A new version of JJ Movies is available. Please update to continue watching."></textarea>
 
-      <label for="appUpdateUrl">Update APK Download Link</label>
+      <label for="appUpdateUrl">Mobile APK Download Link</label>
       <input id="appUpdateUrl" type="url" placeholder="https://example.com/jj-movies.apk">
 
-      <button type="button" id="btnSaveAppControl">Save App Control Settings</button>
+      <button type="button" id="btnSaveAppControl">Save Mobile App Control</button>
       <span id="appControlStatusMsg" style="margin-left:10px; font-size:14px; font-weight:bold; color:#f59e0b;"></span>
+    </div>
+
+    <!-- TV APP MAINTENANCE & VERSION CONTROL (TV ONLY) -->
+    <div class="panel" style="border: 1px solid #a855f7; box-shadow: 0 0 12px rgba(168, 85, 247, 0.15);">
+      <h2 style="color:#a855f7;">📺 TV App Maintenance & Version Control (TV Only)</h2>
+      <p class="muted">Idi kevalam <b>JJ Movies TV App</b> kosam (Mobile App ki affect avvadu). TV Min Version Code penchithe TV lo direct ga Update popup vachi APK download & install avthundi.</p>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin:14px 0; padding:12px; background:#090d18; border-radius:8px; border:1px solid #35405a;">
+        <span style="font-weight:bold; font-size:15px;">Under Maintenance Mode (TV App Only):</span>
+        <label class="switch-label">
+          <input type="checkbox" id="tvMaintenanceToggle">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
+      <label for="tvMaintenanceMsg">TV Maintenance Message</label>
+      <textarea id="tvMaintenanceMsg" placeholder="JJ Movies TV is currently under maintenance. Please check back soon."></textarea>
+
+      <label for="tvMinVersionCode">TV Minimum Required Version Code (Integer: 1, 2, 3...)</label>
+      <input id="tvMinVersionCode" type="number" min="1" value="1" placeholder="e.g. 2">
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin:14px 0; padding:12px; background:#090d18; border-radius:8px; border:1px solid #35405a;">
+        <span style="font-weight:bold; font-size:15px;">Force Update (OFF chesthe 'Later' button vastundi):</span>
+        <label class="switch-label">
+          <input type="checkbox" id="tvForceUpdateToggle" checked>
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
+      <label for="tvUpdateTitle">TV Update Popup Title</label>
+      <input id="tvUpdateTitle" type="text" placeholder="Update JJ Movies TV">
+
+      <label for="tvUpdateMsg">TV Update Popup Message</label>
+      <textarea id="tvUpdateMsg" placeholder="New version of JJ Movies TV is available. Please update to continue."></textarea>
+
+      <label for="tvUpdateUrl">TV APK Direct Download Link</label>
+      <input id="tvUpdateUrl" type="url" placeholder="https://example.com/jj-movies-tv.apk">
+
+      <button type="button" id="btnSaveTvControl" style="background:#a855f7;">Save TV App Control</button>
+      <span id="tvControlStatusMsg" style="margin-left:10px; font-size:14px; font-weight:bold; color:#a855f7;"></span>
     </div>
 
     <!-- ADD / EDIT MOVIE PANEL -->
@@ -469,6 +509,16 @@ hr{border-color:#303a50;margin:24px 0}
   var btnSaveAppControl = document.getElementById("btnSaveAppControl");
   var appControlStatusMsg = document.getElementById("appControlStatusMsg");
 
+  var tvMaintenanceToggle = document.getElementById("tvMaintenanceToggle");
+  var tvMaintenanceMsg = document.getElementById("tvMaintenanceMsg");
+  var tvMinVersionCode = document.getElementById("tvMinVersionCode");
+  var tvForceUpdateToggle = document.getElementById("tvForceUpdateToggle");
+  var tvUpdateTitle = document.getElementById("tvUpdateTitle");
+  var tvUpdateMsg = document.getElementById("tvUpdateMsg");
+  var tvUpdateUrl = document.getElementById("tvUpdateUrl");
+  var btnSaveTvControl = document.getElementById("btnSaveTvControl");
+  var tvControlStatusMsg = document.getElementById("tvControlStatusMsg");
+
   function showMessage(text) { message.textContent = text; }
 
   function isDirectVideoFile(val) {
@@ -581,6 +631,7 @@ hr{border-color:#303a50;margin:24px 0}
     loadFestivalSettings();
     loadAppDownloadLink();
     loadAppControlConfig();
+    loadTvControlConfig();
   }
 
   async function loadFestivalSettings() {
@@ -690,6 +741,51 @@ hr{border-color:#303a50;margin:24px 0}
     var res = await supabase.from("site_settings").upsert(payload);
     appControlStatusMsg.textContent = res.error ? "❌ Failed: " + res.error.message : "✅ Saved Successfully!";
     setTimeout(function () { appControlStatusMsg.textContent = ""; }, 3500);
+  });
+
+  async function loadTvControlConfig() {
+    try {
+      var res = await supabase.from("site_settings").select("value").eq("key", "tv_app_control_config").single();
+      if (res.data && res.data.value) {
+        var v = res.data.value;
+        tvMaintenanceToggle.checked = v.maintenance === true;
+        tvMaintenanceMsg.value = v.maintenance_message || "";
+        tvMinVersionCode.value = v.tv_min_version_code || v.min_version_code || 1;
+        tvForceUpdateToggle.checked = v.force_update !== false;
+        tvUpdateTitle.value = v.update_title || "Update JJ Movies TV";
+        tvUpdateMsg.value = v.update_message || "";
+        tvUpdateUrl.value = v.tv_update_url || v.update_url || "";
+      }
+    } catch (err) {
+      console.warn("Could not load TV control config:", err);
+    }
+  }
+
+  btnSaveTvControl.addEventListener("click", async function () {
+    tvControlStatusMsg.textContent = "Saving...";
+    var minVer = Math.max(1, parseInt(tvMinVersionCode.value, 10) || 1);
+    var cleanTvUrl = safeHttpUrl(tvUpdateUrl.value.trim()) || "";
+    var payload = {
+      key: "tv_app_control_config",
+      value: {
+        maintenance: tvMaintenanceToggle.checked,
+        maintenance_message: (tvMaintenanceMsg.value || "JJ Movies TV is currently under maintenance. Please check back soon.").trim(),
+        tv_min_version_code: minVer,
+        force_update: tvForceUpdateToggle.checked,
+        update_title: (tvUpdateTitle.value || "Update JJ Movies TV").trim(),
+        update_message: (tvUpdateMsg.value || "New version of JJ Movies TV is available. Please update to continue.").trim(),
+        tv_update_url: cleanTvUrl
+      }
+    };
+    var res = await supabase.from("site_settings").upsert(payload);
+    if (!res.error && cleanTvUrl) {
+      await supabase.from("site_settings").upsert({
+        key: "tv_app_download_config",
+        value: { url: cleanTvUrl }
+      });
+    }
+    tvControlStatusMsg.textContent = res.error ? "❌ Failed: " + res.error.message : "✅ TV Settings Saved!";
+    setTimeout(function () { tvControlStatusMsg.textContent = ""; }, 3500);
   });
 
   document.getElementById("loginForm").addEventListener("submit", async function (e) {
