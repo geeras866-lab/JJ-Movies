@@ -12,7 +12,7 @@ on:
       version_code:
         description: 'Android Version Code (Integer: 1, 2, 3...)'
         required: true
-        default: '1'
+        default: '2'
 
 jobs:
   build-apk:
@@ -57,7 +57,7 @@ jobs:
       - name: 🔧 Configure Native Fullscreen Video & AndroidVlc Bridge
         run: |
           VER_NAME="${{ github.event.inputs.app_version || '1.0.0' }}"
-          VER_CODE="${{ github.event.inputs.version_code || '1' }}"
+          VER_CODE="${{ github.event.inputs.version_code || '2' }}"
 
           sed -i "s/versionCode 1/versionCode ${VER_CODE}/g" android/app/build.gradle
           sed -i "s/versionName \"1.0\"/versionName \"${VER_NAME}\"/g" android/app/build.gradle
@@ -71,6 +71,7 @@ jobs:
 
           import android.content.Intent;
           import android.content.pm.ActivityInfo;
+          import android.content.pm.PackageInfo;
           import android.graphics.Color;
           import android.graphics.drawable.ColorDrawable;
           import android.os.Build;
@@ -157,6 +158,19 @@ jobs:
                               intent.putExtra(VlcPlayerActivity.EXTRA_VIDEO_TITLE, title);
                               startActivity(intent);
                           });
+                      }
+
+                      @JavascriptInterface
+                      public int getAppVersionCode() {
+                          try {
+                              PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+                              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                  return (int) pInfo.getLongVersionCode();
+                              }
+                              return pInfo.versionCode;
+                          } catch (Exception e) {
+                              return 1;
+                          }
                       }
                   }, "AndroidVlc");
 
@@ -303,7 +317,7 @@ jobs:
               act = """        <activity
                       android:name=".VlcPlayerActivity"
                       android:exported="false"
-                      android:screenOrientation="sensorLandscape"
+                      android:screenOrientation="sensor"
                       android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode"
                       android:theme="@style/AppTheme.NoActionBar" />
           """
@@ -351,7 +365,13 @@ jobs:
 
           cat << 'EOF' > android/app/src/main/res/drawable/ic_vlc_rotate.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-              <path android:fillColor="#FFFFFF" android:pathData="M16.48,2.52c3.27,1.55 5.61,4.72 5.97,8.48h1.5C23.44,4.84 18.29,0 12,0l-0.66,0.03 3.81,3.81 1.33,-1.32zM10.23,1.75c-0.59,-0.59 -1.54,-0.59 -2.12,0L1.75,8.11c-0.59,0.59 -0.59,1.54 0,2.12l12.02,12.02c0.59,0.59 1.54,0.59 2.12,0l6.36,-6.36c0.59,-0.59 0.59,-1.54 0,-2.12L10.23,1.75zM14.83,21.19L2.81,9.17l6.36,-6.36 12.02,12.02 -6.36,6.36z"/>
+              <path android:fillColor="#FFFFFF" android:pathData="M12,4V1L8,5l4,4V6c3.31,0 6,2.69 6,6 0,1.01 -0.25,1.97 -0.7,2.8l1.46,1.46C19.54,15.03 20,13.57 20,12c0,-4.42 -3.58,-8 -8,-8zM12,18c-3.31,0 -6,-2.69 -6,-6 0,-1.01 0.25,-1.97 0.7,-2.8L5.24,7.74C4.46,8.97 4,10.43 4,12c0,4.42 3.58,8 8,8v3l4,-4 -4,-4v3z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > android/app/src/main/res/drawable/ic_vlc_orient_lock.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFF" android:pathData="M21,5H3C1.9,5 1,5.9 1,7v10c0,1.1 0.9,2 2,2h18c1.1,0 2,-0.9 2,-2V7C23,5.9 22.1,5 21,5zM21,17H3V7h18V17zM14,11v-1c0,-1.1 -0.9,-2 -2,-2s-2,0.9 -2,2v1H9v4h6v-4H14zM13,11h-2v-1c0,-0.55 0.45,-1 1,-1s1,0.45 1,1V11z"/>
           </vector>
           EOF
 
@@ -400,7 +420,6 @@ jobs:
                   android:layout_width="match_parent"
                   android:layout_height="match_parent" />
 
-              <!-- Center Buffer / Seek JJ Movies Brand Overlay -->
               <LinearLayout
                   android:id="@+id/loading_brand_container"
                   android:layout_width="wrap_content"
@@ -442,7 +461,6 @@ jobs:
                       android:textSize="11sp" />
               </LinearLayout>
 
-              <!-- Center Gesture HUD (Brightness / Volume / Aspect) -->
               <TextView
                   android:id="@+id/tv_gesture_hud"
                   android:layout_width="wrap_content"
@@ -640,6 +658,7 @@ jobs:
           import android.content.SharedPreferences;
           import android.content.pm.ActivityInfo;
           import android.content.res.ColorStateList;
+          import android.content.res.Configuration;
           import android.graphics.Color;
           import android.graphics.Typeface;
           import android.graphics.drawable.GradientDrawable;
@@ -682,7 +701,6 @@ jobs:
               private static final String PREFS_NAME = "jj_vlc_prefs";
               private static final String KEY_SUB_SIZE = "sub_rel_fontsize";
 
-              // LibVLC freetype-rel-fontsize: smaller value = bigger text
               private static final int[] SUB_SIZE_VALUES = { 22, 16, 13, 10 };
               private static final String[] SUB_SIZE_LABELS = { "Small", "Normal", "Large", "XL" };
 
@@ -694,7 +712,7 @@ jobs:
               private TextView tvLoadingSub, tvGestureHud;
               private SeekBar seekBar;
               private TextView tvCurrentTime, tvTotalTime, tvTitle;
-              private ImageButton btnPlayPause, btnUnlock;
+              private ImageButton btnPlayPause, btnUnlock, btnRotate;
               private AudioManager audioManager;
 
               private final Handler handler = new Handler(Looper.getMainLooper());
@@ -703,13 +721,12 @@ jobs:
               private boolean isUserSeeking = false;
               private boolean controlsVisible = true;
               private boolean isLocked = false;
-              private boolean isLandscape = true;
+              private boolean isOrientationLocked = false;
               private int aspectMode = 0;
 
-              // Swipe gesture state (Left = Brightness, Right = Volume)
               private float touchStartX = 0f;
               private float touchStartY = 0f;
-              private int gestureMode = 0; // 0 = none, 1 = brightness, 2 = volume
+              private int gestureMode = 0;
               private float startBrightness = 0.5f;
               private int startVolume = 0;
               private int maxVolume = 15;
@@ -777,20 +794,14 @@ jobs:
 
               private void showBrandOverlay(String subText, boolean autoHide) {
                   if (loadingBrandContainer == null) return;
-                  if (tvLoadingSub != null && subText != null) {
-                      tvLoadingSub.setText(subText);
-                  }
+                  if (tvLoadingSub != null && subText != null) tvLoadingSub.setText(subText);
                   loadingBrandContainer.setVisibility(View.VISIBLE);
                   handler.removeCallbacks(hideBrandAfterSeekRunnable);
-                  if (autoHide) {
-                      handler.postDelayed(hideBrandAfterSeekRunnable, 1200);
-                  }
+                  if (autoHide) handler.postDelayed(hideBrandAfterSeekRunnable, 1200);
               }
 
               private void hideBrandOverlay() {
-                  if (loadingBrandContainer != null) {
-                      loadingBrandContainer.setVisibility(View.GONE);
-                  }
+                  if (loadingBrandContainer != null) loadingBrandContainer.setVisibility(View.GONE);
               }
 
               private void showGestureHud(String text) {
@@ -853,20 +864,32 @@ jobs:
                   Toast.makeText(this, "Screen Unlocked", Toast.LENGTH_SHORT).show();
               }
 
-              private void applyLandscapeLock() {
-                  isLandscape = true;
-                  setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+              private void toggleOrientationLock() {
+                  if (!isOrientationLocked) {
+                      isOrientationLocked = true;
+                      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
+                      if (btnRotate != null) btnRotate.setImageResource(R.drawable.ic_vlc_orient_lock);
+                      showGestureHud("Orientation Locked");
+                  } else {
+                      isOrientationLocked = false;
+                      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
+                      if (btnRotate != null) btnRotate.setImageResource(R.drawable.ic_vlc_rotate);
+                      showGestureHud("Auto-Rotate");
+                  }
+                  scheduleHideControls();
               }
 
-              private void toggleRotation() {
-                  if (isLandscape) {
-                      isLandscape = false;
+              private void manualFlipOrientation() {
+                  int current = getResources().getConfiguration().orientation;
+                  isOrientationLocked = true;
+                  if (current == Configuration.ORIENTATION_LANDSCAPE) {
                       setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-                      Toast.makeText(this, "Portrait Mode", Toast.LENGTH_SHORT).show();
+                      showGestureHud("Portrait Locked");
                   } else {
-                      applyLandscapeLock();
-                      Toast.makeText(this, "Landscape Locked", Toast.LENGTH_SHORT).show();
+                      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                      showGestureHud("Landscape Locked");
                   }
+                  if (btnRotate != null) btnRotate.setImageResource(R.drawable.ic_vlc_orient_lock);
                   scheduleHideControls();
               }
 
@@ -889,9 +912,7 @@ jobs:
                   long hours = totalSec / 3600;
                   long mins = (totalSec % 3600) / 60;
                   long secs = totalSec % 60;
-                  if (hours > 0) {
-                      return String.format(Locale.US, "%d:%02d:%02d", hours, mins, secs);
-                  }
+                  if (hours > 0) return String.format(Locale.US, "%d:%02d:%02d", hours, mins, secs);
                   return String.format(Locale.US, "%d:%02d", mins, secs);
               }
 
@@ -910,7 +931,7 @@ jobs:
                   for (int i = 0; i < SUB_SIZE_VALUES.length; i++) {
                       if (SUB_SIZE_VALUES[i] == currentSubFontSize) return i;
                   }
-                  return 1; // Normal
+                  return 1;
               }
 
               private void initVlcPlayer(long resumePositionMs, int restoreAudioId, int restoreSpuId) {
@@ -946,9 +967,7 @@ jobs:
                           btnPlayPause.setImageResource(R.drawable.ic_vlc_pause);
                           if (!restored[0]) {
                               restored[0] = true;
-                              if (resumePositionMs > 0) {
-                                  mediaPlayer.setTime(resumePositionMs);
-                              }
+                              if (resumePositionMs > 0) mediaPlayer.setTime(resumePositionMs);
                               handler.postDelayed(() -> {
                                   if (mediaPlayer != null) {
                                       if (restoreAudioId != Integer.MIN_VALUE) mediaPlayer.setAudioTrack(restoreAudioId);
@@ -962,11 +981,8 @@ jobs:
                           showControls();
                       } else if (event.type == MediaPlayer.Event.Buffering) {
                           float pct = event.getBuffering();
-                          if (pct >= 100f) {
-                              hideBrandOverlay();
-                          } else {
-                              showBrandOverlay("Buffering " + Math.round(pct) + "%", false);
-                          }
+                          if (pct >= 100f) hideBrandOverlay();
+                          else showBrandOverlay("Buffering " + Math.round(pct) + "%", false);
                       } else if (event.type == MediaPlayer.Event.EncounteredError) {
                           hideBrandOverlay();
                           Toast.makeText(this, "Playback error. Try another server.", Toast.LENGTH_LONG).show();
@@ -990,7 +1006,7 @@ jobs:
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                  applyLandscapeLock();
+                  setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
                   hideSystemUi();
                   setContentView(R.layout.activity_vlc_player);
 
@@ -1027,10 +1043,10 @@ jobs:
                   tvTitle = findViewById(R.id.tv_video_title);
                   btnPlayPause = findViewById(R.id.btn_play_pause);
                   btnUnlock = findViewById(R.id.btn_unlock);
+                  btnRotate = findViewById(R.id.btn_rotate);
 
                   ImageButton btnBack = findViewById(R.id.btn_back);
                   ImageButton btnTracks = findViewById(R.id.btn_tracks);
-                  ImageButton btnRotate = findViewById(R.id.btn_rotate);
                   ImageButton btnAspect = findViewById(R.id.btn_aspect);
                   ImageButton btnLock = findViewById(R.id.btn_lock);
 
@@ -1112,7 +1128,11 @@ jobs:
 
                   if (btnBack != null) btnBack.setOnClickListener(v -> finish());
                   if (btnTracks != null) btnTracks.setOnClickListener(v -> { showControls(); showSideBySideTracksDialog(); });
-                  if (btnRotate != null) btnRotate.setOnClickListener(v -> toggleRotation());
+                  if (btnRotate != null) {
+                      btnRotate.setImageResource(R.drawable.ic_vlc_rotate);
+                      btnRotate.setOnClickListener(v -> toggleOrientationLock());
+                      btnRotate.setOnLongClickListener(v -> { manualFlipOrientation(); return true; });
+                  }
                   if (btnPlayPause != null) btnPlayPause.setOnClickListener(v -> { togglePlayPause(); scheduleHideControls(); });
                   if (btnAspect != null) btnAspect.setOnClickListener(v -> cycleAspectRatio());
                   if (btnLock != null) btnLock.setOnClickListener(v -> lockScreen());
@@ -1181,7 +1201,6 @@ jobs:
                   container.setBackground(dialogBg);
                   container.setPadding(pad, pad, pad, pad);
 
-                  // Left Column: Audio Tracks
                   LinearLayout leftCol = new LinearLayout(this);
                   leftCol.setOrientation(LinearLayout.VERTICAL);
                   leftCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -1219,12 +1238,10 @@ jobs:
                   audioScroll.addView(audioList);
                   leftCol.addView(audioScroll);
 
-                  // Center Divider
                   View divider = new View(this);
                   divider.setLayoutParams(new LinearLayout.LayoutParams(Math.round(1 * density), ViewGroup.LayoutParams.MATCH_PARENT));
                   divider.setBackgroundColor(Color.parseColor("#2A2F3D"));
 
-                  // Right Column: Subtitles + Mini Slider
                   LinearLayout rightCol = new LinearLayout(this);
                   rightCol.setOrientation(LinearLayout.VERTICAL);
                   rightCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -1262,7 +1279,6 @@ jobs:
                   subScroll.addView(subList);
                   rightCol.addView(subScroll);
 
-                  // Mini Slider for Subtitle Size
                   int initIdx = getCurrentSubSizeIndex();
 
                   LinearLayout sizeHeaderRow = new LinearLayout(this);
