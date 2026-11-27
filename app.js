@@ -1,1698 +1,832 @@
-// Zero external URLs, zero API keys, zero secrets, zero GitHub references
-var API_BASE = "./api";
-var TELEGRAM_BOT_USERNAME = "jj_files_bot";
-
-var movies = [];
-var movieGrid = document.getElementById("movieGrid");
-var searchInput = document.getElementById("searchInput");
-var genreFilter = document.getElementById("genreFilter");
-var yearFilter = document.getElementById("yearFilter");
-var movieCount = document.getElementById("movieCount");
-var emptyMessage = document.getElementById("emptyMessage");
-var movieModal = document.getElementById("movieModal");
-var modalDetails = document.getElementById("modalDetails");
-
-var carouselInterval = null;
-var inlineSearch = "";
-var currentActiveStreamUrl = "";
-var currentActiveMovieTitle = "JJ Movies";
-var MOVIES_CACHE_KEY = "jj_movies_cache_v1";
-
-// ---------- Notch / cutout support + black background ----------
-(function () {
-  var vp = document.querySelector('meta[name="viewport"]');
-  if (!vp) {
-    vp = document.createElement("meta");
-    vp.name = "viewport";
-    document.head.appendChild(vp);
-  }
-  vp.setAttribute("content", "width=device-width, initial-scale=1, viewport-fit=cover");
-  var st = document.createElement("style");
-  st.textContent = "html,body{background:#000;}";
-  document.head.appendChild(st);
-})();
-
-// ---------- Environment Detection ----------
-function isRunningInsideApk() {
-  var ua = navigator.userAgent || "";
-  var isCap = Boolean(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-  var isWv = /wv|Android.*Version\/[0-9.]+/i.test(ua);
-  var isTv = /JJTV/i.test(ua) || /[?&]tv=1/.test(location.search);
-  return isCap || isWv || isTv || hasNativeVlcBridge() || window.location.protocol === "capacitor:" || window.location.hostname === "localhost";
-}
-
-function hasNativeVlcBridge() {
-  return Boolean(window.AndroidVlc && typeof window.AndroidVlc.playVideo === "function");
-}
-
-// ---------- Basic Helpers ----------
-function escapeHTML(value) {
-  return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
-    return {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    }[c];
-  });
-}
-
-function safeURL(value) {
-  if (!value) return "";
-  var val = String(value).trim();
-  if (!val) return "";
-  if (!val.startsWith("http://") && !val.startsWith("https://")) {
-    val = "https://" + val;
-  }
-  return val;
-}
-
-function safeAppDownloadURL(value) {
-  var val = String(value || "").trim();
-  if (!val) return "";
-  if (val === "./jj-movies.apk" || val === "/jj-movies.apk" || val === "jj-movies.apk") {
-    return "./jj-movies.apk";
-  }
-  return safeURL(val);
-}
-
-function applyAppDownloadUrlFromSettings(data) {
-  var appCfgRow = Array.isArray(data) ? data.find(function (r) { return r && r.key === "app_download_config"; }) : null;
-  if (!appCfgRow || !appCfgRow.value || !appCfgRow.value.url) return;
-
-  var targetUrl = safeAppDownloadURL(appCfgRow.value.url);
-  if (!targetUrl) return;
-
-  var isExternal = /^https?:\/\//i.test(targetUrl);
-  ["navAppDownloadLink", "bannerAppDownloadLink", "footerAppDownloadLink"].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.setAttribute("href", targetUrl);
-    if (isExternal) {
-      el.removeAttribute("download");
-      el.setAttribute("target", "_blank");
-      el.setAttribute("rel", "noopener noreferrer");
-    } else {
-      el.setAttribute("download", "");
-      el.removeAttribute("target");
-      el.removeAttribute("rel");
-    }
-  });
-}
-
-// ---------- Strict App Maintenance & Version Control (APK Only) ----------
-window.__JJ_APP_BLOCKED = false;
-
-function getInstalledApkVersionCode() {
-  try {
-    if (window.AndroidVlc && typeof window.AndroidVlc.getAppVersionCode === "function") {
-      var code = parseInt(window.AndroidVlc.getAppVersionCode(), 10);
-      if (!isNaN(code) && code > 0) return code;
-    }
-  } catch (e) {}
-  // Old APKs lo getAppVersionCode() ledu kabatti automatic ga Version 1 ga count avtayi
-  return 1;
-}
-
-function showStrictAppBlockOverlay(cfg) {
-  window.__JJ_APP_BLOCKED = true;
-  var existing = document.getElementById("jjStrictBlockOverlay");
-  if (existing) existing.remove();
-
-  var noticeModal = document.getElementById("jjStartupNoticeModal");
-  if (noticeModal) noticeModal.remove();
-
-  var wrap = document.createElement("div");
-  wrap.id = "jjStrictBlockOverlay";
-  wrap.style.cssText =
-    "position:fixed;inset:0;z-index:2147483647;background:#080d18;display:flex;align-items:center;justify-content:center;padding:24px;";
-
-  var btnHtml = cfg.actionUrl
-    ? '<a class="jj-strict-update-btn" href="' + escapeHTML(cfg.actionUrl) + '" target="_blank" rel="noopener noreferrer" style="display:inline-block;width:100%;padding:14px 18px;margin-top:18px;background:linear-gradient(135deg,#ff2450,#ff6b00);color:#fff;text-decoration:none;border-radius:12px;font-weight:800;font-size:15px;">⬇ ' + escapeHTML(cfg.actionLabel || "Update New App") + '</a>'
-    : "";
-
-  wrap.innerHTML =
-    '<div style="width:100%;max-width:380px;background:#111827;border:1.5px solid rgba(255,36,80,.45);border-radius:20px;padding:26px 22px;text-align:center;color:#f8fafc;box-shadow:0 24px 60px rgba(0,0,0,.95);">' +
-      '<div style="font-size:44px;margin-bottom:10px;">' + escapeHTML(cfg.icon || "🛠️") + '</div>' +
-      '<div style="display:inline-block;background:#ff2450;color:#fff;font-size:10px;font-weight:800;letter-spacing:1.2px;padding:3px 10px;border-radius:999px;margin-bottom:12px;">JJ MOVIES</div>' +
-      '<h2 style="margin:0 0 10px;font-size:21px;font-weight:900;color:#fff;">' + escapeHTML(cfg.title) + '</h2>' +
-      '<p style="margin:0;font-size:14px;line-height:1.6;color:#cbd5e1;white-space:pre-line;">' + escapeHTML(cfg.message) + '</p>' +
-      btnHtml +
-    '</div>';
-
-  document.body.style.overflow = "hidden";
-  document.body.appendChild(wrap);
-}
-
-function applyAppControlFromSettings(data) {
-  if (!isRunningInsideApk() || !Array.isArray(data)) return;
-
-  var ctrlRow = data.find(function (r) { return r && r.key === "app_control_config"; });
-  if (!ctrlRow || !ctrlRow.value) return;
-  var cfg = ctrlRow.value;
-
-  if (cfg.maintenance === true) {
-    showStrictAppBlockOverlay({
-      icon: "🛠️",
-      title: "App Under Maintenance",
-      message: cfg.maintenance_message || "This app is currently under maintenance. Please check back soon.",
-      actionUrl: "",
-      actionLabel: ""
-    });
-    return;
-  }
-
-  var minVer = parseInt(cfg.min_version_code, 10) || 1;
-  var currentVer = getInstalledApkVersionCode();
-  if (currentVer < minVer) {
-    var fallbackAppRow = data.find(function (r) { return r && r.key === "app_download_config"; });
-    var downloadLink = safeAppDownloadURL(cfg.update_url || (fallbackAppRow && fallbackAppRow.value && fallbackAppRow.value.url) || "./jj-movies.apk");
-    showStrictAppBlockOverlay({
-      icon: "🚀",
-      title: cfg.update_title || "Update New App",
-      message: cfg.update_message || "You are using an older version of JJ Movies. Please update to the latest version to continue.",
-      actionUrl: downloadLink,
-      actionLabel: "Update New App"
-    });
-  }
-}
-
-function buildTelegramBotStartUrl(versionOrId) {
-  var payload = String(versionOrId == null ? "" : versionOrId).trim();
-  if (!payload) return "https://t.me/" + TELEGRAM_BOT_USERNAME;
-  return "https://t.me/" + TELEGRAM_BOT_USERNAME + "?start=" + encodeURIComponent(payload);
-}
-
-function isSeries(movie) {
-  return Boolean(movie && movie.type === "series");
-}
-
-function getMoviePinLabel(movie) {
-  if (!movie || movie.pinned !== true) return "";
-  return String(movie.pinLabel || "").trim();
-}
-
-function getAdaptivePosterUrl(originalUrl) {
-  if (!originalUrl) return "";
-  var val = String(originalUrl).trim();
-  if (
-    (!val.startsWith("http://") && !val.startsWith("https://")) ||
-    val.includes(" ") ||
-    val.includes("api.telegram.org") ||
-    val.includes("t.me")
-  ) {
-    return "";
-  }
-  var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  var isWifi = Boolean(conn && conn.type === "wifi" && !conn.saveData);
-  if (val.includes("image.tmdb.org/t/p/")) {
-    return isWifi
-      ? val.replace(/\/t\/p\/[^\/]+/, "/t/p/w500")
-      : val.replace(/\/t\/p\/[^\/]+/, "/t/p/w185");
-  }
-  return val;
-}
-
-function showTextPlaceholder(imgElement, movieTitle) {
-  if (!imgElement || !imgElement.parentNode) return;
-  if (imgElement.classList.contains("modal-mini-poster") || imgElement.classList.contains("banner-bg-img")) {
-    imgElement.style.display = "none";
-    return;
-  }
-  var placeholder = document.createElement("div");
-  placeholder.className = "poster-placeholder";
-  placeholder.textContent = movieTitle || "Movie";
-  imgElement.replaceWith(placeholder);
-}
-
-function handleMissingPoster(imgElement, movieTitle) {
-  showTextPlaceholder(imgElement, movieTitle);
-}
-window.handleMissingPoster = handleMissingPoster;
-
-// ---------- Server Proxy Helpers ----------
-async function fetchFromApi(type, params) {
-  var queryObj = Object.assign({ type: type }, params || {});
-  var query = new URLSearchParams(queryObj).toString();
-  var res = await fetch(API_BASE + "/movies?" + query, { cache: "no-store" });
-  if (!res.ok) throw new Error("API request failed: " + res.status);
-  return res.json();
-}
-
-async function fetchSignedUrlByFileName(fileName, meta) {
-  var cleanFile = String(fileName || "").trim().replace(/^\/+/, "");
-  if (!cleanFile) throw new Error("Missing file name");
-
-  var queryParams = new URLSearchParams();
-  queryParams.set("file", cleanFile);
-  if (meta && meta.id) queryParams.set("id", String(meta.id));
-  if (meta && meta.episodeId) queryParams.set("episode_id", String(meta.episodeId));
-
-  var res = await fetch(API_BASE + "/get-token?" + queryParams.toString(), {
-    method: "GET",
-    credentials: "same-origin",
-    cache: "no-store"
-  });
-  if (!res.ok) throw new Error("Token generation failed: " + res.status);
-  var data = await res.json();
-  if (!data || !data.url) throw new Error("Invalid token stream response");
-  return String(data.url).trim();
-}
-
-// ---------- Pixeldrain + Filemoon + B2 Worker Helpers ----------
-function isDirectVideoFile(url) {
-  if (!url) return false;
-  return /\.(mp4|mkv|webm|m3u8|avi|mov|ts|flv|m4v)(\?.*)?$/i.test(url);
-}
-
-function isPlainOrB2FileName(val) {
-  var s = String(val || "").trim().replace(/^\/+/, "");
-  if (!s || /^https?:\/\//i.test(s)) return false;
-  if (/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(s)) return false;
-  return /^[a-zA-Z0-9_-]+\/.+$/.test(s) || (s.indexOf("/") === -1 && isDirectVideoFile(s));
-}
-
-function safeTokenRefValue(value) {
-  var val = String(value || "").trim();
-  if (!val) return "";
-  if (isPlainOrB2FileName(val)) return val;
-  return safeURL(val);
-}
-
-function extractWorkerFileName(rawUrl) {
-  var val = String(rawUrl || "").trim();
-  if (!val) return "";
-
-  var b2FakeUrl = val.match(/^https?:\/\/(b2_[a-zA-Z0-9_-]+)\/(.+)$/i);
-  if (b2FakeUrl) {
-    var pathPart = b2FakeUrl[2].split("?")[0];
-    try { pathPart = decodeURIComponent(pathPart); } catch (e) {}
-    return b2FakeUrl[1] + "/" + pathPart;
-  }
-
-  if (/^https?:\/\/[^\/]+\.workers\.dev\//i.test(val)) {
-    try {
-      var u = new URL(val);
-      return decodeURIComponent(u.pathname.replace(/^\/+/, ""));
-    } catch (e) {
-      return val.replace(/^https?:\/\/[^\/]+/i, "").replace(/^\/+/, "").split("?")[0];
-    }
-  }
-
-  if (isPlainOrB2FileName(val)) {
-    return val.replace(/^\/+/, "");
-  }
-
-  return "";
-}
-
-function isWorkerStreamLink(rawUrl) {
-  return Boolean(extractWorkerFileName(rawUrl));
-}
-
-function isB2FileStream(rawUrl) {
-  var val = String(rawUrl || "").trim();
-  if (!val) return false;
-  if (/^(?:https?:\/\/)?b2_[a-zA-Z0-9_-]+\//i.test(val)) return true;
-  if (/^https?:\/\/[^\/]+\.workers\.dev\//i.test(val)) return true;
-  if (!/^https?:\/\//i.test(val) && isPlainOrB2FileName(val)) return true;
-  return false;
-}
-
-function extractPixeldrainId(rawUrl) {
-  var val = String(rawUrl || "").trim();
-  if (!val) return "";
-  var uMatch = val.match(/(?:https?:\/\/)?(?:www\.)?pixeldrain\.com\/u\/([A-Za-z0-9_-]+)/i);
-  if (uMatch && uMatch[1]) return uMatch[1];
-  var apiMatch = val.match(/(?:https?:\/\/)?(?:www\.)?pixeldrain\.com\/api\/file\/([A-Za-z0-9_-]+)/i);
-  if (apiMatch && apiMatch[1]) return apiMatch[1];
-  if (/^[A-Za-z0-9_-]{6,20}$/.test(val)) return val;
-  return "";
-}
-
-function isPixeldrainLink(rawUrl) {
-  return Boolean(extractPixeldrainId(rawUrl));
-}
-
-function normalizeStreamUrl(url) {
-  var raw = String(url || "").trim();
-  if (!raw) return "";
-
-  if (isPixeldrainLink(raw)) {
-    return "https://pixeldrain.com/api/file/" + extractPixeldrainId(raw);
-  }
-
-  var u = safeURL(raw);
-  if (!u || isDirectVideoFile(u)) return u;
-  if (u.indexOf("/e/") !== -1) return u;
-
-  var m = u.match(/^(https?:\/\/[^\/]+)\/(?:d|v)\/([A-Za-z0-9]+)(\?.*)?$/i);
-  if (m) return m[1] + "/e/" + m[2] + (m[3] || "");
-
-  return u.replace(/streamlare\.com\/(v|d)\//, "streamlare.com/e/");
-}
-
-async function resolveTokenStreamUrl(rawUrl, linkType, meta) {
-  var raw = String(rawUrl || "").trim();
-  if (!raw) throw new Error("Empty stream link");
-
-  if (/^https?:\/\//i.test(raw) && /[?&]sig=/i.test(raw)) {
-    return raw;
-  }
-
-  var workerFile = extractWorkerFileName(raw);
-  if (workerFile) {
-    return fetchSignedUrlByFileName(workerFile, meta);
-  }
-
-  return normalizeStreamUrl(raw);
-}
-
-async function playMovieByFileName(fileName, title) {
-  if (window.__JJ_APP_BLOCKED) return;
-  var cleanFile = String(fileName || "").trim().replace(/^\/+/, "");
-  if (!cleanFile) return;
-
-  var playTitle = title || cleanFile.replace(/\.[^/.]+$/, "");
-  currentActiveMovieTitle = playTitle;
-
-  var signedUrl = await fetchSignedUrlByFileName(cleanFile);
-  currentActiveStreamUrl = signedUrl;
-
-  if (hasNativeVlcBridge()) {
-    launchNativeVlc(signedUrl, playTitle);
-    return signedUrl;
-  }
-
-  ensureInAppPlayerModal();
-  var modal = document.getElementById("inAppVideoModal");
-  var titleElem = document.getElementById("modalMovieTitle");
-  var serverContainer = document.getElementById("serverSwitchContainer");
-  if (titleElem) titleElem.textContent = playTitle;
-  if (serverContainer) serverContainer.innerHTML = "";
-  if (modal) {
-    modal.style.display = "flex";
-    modal.style.visibility = "visible";
-    modal.style.opacity = "1";
-    modal.style.zIndex = "99999";
-  }
-
-  await playMovieStream(signedUrl, playTitle, "token");
-  return signedUrl;
-}
-window.playMovieByFileName = playMovieByFileName;
-
-function launchNativeVlc(playableUrl, title) {
-  if (window.__JJ_APP_BLOCKED) return false;
-  var activeTitle = title ||
-    currentActiveMovieTitle ||
-    (document.getElementById("modalMovieTitle") && document.getElementById("modalMovieTitle").textContent) ||
-    "JJ Movies";
-  if (hasNativeVlcBridge() && playableUrl) {
-    window.AndroidVlc.playVideo(String(playableUrl), String(activeTitle));
-    return true;
-  }
-  return false;
-}
-
-function loadHls(cb) {
-  if (window.Hls) return cb();
-  var s = document.createElement("script");
-  s.src = "https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js";
-  s.onload = cb;
-  document.head.appendChild(s);
-}
-
-// ---------- Fullscreen & Orientation ----------
-function lockLandscape() {
-  try {
-    var P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenOrientation;
-    if (P) { P.lock({ orientation: "landscape" }); return; }
-  } catch (e) {}
-  if (screen.orientation && screen.orientation.lock) {
-    screen.orientation.lock("landscape").catch(function () {});
-  }
-}
-
-function unlockOrientation() {
-  try {
-    var P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenOrientation;
-    if (P) { P.unlock(); return; }
-  } catch (e) {}
-  if (screen.orientation && screen.orientation.unlock) {
-    try { screen.orientation.unlock(); } catch (e) {}
-  }
-}
-
-function jjFsTarget() {
-  return document.getElementById("vlcInAppIframe") || document.getElementById("vlcInAppPlayer") || document.getElementById("jjPlayerStage");
-}
-
-function isInFullscreen() {
-  return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
-}
-
-async function enterTrueFullscreen() {
-  var el = jjFsTarget();
-  if (!el) return;
-  try {
-    if (el.requestFullscreen) await el.requestFullscreen();
-    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-  } catch (e) {}
-}
-
-async function exitTrueFullscreen() {
-  try {
-    if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
-    else if (document.webkitFullscreenElement && document.webkitExitFullscreen) document.webkitExitFullscreen();
-  } catch (e) {}
-  var btn = document.getElementById("jjFullscreenBtn");
-  if (btn) btn.textContent = "⛶ Rotate Fullscreen";
-}
-
-function togglePlayerFullscreen() {
-  if (isInFullscreen()) exitTrueFullscreen();
-  else enterTrueFullscreen();
-}
-
-function handleNativeFullscreenChange() {
-  var btn = document.getElementById("jjFullscreenBtn");
-  if (isInFullscreen()) {
-    lockLandscape();
-    if (btn) btn.textContent = "✕ Exit Fullscreen";
-  } else {
-    unlockOrientation();
-    if (btn) btn.textContent = "⛶ Rotate Fullscreen";
-  }
-}
-
-document.addEventListener("fullscreenchange", handleNativeFullscreenChange);
-document.addEventListener("webkitfullscreenchange", handleNativeFullscreenChange);
-
-function ensureInAppPlayerModal() {
-  var modal = document.getElementById("inAppVideoModal");
-  if (!modal) {
-    modal = document.createElement("div");
-    modal.id = "inAppVideoModal";
-    modal.className = "jj-player-modal-overlay";
-    modal.style.display = "none";
-    modal.innerHTML =
-      '<div class="jj-player-modal-box">' +
-        '<div class="jj-player-header">' +
-          '<div class="jj-player-title-wrap">' +
-            '<span class="jj-vlc-badge">▶ IN-APP PLAYER</span>' +
-            '<h3 id="modalMovieTitle" class="jj-player-title">Playing Movie</h3>' +
-          '</div>' +
-          '<div class="jj-player-header-actions">' +
-            '<button type="button" id="jjFullscreenBtn" class="jj-player-fs-btn" onclick="togglePlayerFullscreen()">⛶ Rotate Fullscreen</button>' +
-            '<button type="button" class="jj-player-close" onclick="closeInAppPlayer()" aria-label="Close">&times;</button>' +
-          '</div>' +
-        '</div>' +
-        '<div id="serverSwitchContainer" class="jj-server-bar"></div>' +
-        '<div id="jjPlayerStage" class="jj-player-stage"></div>' +
-      '</div>';
-    modal.addEventListener("click", function (e) {
-      if (e.target === modal) closeInAppPlayer();
-    });
-    document.body.appendChild(modal);
-  }
-}
-
-window.addEventListener("popstate", function () {
-  if (window.__JJ_APP_BLOCKED) return;
-  var noticeModal = document.getElementById("jjStartupNoticeModal");
-  if (noticeModal) {
-    noticeModal.remove();
-    return;
-  }
-  var vModal = document.getElementById("inAppVideoModal");
-  if (vModal && vModal.style.display === "flex") {
-    if (isInFullscreen()) {
-      exitTrueFullscreen();
-      try { history.pushState({ jjPlayerOpen: true }, "", window.location.href); } catch (e) {}
-      return;
-    }
-    closeInAppPlayer(true);
-    return;
-  }
-  if (movieModal && !movieModal.hidden) {
-    movieModal.hidden = true;
-  }
-});
-
-function openMoviePlayerById(movieId) {
-  if (window.__JJ_APP_BLOCKED) return;
-  var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
-  if (!movie) return;
-  openServerSelection(movie.title, movie.stream1, movie.stream2, movie.linkType, { id: movie.id });
-}
-
-async function openServerSelection(title, s1, s2, linkType, meta) {
-  if (window.__JJ_APP_BLOCKED) return;
-  var cleanTitle = title || "Playing Movie";
-  currentActiveMovieTitle = cleanTitle;
-
-  var servers = [];
-  if (s1) servers.push({ name: "⚡ Server 1", url: s1, linkType: linkType });
-  if (s2) servers.push({ name: "🚀 Server 2", url: s2, linkType: linkType });
-  if (!servers.length) return;
-
-  if (hasNativeVlcBridge()) {
-    var vlcServer = servers.find(function (srv) {
-      var norm = normalizeStreamUrl(srv.url);
-      return isWorkerStreamLink(srv.url) || isPixeldrainLink(srv.url) || isDirectVideoFile(norm);
-    });
-    if (vlcServer) {
-      try {
-        var playableUrl = await resolveTokenStreamUrl(vlcServer.url, vlcServer.linkType, meta);
-        currentActiveStreamUrl = playableUrl;
-        launchNativeVlc(playableUrl, cleanTitle);
-      } catch (err) {
-        alert("Stream Error: " + err.message);
-      }
-      return;
-    }
-  }
-
-  ensureInAppPlayerModal();
-  var modal = document.getElementById("inAppVideoModal");
-  var titleElem = document.getElementById("modalMovieTitle");
-  var serverContainer = document.getElementById("serverSwitchContainer");
-  if (!modal) return;
-
-  if (titleElem) titleElem.textContent = cleanTitle;
-  modal.style.display = "flex";
-  modal.style.visibility = "visible";
-  modal.style.opacity = "1";
-  modal.style.zIndex = "99999";
-
-  try { history.pushState({ jjPlayerOpen: true }, "", window.location.href); } catch (e) {}
-
-  serverContainer.innerHTML = "";
-  servers.forEach(function (srv, idx) {
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "jj-server-btn" + (idx === 0 ? " active" : "");
-    btn.textContent = srv.name;
-    btn.addEventListener("click", function () {
-      serverContainer.querySelectorAll(".jj-server-btn").forEach(function (b) { b.classList.remove("active"); });
-      btn.classList.add("active");
-      playMovieStream(srv.url, cleanTitle, srv.linkType, meta);
-    });
-    serverContainer.appendChild(btn);
-  });
-
-  playMovieStream(servers[0].url, cleanTitle, servers[0].linkType, meta);
-}
-
-async function playMovieStream(rawUrl, title, linkType, meta) {
-  if (window.__JJ_APP_BLOCKED) return;
-  var stage = document.getElementById("jjPlayerStage");
-  if (!stage) return;
-  var raw = String(rawUrl || "").trim();
-  if (title) currentActiveMovieTitle = title;
-
-  stage.innerHTML = '<div style="color:#cbd5e1;padding:30px;text-align:center;font-size:13px;">⚡ Loading stream...</div>';
-
-  var url = "";
-  try {
-    url = await resolveTokenStreamUrl(raw, linkType, meta);
-  } catch (err) {
-    stage.innerHTML = '<div style="color:#f87171;padding:20px;text-align:center;font-size:13px;">Stream Error: ' + escapeHTML(err.message) + '</div>';
-    return;
-  }
-
-  currentActiveStreamUrl = url;
-  stage.innerHTML = "";
-
-  if (hasNativeVlcBridge() && (isWorkerStreamLink(raw) || isPixeldrainLink(raw) || isDirectVideoFile(url))) {
-    closeInAppPlayer();
-    launchNativeVlc(url, currentActiveMovieTitle);
-    return;
-  }
-
-  if (isDirectVideoFile(url)) {
-    var video = document.createElement("video");
-    video.id = "vlcInAppPlayer";
-    video.controls = true;
-    video.autoplay = true;
-    video.playsInline = true;
-    video.setAttribute("controlsList", "nodownload");
-    video.style.width = "100%";
-    video.style.height = "100%";
-    video.style.background = "#000";
-    video.style.objectFit = "contain";
-
-    video.addEventListener("error", function () {
-      stage.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;font-size:13px;">Video play avvatledu. MP4 (H.264 + AAC) leda Server 2 try cheyandi.</div>';
-    });
-
-    if (/\.m3u8(\?.*)?$/i.test(url) && !video.canPlayType("application/vnd.apple.mpegurl")) {
-      loadHls(function () {
-        if (window.Hls && Hls.isSupported()) {
-          var h = new Hls();
-          h.loadSource(url);
-          h.attachMedia(video);
-        }
-      });
-    } else {
-      video.src = url;
-    }
-
-    stage.appendChild(video);
-    video.play().catch(function () {});
-  } else {
-    var iframe = document.createElement("iframe");
-    iframe.id = "vlcInAppIframe";
-    iframe.src = url;
-    iframe.allowFullscreen = true;
-    iframe.setAttribute("webkitallowfullscreen", "true");
-    iframe.setAttribute("mozallowfullscreen", "true");
-    iframe.setAttribute("referrerpolicy", "no-referrer");
-    iframe.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; encrypted-media; screen-wake-lock");
-    iframe.style.width = "100%";
-    iframe.style.height = "100%";
-    iframe.style.border = "0";
-    stage.appendChild(iframe);
-  }
-}
-
-function closeInAppPlayer(fromPopState) {
-  var modal = document.getElementById("inAppVideoModal");
-  var stage = document.getElementById("jjPlayerStage");
-  exitTrueFullscreen();
-  if (stage) stage.innerHTML = "";
-  if (modal) modal.style.display = "none";
-  if (!fromPopState && history.state && history.state.jjPlayerOpen) {
-    try { history.back(); } catch (e) {}
-  }
-}
-
-window.openMoviePlayerById = openMoviePlayerById;
-window.openServerSelection = openServerSelection;
-window.playMovieStream = playMovieStream;
-window.closeInAppPlayer = closeInAppPlayer;
-window.togglePlayerFullscreen = togglePlayerFullscreen;
-window.launchNativeVlc = launchNativeVlc;
-
-// ---------- UI Styles & Notices Ticker ----------
-function createExtraSections() {
-  if (!document.getElementById("jjExtraStyles")) {
-    var style = document.createElement("style");
-    style.id = "jjExtraStyles";
-    style.textContent = `
-      .jj-feature-section { max-width:1200px; margin:14px auto 8px; padding:0 12px; }
-      .jj-alert-ticker-container {
-        background: #0d1526;
-        border: 1px solid rgba(255, 36, 80, 0.15);
-        border-left: 3px solid #ff2450;
-        border-radius: 6px;
-        padding: 5px 12px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        min-height: 34px;
-        margin-top: 4px;
-      }
-      .jj-alert-ticker-content { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #e2e8f0; font-weight: 500; min-width: 0; flex: 1; }
-      .jj-ticker-badge { background: #ff2450; color: #fff; font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 3px; text-transform: uppercase; flex-shrink: 0; }
-      .jj-ticker-text-wrapper { overflow: hidden; position: relative; flex: 1; display: flex; align-items: center; height: 16px; }
-      .jj-ticker-slide { display: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; animation: tickerFade 0.4s ease-in-out; }
-      .jj-ticker-slide.active { display: inline-block; }
-      @keyframes tickerFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-      .jj-ticker-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #f1f5f9; text-decoration: none; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
-      .jj-ticker-btn:hover { background: #ff2450; border-color: #ff2450; color: #fff; }
-      .jj-pin-badge { color:#ff7293; font-size:12px; font-weight:bold; overflow-wrap:anywhere; }
-      .jj-watch-online-hero-wrap { margin: 14px 0 12px 0; padding: 12px 14px; background: linear-gradient(135deg, rgba(255,36,80,0.16), rgba(255,107,0,0.14)); border: 1.5px solid rgba(255,65,102,0.55); border-radius: 14px; }
-      .btn-big-watch-online { width: 100%; padding: 14px 18px; background: linear-gradient(135deg, #ff2450, #ff6b00); color: #fff !important; border: none; border-radius: 10px; font-size: 15px; font-weight: 900; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; }
-      .jj-watch-subtext { text-align: center; font-size: 11px; color: #cbd5e1; margin-top: 7px; font-weight: 600; }
-      .jj-player-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(4,8,16,0.98); z-index: 10000; justify-content: center; align-items: center; padding: 12px; }
-      .jj-player-modal-box { width: 100%; max-width: 920px; background: #0d1526; border: 1px solid rgba(255,36,80,0.3); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; }
-      .jj-player-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-      .jj-player-title-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-      .jj-player-header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-      .jj-player-fs-btn { background: linear-gradient(135deg, #ff2450, #ff6b00); border: none; color: #fff; font-size: 11px; font-weight: 800; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
-      .jj-vlc-badge { background: #ff6b00; color: #fff; font-size: 9px; font-weight: 800; padding: 3px 6px; border-radius: 4px; flex-shrink: 0; }
-      .jj-player-title { color: #f8fafc; font-size: 15px; font-weight: 700; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .jj-player-close { background: rgba(255,255,255,0.12); border: none; color: #fff; font-size: 22px; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; }
-      .jj-server-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-      .jj-server-btn { background: #162238; border: 1px solid rgba(255,255,255,0.14); color: #cbd5e1; font-size: 11px; font-weight: 700; padding: 6px 14px; border-radius: 6px; cursor: pointer; }
-      .jj-server-btn.active { background: #ff2450; border-color: #ff2450; color: #fff; }
-      .jj-player-stage { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
-      .jj-episodes-wrap { margin: 14px 0 12px; padding: 12px; background: #0d1526; border: 1.5px solid rgba(255,65,102,0.45); border-radius: 14px; }
-      .jj-episodes-head { color: #fff; font-weight: 800; font-size: 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 3px; }
-      .jj-episodes-sub { color: #94a3b8; font-size: 10px; font-weight: 600; }
-      .jj-season-tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 10px; }
-      .jj-season-btn { flex-shrink: 0; background: #162238; border: 1px solid rgba(255,255,255,0.14); color: #cbd5e1; font-size: 11px; font-weight: 700; padding: 6px 14px; border-radius: 6px; cursor: pointer; }
-      .jj-season-btn.active { background: #ff2450; border-color: #ff2450; color: #fff; }
-      .jj-ep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
-      .jj-ep-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: linear-gradient(135deg, #ff2450, #ff6b00); color: #fff; border: none; border-radius: 9px; padding: 10px 12px; cursor: pointer; }
-      .jj-ep-btn.disabled { background: #1a2536; color: #64748b; cursor: not-allowed; }
-      .jj-ep-num { font-size: 12px; font-weight: 800; }
-      .jj-ep-sub { font-size: 10px; font-weight: 600; opacity: 0.9; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .jj-ep-empty { color: #64748b; font-size: 12px; text-align: center; padding: 10px 0; margin: 0; }
-    `;
-    document.head.appendChild(style);
-  }
-
-  var collection = document.getElementById("collection");
-  if (collection && !document.getElementById("jjUpdatesSection")) {
-    var updates = document.createElement("section");
-    updates.id = "jjUpdatesSection";
-    updates.className = "jj-feature-section";
-    updates.innerHTML =
-      '<div id="jjAlertsTicker" class="jj-alert-ticker-container" style="display:none;">' +
-        '<div class="jj-alert-ticker-content">' +
-          '<span class="jj-ticker-badge">NOTICES</span>' +
-          '<div id="jjTickerTextWrapper" class="jj-ticker-text-wrapper"></div>' +
-        '</div>' +
-        '<div id="jjTickerActionArea"></div>' +
-      '</div>';
-    collection.parentNode.insertBefore(updates, collection);
-  }
-
-  ensureInAppPlayerModal();
-}
-
-// ---------- Festival Mode & App Download Link Sync ----------
-function getSmartCalendarFestival() {
-  var now = new Date();
-  var m = now.getMonth() + 1, d = now.getDate(), y = now.getFullYear();
-  if ((m === 12 && d >= 31) || (m === 1 && d <= 1)) return { name: "HAPPY NEW YEAR " + (m === 12 ? y + 1 : y), type: "newyear" };
-  if (m === 1 && d >= 14 && d <= 15) return { name: "HAPPY SANKRANTI", type: "sankranti" };
-  if (m === 1 && d === 26) return { name: "HAPPY REPUBLIC DAY", type: "tricolor" };
-  if (m === 3 && d === 25) return { name: "HAPPY HOLI", type: "holi" };
-  if (m === 8 && d === 15) return { name: "HAPPY INDEPENDENCE DAY", type: "tricolor" };
-  if (m === 11 && d >= 1 && d <= 2) return { name: "HAPPY DIWALI", type: "diwali" };
-  if (m === 12 && d === 25) return { name: "MERRY CHRISTMAS", type: "christmas" };
-  return null;
-}
-
-async function initNeonFestivalMode() {
-  var activeFestival = null;
-  var settingsData = null;
-
-  try {
-    settingsData = await fetchFromApi("settings");
-    applyAppDownloadUrlFromSettings(settingsData);
-    applyAppControlFromSettings(settingsData);
-  } catch (err) {}
-
-  try {
-    var cfgRow = Array.isArray(settingsData) ? settingsData.find(function (r) { return r && r.key === "festival_config"; }) : null;
-    if (cfgRow && cfgRow.value) {
-      if (cfgRow.value.enabled === false) return;
-      if (cfgRow.value.enabled === true) {
-        var custName = (cfgRow.value.name || "").trim();
-        if (custName && custName !== "HAPPY FESTIVAL") {
-          var lower = custName.toLowerCase();
-          var manualType = "general";
-          if (lower.includes("diwali") || lower.includes("deepavali")) manualType = "diwali";
-          else if (lower.includes("sankranti") || lower.includes("pongal")) manualType = "sankranti";
-          else if (lower.includes("holi")) manualType = "holi";
-          else if (lower.includes("christmas") || lower.includes("santa")) manualType = "christmas";
-          else if (lower.includes("republic") || lower.includes("independence")) manualType = "tricolor";
-          else if (lower.includes("new year")) manualType = "newyear";
-          activeFestival = { name: custName, type: manualType };
-        }
-      }
-    }
-  } catch (err) {}
-
-  if (!activeFestival) activeFestival = getSmartCalendarFestival();
-  if (activeFestival) {
-    renderSubtleNeonBanner(activeFestival.name, activeFestival.type);
-    startSubtleHeaderSparks(activeFestival.type);
-  }
-}
-
-function renderSubtleNeonBanner(text, type) {
-  var style = document.createElement("style");
-  var borderCol = "#00f0ff", shadowCol = "#ff007f", leftIcon = "✨", rightIcon = "✨";
-  if (type === "diwali") { borderCol = "#ffb703"; shadowCol = "#fb8500"; leftIcon = "🪔"; rightIcon = "🪔"; }
-  else if (type === "sankranti") { borderCol = "#06d6a0"; shadowCol = "#ffd166"; leftIcon = "🪁"; rightIcon = "🪁"; }
-  else if (type === "christmas") { borderCol = "#ff3838"; shadowCol = "#2ed573"; leftIcon = "🎅"; rightIcon = "🦌"; }
-  else if (type === "holi") { borderCol = "#ff007f"; shadowCol = "#00e5ff"; leftIcon = "🎨"; rightIcon = "🎨"; }
-  else if (type === "tricolor") { borderCol = "#ff9933"; shadowCol = "#138808"; leftIcon = "🇮🇳"; rightIcon = "🇮🇳"; }
-  else if (type === "newyear") { borderCol = "#00f0ff"; shadowCol = "#7209b7"; leftIcon = "🎆"; rightIcon = "🎆"; }
-
-  style.textContent =
-    ".subtle-fest-header{background:linear-gradient(90deg,rgba(8,13,24,.95),rgba(16,24,40,.98),rgba(8,13,24,.95));border-bottom:1.5px solid " + borderCol + ";padding:8px 12px;text-align:center;position:sticky;top:0;z-index:1002;overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:40px;}" +
-    ".subtle-fest-text{font-size:clamp(13px,2.8vw,16px);font-weight:800;letter-spacing:1.8px;color:#fff;text-transform:uppercase;text-shadow:0 0 6px #fff,0 0 14px " + shadowCol + ";display:flex;align-items:center;gap:10px;z-index:2;}" +
-    "#festHeaderCanvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;}";
-  document.head.appendChild(style);
-
-  var banner = document.createElement("div");
-  banner.className = "subtle-fest-header";
-  banner.innerHTML =
-    '<canvas id="festHeaderCanvas"></canvas>' +
-    '<div class="subtle-fest-text"><span>' + leftIcon + '</span><span>' + escapeHTML(text) + '</span><span>' + rightIcon + '</span></div>';
-  document.body.prepend(banner);
-}
-
-function startSubtleHeaderSparks(type) {
-  var canvas = document.getElementById("festHeaderCanvas");
-  if (!canvas) return;
-  var ctx = canvas.getContext("2d");
-  var banner = canvas.parentElement;
-  var width = (canvas.width = banner.offsetWidth);
-  var height = (canvas.height = banner.offsetHeight);
-  window.addEventListener("resize", function () {
-    if (banner) { width = canvas.width = banner.offsetWidth; height = canvas.height = banner.offsetHeight; }
-  });
-  var sparks = [];
-  var colors = type === "christmas" ? ["#fff", "#2ed573", "#ff4757", "#ffd700"]
-    : type === "sankranti" ? ["#00f0ff", "#ffd166", "#06d6a0", "#ff007f"]
-    : type === "holi" ? ["#ff007f", "#00e5ff", "#76ff03", "#ffea00"]
-    : ["#ffd700", "#ffea00", "#fff", "#ff8800"];
-
-  function MiniSpark(originX) {
-    this.x = originX + (Math.random() - 0.5) * 40;
-    this.y = height * 0.8;
-    this.vx = (Math.random() - 0.5) * 2;
-    this.vy = -(Math.random() * 2.5 + 1);
-    this.alpha = 1;
-    this.decay = Math.random() * 0.03 + 0.02;
-    this.size = Math.random() * 1.8 + 1;
-    this.color = colors[Math.floor(Math.random() * colors.length)];
-  }
-  MiniSpark.prototype.update = function () {
-    this.x += this.vx; this.y += this.vy; this.vy += 0.08; this.alpha -= this.decay;
-    return this.alpha > 0;
-  };
-  MiniSpark.prototype.draw = function () {
-    ctx.save(); ctx.globalAlpha = this.alpha; ctx.fillStyle = this.color;
-    ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-  };
-  function loop() {
-    ctx.clearRect(0, 0, width, height);
-    if (Math.random() > 0.4) { sparks.push(new MiniSpark(width * 0.08)); sparks.push(new MiniSpark(width * 0.92)); }
-    for (var i = sparks.length - 1; i >= 0; i--) {
-      if (!sparks[i].update()) sparks.splice(i, 1);
-      else sparks[i].draw();
-    }
-    requestAnimationFrame(loop);
-  }
-  loop();
-}
-
-// ---------- Movies Data & Rendering ----------
-function applyMoviesData(data) {
-  movies = (Array.isArray(data) ? data : []).map(function (item) {
-    var rawTrailer = item.trailer_url || item.trailer || item.trailer_link || item.video_url || item.youtube_link || item.trailerUrl || "";
-    var rawStream1 = item.stream_url_1 || item.stream_url || item.stream1 || "";
-    var rawStream2 = item.stream_url_2 || item.stream2 || "";
-    var linkType = String(item.link_type || item.stream_type || "token").toLowerCase().trim();
-    return {
-      id: item.id,
-      title: item.title || "Untitled",
-      year: item.release_year || "",
-      runtime: item.runtime || "",
-      category: item.category || "",
-      type: String(item.content_type || "movie").toLowerCase() === "series" ? "series" : "movie",
-      genre: item.genre || "",
-      poster: item.poster_url || "",
-      description: item.description || "",
-      pinned: item.is_pinned === true,
-      pinLabel: String(item.pin_label || "").trim(),
-      linkType: linkType,
-      trailer: safeURL(rawTrailer),
-      stream1: safeTokenRefValue(rawStream1),
-      stream2: safeTokenRefValue(rawStream2),
-      versions: []
-    };
-  });
-
-  setupYears();
-  renderMovies();
-  renderShowcaseCarousel();
-
-  var qid = new URLSearchParams(window.location.search).get("movie");
-  if (qid) showMovieDetails(qid);
-
-  loadMessages();
-}
-window.applyMoviesData = applyMoviesData;
-
-function readMoviesCache() {
-  try {
-    var raw = localStorage.getItem(MOVIES_CACHE_KEY);
-    var arr = raw ? JSON.parse(raw) : null;
-    return Array.isArray(arr) && arr.length ? arr : null;
-  } catch (e) { return null; }
-}
-
-function loadMovies() {
-  if (movieCount) movieCount.textContent = "Loading movies...";
-
-  fetchFromApi("movies")
-    .then(function (data) {
-      try { localStorage.setItem(MOVIES_CACHE_KEY, JSON.stringify(data)); } catch (e) {}
-      hideOfflineBar();
-      applyMoviesData(data);
-    })
-    .catch(function () {
-      var cached = readMoviesCache();
-      if (cached) {
-        applyMoviesData(cached);
-        showOfflineBar();
-        return;
-      }
-      if (movieCount) movieCount.textContent = "Unable to load movies";
-      if (emptyMessage) {
-        emptyMessage.hidden = false;
-        emptyMessage.textContent = navigator.onLine === false
-          ? "No internet connection. Please turn on your internet and pull down to refresh."
-          : "Unable to load movies. Please pull down to refresh.";
-      }
-      if (movieGrid) movieGrid.innerHTML = "";
-      showOfflineBar();
-      loadMessages();
-    });
-}
-
-function renderShowcaseCarousel() {
-  var bannerContainer = document.getElementById("bannerCarousel");
-  if (!bannerContainer) return;
-
-  var pinnedList = movies.filter(function (movie) { return movie.pinned === true; });
-  var showpiece = pinnedList.length > 0 ? pinnedList : movies.slice(0, 3);
-  if (!showpiece.length) return;
-
-  bannerContainer.innerHTML = showpiece.map(function (movie, index) {
-    var isCurrent = index === 0 ? "active" : "";
-    var tagBadge = getMoviePinLabel(movie) || "POPULAR";
-    var posterSrc = getAdaptivePosterUrl(movie.poster);
-    var hasStream = !isSeries(movie) && Boolean(movie.stream1 || movie.stream2);
-
-    return (
-      '<div class="banner-slide ' + isCurrent + '">' +
-        '<div class="banner-backdrop">' +
-          '<img src="' + escapeHTML(posterSrc) + '" data-movie-title="' + escapeHTML(movie.title) + '" alt="' + escapeHTML(movie.title) + '" class="banner-bg-img">' +
-          '<div class="banner-vignette"></div>' +
-        '</div>' +
-        '<div class="banner-overlay-content">' +
-          '<div class="banner-badge-group">' +
-            '<span class="banner-badge-tag crimson">' + escapeHTML(tagBadge) + '</span>' +
-            '<span class="banner-badge-tag">' + escapeHTML(movie.year || "2026") + '</span>' +
-            (movie.runtime ? '<span class="banner-badge-tag">' + escapeHTML(movie.runtime) + '</span>' : '') +
-          '</div>' +
-          '<h1 class="banner-title">' + escapeHTML(movie.title) + '</h1>' +
-          '<p class="banner-desc">' + escapeHTML(movie.description || "Watch online or grab complete downloads and quality prints on Telegram bot.") + '</p>' +
-          '<div class="banner-action-row">' +
-            '<button onclick="showMovieDetails(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-primary">' + (isSeries(movie) ? "⚡ View Series Details" : "⚡ View Movie Details") + '</button>' +
-            (hasStream ? '<button onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : (isSeries(movie) ? '<button onclick="showMovieDetails(\'' + escapeHTML(movie.id) + '\')" class="btn-banner-secondary">▶ Watch Online</button>' : '')) +
-            (movie.trailer ? '<a href="' + escapeHTML(movie.trailer) + '" target="_blank" rel="noopener noreferrer" class="btn-banner-secondary">▶ Trailer</a>' : '') +
-          '</div>' +
-        '</div>' +
-      '</div>'
-    );
-  }).join("");
-
-  bannerContainer.querySelectorAll(".banner-bg-img").forEach(function (img) {
-    var mTitle = img.getAttribute("data-movie-title");
-    img.onerror = function () { handleMissingPoster(img, mTitle); };
-    if (!img.getAttribute("src")) handleMissingPoster(img, mTitle);
-  });
-
-  if (carouselInterval) clearInterval(carouselInterval);
-  var currentSlide = 0;
-  carouselInterval = setInterval(function () {
-    var slides = document.querySelectorAll(".banner-slide");
-    if (slides.length <= 1) return;
-    slides[currentSlide].classList.remove("active");
-    currentSlide = (currentSlide + 1) % slides.length;
-    slides[currentSlide].classList.add("active");
-  }, 5500);
-}
-window.renderShowcaseCarousel = renderShowcaseCarousel;
-
-function setupYears() {
-  if (!yearFilter) return;
-  yearFilter.innerHTML = '<option value="all">All Years</option>';
-  var years = [];
-  movies.forEach(function (movie) {
-    if (movie.year && years.indexOf(String(movie.year)) === -1) years.push(String(movie.year));
-  });
-  years.sort(function (a, b) { return Number(b) - Number(a); });
-  years.forEach(function (year) {
-    var option = document.createElement("option");
-    option.value = year;
-    option.textContent = year;
-    yearFilter.appendChild(option);
-  });
-}
-window.setupYears = setupYears;
-
-function matchesFilters(movie) {
-  var selectedCategory = genreFilter ? genreFilter.value.toLowerCase().trim() : "all";
-  var year = yearFilter ? yearFilter.value : "all";
-  var movieCategory = (movie.category || "").toLowerCase().trim();
-  var matchesCategory = selectedCategory === "all" || movieCategory === selectedCategory;
-  var matchesYear = year === "all" || String(movie.year) === year;
-  var matchesText = true;
-  if (inlineSearch) {
-    matchesText = (movie.title || "").toLowerCase().includes(inlineSearch) ||
-      (movie.description || "").toLowerCase().includes(inlineSearch) ||
-      (movie.category || "").toLowerCase().includes(inlineSearch);
-  }
-  return matchesCategory && matchesYear && matchesText;
-}
-
-function createMovieCard(movie) {
-  var card = document.createElement("article");
-  card.className = "movie-card";
-
-  var wrapper = document.createElement("div");
-  wrapper.className = "card-poster-wrapper";
-
-  var tagBadgeLeftText = getMoviePinLabel(movie) || movie.category || (isSeries(movie) ? "SERIES" : "FILMS");
-  var badgeLeft = document.createElement("div");
-  badgeLeft.className = "card-badge-top-left";
-  badgeLeft.textContent = tagBadgeLeftText;
-
-  var badgeRight = document.createElement("div");
-  badgeRight.className = "card-badge-top-right";
-  badgeRight.textContent = movie.year || "2026";
-
-  wrapper.appendChild(badgeLeft);
-  wrapper.appendChild(badgeRight);
-
-  var image = document.createElement("img");
-  image.className = "poster";
-  image.alt = movie.title + " poster";
-  image.loading = "lazy";
-  image.decoding = "async";
-
-  image.onload = function () {
-    if (image.naturalWidth > image.naturalHeight) {
-      image.style.objectFit = "contain";
-      image.style.background = "#000";
-    }
-  };
-  image.onerror = function () { handleMissingPoster(image, movie.title); };
-
-  wrapper.appendChild(image);
-  card.appendChild(wrapper);
-
-  var adaptiveSrc = getAdaptivePosterUrl(movie.poster);
-  if (adaptiveSrc) image.src = adaptiveSrc;
-  else handleMissingPoster(image, movie.title);
-
-  var info = document.createElement("div");
-  info.className = "movie-info";
-
-  var title = document.createElement("h3");
-  title.textContent = movie.title;
-
-  var metaParts = [];
-  if (movie.runtime) metaParts.push(movie.runtime);
-  if (movie.category) metaParts.push(movie.category);
-
-  var meta = document.createElement("div");
-  meta.className = "movie-meta";
-  meta.textContent = metaParts.length ? metaParts.join(" • ") : (movie.year || "Movie");
-
-  var button = document.createElement("button");
-  button.className = "details-button";
-  button.type = "button";
-  button.textContent = isSeries(movie)
-    ? "▶ Watch Online / Downloads"
-    : ((movie.stream1 || movie.stream2) ? "▶ Watch / Downloads" : "⚡ Get Downloads");
-  button.addEventListener("click", function () { showMovieDetails(movie.id); });
-
-  info.appendChild(title);
-  info.appendChild(meta);
-  info.appendChild(button);
-  card.appendChild(info);
-
-  return card;
-}
-
-function renderMovies() {
-  if (!movieGrid) return;
-  var filtered = movies.filter(matchesFilters);
-  filtered.sort(function (a, b) {
-    if (a.pinned && !b.pinned) return -1;
-    if (!a.pinned && b.pinned) return 1;
-    return 0;
-  });
-
-  movieGrid.innerHTML = "";
-  filtered.forEach(function (movie) { movieGrid.appendChild(createMovieCard(movie)); });
-
-  if (movieCount) movieCount.textContent = filtered.length + (filtered.length === 1 ? " title" : " titles");
-  if (emptyMessage) emptyMessage.hidden = filtered.length !== 0;
-}
-window.renderMovies = renderMovies;
-
-function handleLiveSearch() {
-  var search = searchInput ? searchInput.value.trim().toLowerCase() : "";
-  var resultsSection = document.getElementById("searchResultsSection");
-  var searchGrid = document.getElementById("searchGrid");
-  var mainWrapper = document.getElementById("mainContentWrapper");
-  var clearBtn = document.getElementById("clearSearchBtn");
-  var countEl = document.getElementById("searchResultCount");
-  var titleEl = document.getElementById("searchResultsTitle");
-
-  if (!resultsSection || !searchGrid || !mainWrapper) {
-    inlineSearch = search;
-    if (clearBtn) clearBtn.style.display = search ? "block" : "none";
-    renderMovies();
-    return;
-  }
-  inlineSearch = "";
-  if (clearBtn) clearBtn.style.display = search ? "block" : "none";
-
-  if (search === "") {
-    resultsSection.style.display = "none";
-    mainWrapper.style.display = "block";
-    renderMovies();
-    return;
-  }
-
-  mainWrapper.style.display = "none";
-  resultsSection.style.display = "block";
-
-  var matches = movies.filter(function (movie) {
-    return (movie.title || "").toLowerCase().includes(search) ||
-      (movie.description || "").toLowerCase().includes(search) ||
-      (movie.category || "").toLowerCase().includes(search);
-  });
-
-  searchGrid.innerHTML = "";
-  if (countEl) countEl.textContent = matches.length + (matches.length === 1 ? " movie" : " movies");
-  if (titleEl) titleEl.textContent = 'Results for "' + search + '"';
-
-  if (!matches.length) {
-    searchGrid.innerHTML = '<p class="empty-message" style="grid-column:1/-1;">No movies found matching your search.</p>';
-    return;
-  }
-  matches.forEach(function (movie) { searchGrid.appendChild(createMovieCard(movie)); });
-}
-
-function clearLiveSearch() {
-  if (searchInput) {
-    searchInput.value = "";
-    handleLiveSearch();
-    searchInput.focus();
-  }
-}
-window.clearLiveSearch = clearLiveSearch;
-
-// ---------- Series Episodes (Website + App) ----------
-async function loadEpisodes(movie) {
-  var box = document.getElementById("modalEpisodesContainer");
-  if (!box) return;
-  try {
-    var eps = await fetchFromApi("episodes", { movie_id: movie.id });
-    try { localStorage.setItem("jj_eps_" + movie.id, JSON.stringify(eps)); } catch (e) {}
-    box = document.getElementById("modalEpisodesContainer");
-    if (!box) return;
-    if (!eps || !eps.length) {
-      box.innerHTML = '<p class="jj-ep-empty">No episodes added yet.</p>';
-      return;
-    }
-    renderEpisodes(movie, eps, box);
-  } catch (err) {
-    box = document.getElementById("modalEpisodesContainer");
-    if (!box) return;
-    var cachedEps = null;
-    try { cachedEps = JSON.parse(localStorage.getItem("jj_eps_" + movie.id) || "null"); } catch (e) {}
-    if (cachedEps && cachedEps.length) renderEpisodes(movie, cachedEps, box);
-    else box.innerHTML = '<p class="jj-ep-empty" style="color:#ef4444;">Unable to load episodes.</p>';
-  }
-}
-
-function renderEpisodes(movie, eps, box) {
-  var seasons = [];
-  eps.forEach(function (e) {
-    var n = Number(e.season_number) || 1;
-    if (seasons.indexOf(n) === -1) seasons.push(n);
-  });
-  seasons.sort(function (a, b) { return a - b; });
-  var activeSeason = seasons[0];
-
-  function draw() {
-    var tabs = '<div class="jj-season-tabs">' + seasons.map(function (n) {
-      return '<button type="button" class="jj-season-btn' + (n === activeSeason ? " active" : "") + '" data-season="' + n + '">Season ' + n + '</button>';
-    }).join("") + '</div>';
-
-    var list = eps.filter(function (e) { return (Number(e.season_number) || 1) === activeSeason; });
-    var grid = list.map(function (e) {
-      var playable = Boolean(e.stream_url_1 || e.stream_url_2);
-      var sub = e.title ? '<span class="jj-ep-sub">' + escapeHTML(e.title) + '</span>' : "";
-      return '<button type="button" class="jj-ep-btn' + (playable ? "" : " disabled") + '" data-ep="' + escapeHTML(e.id) + '"' + (playable ? "" : " disabled") + '>' +
-        '<span class="jj-ep-num">▶ Episode ' + escapeHTML(e.episode_number) + '</span>' + sub + '</button>';
-    }).join("");
-
-    box.innerHTML = tabs + '<div class="jj-ep-grid">' + grid + '</div>';
-
-    box.querySelectorAll(".jj-season-btn").forEach(function (b) {
-      b.addEventListener("click", function () { activeSeason = Number(b.getAttribute("data-season")); draw(); });
-    });
-    box.querySelectorAll(".jj-ep-btn:not(.disabled)").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var ep = eps.find(function (x) { return String(x.id) === b.getAttribute("data-ep"); });
-        if (!ep) return;
-        var epLinkType = String(ep.link_type || ep.stream_type || movie.linkType || "token").toLowerCase().trim();
-        var label = movie.title + " • S" + (Number(ep.season_number) || 1) + " • Episode " + ep.episode_number;
-        openServerSelection(
-          label,
-          safeTokenRefValue(ep.stream_url_1),
-          safeTokenRefValue(ep.stream_url_2),
-          epLinkType,
-          { id: movie.id, episodeId: ep.id }
-        );
-      });
-    });
-  }
-  draw();
-}
-
-// ---------- Movie Details Modal (Website + App Both Show Player & Bot Prints) ----------
-async function showMovieDetails(movieId) {
-  if (window.__JJ_APP_BLOCKED) return;
-  var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
-  if (!movie) return;
-
-  var pinLabel = getMoviePinLabel(movie);
-  var pinBadgeHTML = pinLabel ? '<div class="jj-pin-badge" style="margin-bottom:8px;">' + escapeHTML(pinLabel) + '</div>' : '';
-  var trailerLink = movie.trailer || ("https://www.youtube.com/results?search_query=" + encodeURIComponent(movie.title + " Telugu trailer"));
-  var modalPosterSrc = getAdaptivePosterUrl(movie.poster);
-  var seriesMode = isSeries(movie);
-  var hasStream = Boolean(movie.stream1 || movie.stream2);
-  var isB2Linked = Boolean(isB2FileStream(movie.stream1) || isB2FileStream(movie.stream2));
-  var watchSubText = isB2Linked
-    ? "⚡ Direct Streaming • Dolby 5.1 Audio"
-    : "⚡ Direct Streaming • No Download Required";
-
-  var episodesSectionHTML = seriesMode
-    ? '<div class="jj-episodes-wrap"><div class="jj-episodes-head">▶ WATCH ONLINE <span class="jj-episodes-sub">⚡ Direct Streaming • No Download Required</span></div><div id="modalEpisodesContainer"><p class="jj-ep-empty">Loading episodes...</p></div></div>'
-    : "";
-
-  var bigWatchOnlineSectionHTML = (!seriesMode && hasStream)
-    ? '<div class="jj-watch-online-hero-wrap">' +
-        '<button type="button" onclick="openMoviePlayerById(\'' + escapeHTML(movie.id) + '\')" class="btn-big-watch-online"><span>▶</span> WATCH ONLINE (INSTANT HD PLAYER)</button>' +
-        '<div class="jj-watch-subtext">' + watchSubText + '</div>' +
-      '</div>'
-    : "";
-
-  var printsSectionHTML =
-    '<div class="prints-header-bar"><span>Available Quality Prints</span><span class="status-dot-active">● Ready via @' + escapeHTML(TELEGRAM_BOT_USERNAME) + '</span></div>' +
-    '<div id="modalVersionContainer"><p style="color:#64748b;font-size:12px;text-align:center;padding:16px 0;">Loading prints...</p></div>';
-
-  modalDetails.innerHTML =
-    pinBadgeHTML +
-    '<div class="movie-header-flex">' +
-      '<img id="modalPosterImg" class="modal-mini-poster" src="' + escapeHTML(modalPosterSrc) + '" alt="' + escapeHTML(movie.title) + '">' +
-      '<div class="movie-header-info">' +
-        '<h2>' + escapeHTML(movie.title) + '</h2>' +
-        '<div class="movie-meta-chips">' +
-          '<span>' + escapeHTML(movie.year || "N/A") + '</span>' +
-          (movie.runtime ? '<span>• ' + escapeHTML(movie.runtime) + '</span>' : '') +
-          (movie.category ? '<span class="genre-badge">• ' + escapeHTML(movie.category) + '</span>' : '') +
-        '</div>' +
-        '<p class="movie-desc-text" style="margin-top:6px;">' + escapeHTML(movie.description || "No description available.") + '</p>' +
-        '<div class="modal-action-buttons-row">' +
-          '<a href="' + escapeHTML(trailerLink) + '" target="_blank" rel="noopener noreferrer" class="btn-modal-trailer">▶ Watch Trailer</a>' +
-        '</div>' +
-      '</div>' +
-    '</div>' +
-    bigWatchOnlineSectionHTML +
-    episodesSectionHTML +
-    printsSectionHTML +
-    '<div class="modal-footer-sharing">' +
-      '<span>Share with friends:</span>' +
-      '<a id="btnShareModalWhatsApp" href="#" class="btn-whatsapp-share" target="_blank" rel="noopener noreferrer">💚 Share to WhatsApp</a>' +
-    '</div>';
-
-  var modalImg = document.getElementById("modalPosterImg");
-  if (modalImg) {
-    modalImg.onerror = function () { handleMissingPoster(modalImg, movie.title); };
-    if (!modalPosterSrc) handleMissingPoster(modalImg, movie.title);
-  }
-
-  var wasHidden = movieModal.hidden;
-  movieModal.hidden = false;
-  if (wasHidden) {
-    try { history.pushState({ jjModalOpen: true }, "", window.location.href); } catch (e) {}
-  }
-
-  if (seriesMode) loadEpisodes(movie);
-
-  var shareAnchor = document.getElementById("btnShareModalWhatsApp");
-  if (shareAnchor) {
-    var shareUrl = window.location.origin + window.location.pathname + "?movie=" + encodeURIComponent(movie.id);
-    var customText = "🍿 *Watch " + movie.title + "* (" + (movie.year || "Movie") + ") on JJ Movies: " + shareUrl;
-    shareAnchor.href = "https://api.whatsapp.com/send?text=" + encodeURIComponent(customText);
-  }
-
-  try {
-    var versions = await fetchFromApi("versions", { movie_id: movieId });
-    var container = document.getElementById("modalVersionContainer");
-    if (!container) return;
-
-    if (!Array.isArray(versions) || versions.length === 0) {
-      container.innerHTML = '<p style="color:#64748b;font-size:12px;text-align:center;padding:12px;">No prints added yet.</p>';
-      return;
-    }
-
-    container.innerHTML = '<div class="version-list-grid">' + versions.map(function (v) {
-      var botURL = v.bot_url ? safeURL(v.bot_url) : buildTelegramBotStartUrl(v.id);
-      return (
-        '<div class="version-tile">' +
-          '<div class="version-tile-info">' +
-            '<span class="version-quality-title">💾 ' + escapeHTML(v.quality || "Standard") + '</span>' +
-            '<span class="version-audio-sub">Audio: ' + escapeHTML(v.audio_language || "Telugu") + '</span>' +
-          '</div>' +
-          '<a class="btn-tele-bot" href="' + escapeHTML(botURL) + '" target="_blank" rel="noopener noreferrer">⚡ Get Files in Bot</a>' +
-        '</div>'
-      );
-    }).join("") + '</div>';
-  } catch (err) {
-    var errContainer = document.getElementById("modalVersionContainer");
-    if (errContainer) errContainer.innerHTML = '<p style="color:#ef4444;font-size:12px;text-align:center;">Failed to load prints.</p>';
-  }
-}
-window.showMovieDetails = showMovieDetails;
-
-// ---------- Startup Notice Popup Modal (100% Custom Message & Link) ----------
-function extractNoticeButton(rawMsg) {
-  var text = String(rawMsg || "");
-  var match = text.match(/\n?\|\|BTN:\s*([^|\n]+?)\s*\|\s*(https?:\/\/\S+)\s*$/i);
-  if (!match) {
-    return { cleanMessage: text.trim(), btnLabel: "", btnUrl: "" };
-  }
-  var cleanUrl = safeURL(match[2].trim());
-  var cleanLabel = String(match[1] || "").trim();
-  return {
-    cleanMessage: text.replace(match[0], "").trim(),
-    btnLabel: cleanLabel,
-    btnUrl: /^https?:\/\//i.test(cleanUrl) ? cleanUrl : ""
-  };
-}
-
-function pickTargetedNotice(messagesList) {
-  if (!Array.isArray(messagesList) || !messagesList.length) return null;
-  var inApp = isRunningInsideApk();
-
-  function stripTargetTag(t) {
-    return String(t || "").replace(/^\s*\[(WEB|APP|ALL|NOTICE)\]\s*/i, "").trim();
-  }
-
-  var targeted = messagesList.find(function (m) {
-    var rawTitle = String(m.title || "").trim();
-    if (inApp) return /^\s*\[APP\]/i.test(rawTitle);
-    return /^\s*\[WEB\]/i.test(rawTitle);
-  });
-
-  var chosen = targeted || messagesList.find(function (m) {
-    return !/^\s*\[(WEB|APP|NOTICE)\]/i.test(String(m.title || "").trim());
-  });
-
-  if (!chosen) return null;
-  return Object.assign({}, chosen, {
-    title: stripTargetTag(chosen.title) || "JJ Movies Notice",
-    isAppNotice: inApp
-  });
-}
-
-function renderStartupNoticeModal(msgItem) {
-  if (window.__JJ_APP_BLOCKED) return;
-  if (!msgItem || !msgItem.title) return;
-  var inApp = Boolean(msgItem.isAppNotice != null ? msgItem.isAppNotice : isRunningInsideApk());
-  var hideKey = "jj_notice_hide_until_" + (inApp ? "app_" : "web_") + String(msgItem.id || "") + "_" + String(msgItem.title || "").slice(0, 20) + "_" + String(msgItem.link_url || "").slice(-10);
-  try {
-    var hiddenUntil = Number(localStorage.getItem(hideKey) || 0);
-    if (hiddenUntil && Date.now() < hiddenUntil) return;
-  } catch (e) {}
-
-  if (document.getElementById("jjStartupNoticeModal")) return;
-
-  if (!document.getElementById("jjNoticeModalStyles")) {
-    var st = document.createElement("style");
-    st.id = "jjNoticeModalStyles";
-    st.textContent =
-      ".jj-notice-backdrop{position:fixed;inset:0;background:rgba(4,8,16,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:100001;display:flex;align-items:center;justify-content:center;padding:16px;animation:jjNoticeFade .2s ease;}" +
-      "@keyframes jjNoticeFade{from{opacity:0;}to{opacity:1;}}" +
-      ".jj-notice-card{width:100%;max-width:400px;background:#111318;border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:20px;color:#f8fafc;box-shadow:0 24px 60px rgba(0,0,0,.9);position:relative;}" +
-      ".jj-notice-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}" +
-      ".jj-notice-icon-box{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:17px;}" +
-      ".jj-notice-x{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);color:#cbd5e1;width:32px;height:32px;border-radius:10px;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;}" +
-      ".jj-notice-x:hover{background:#ff2450;color:#fff;border-color:#ff2450;}" +
-      ".jj-notice-tag{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:1px;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;}" +
-      ".jj-notice-dot{width:6px;height:6px;border-radius:50%;background:#ff4166;display:inline-block;}" +
-      ".jj-notice-title{margin:0 0 8px;font-size:19px;font-weight:800;line-height:1.3;color:#fff;}" +
-      ".jj-notice-body{margin:0 0 14px;font-size:13px;line-height:1.55;color:#cbd5e1;white-space:pre-line;}" +
-      ".jj-notice-action{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:linear-gradient(135deg,rgba(255,184,48,.14),rgba(255,107,0,.1));border:1px solid rgba(255,184,48,.38);border-radius:12px;text-decoration:none;margin-bottom:12px;}" +
-      ".jj-notice-action-left{display:flex;flex-direction:column;gap:2px;min-width:0;}" +
-      ".jj-notice-action-main{font-size:14px;font-weight:800;color:#fde047;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
-      ".jj-notice-action-arrow{width:30px;height:30px;border-radius:8px;background:rgba(255,184,48,.18);color:#fde047;display:flex;align-items:center;justify-content:center;font-weight:900;flex-shrink:0;}" +
-      ".jj-notice-foot{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:11px 14px;margin-top:4px;}" +
-      ".jj-notice-dismiss{background:none;border:none;color:#e2e8f0;font-weight:700;font-size:13px;cursor:pointer;padding:0;}" +
-      ".jj-notice-dismiss:hover{color:#ff4166;}" +
-      ".jj-notice-hide-tag{font-size:11px;color:#64748b;font-weight:600;}";
-    document.head.appendChild(st);
-  }
-
-  var parsedMsg = extractNoticeButton(msgItem.message);
-  var directLink = String(msgItem.link_url || "").trim();
-  var fallbackUrl = directLink ? safeURL(directLink) : "";
-  var finalBtnUrl = parsedMsg.btnUrl || (/^https?:\/\//i.test(fallbackUrl) ? fallbackUrl : "");
-  var finalBtnLabel = parsedMsg.btnLabel || "Open Link";
-  var hasCustomBtn = Boolean(finalBtnUrl);
-
-  var actionHTML = hasCustomBtn
-    ? '<a class="jj-notice-action" href="' + escapeHTML(finalBtnUrl) + '" target="_blank" rel="noopener noreferrer">' +
-        '<div class="jj-notice-action-left">' +
-          '<span class="jj-notice-action-main">' + escapeHTML(finalBtnLabel) + '</span>' +
-        '</div>' +
-        '<span class="jj-notice-action-arrow">→</span>' +
-      '</a>'
-    : "";
-
-  var wrap = document.createElement("div");
-  wrap.id = "jjStartupNoticeModal";
-  wrap.className = "jj-notice-backdrop";
-
-  wrap.innerHTML =
-    '<div class="jj-notice-card">' +
-      '<div class="jj-notice-top">' +
-        '<div class="jj-notice-icon-box">📢</div>' +
-        '<button type="button" class="jj-notice-x" id="jjNoticeCloseX" aria-label="Close">&times;</button>' +
-      '</div>' +
-      '<div class="jj-notice-tag"><span class="jj-notice-dot"></span><span>JJ MOVIES NOTICE</span></div>' +
-      '<h3 class="jj-notice-title">' + escapeHTML(msgItem.title) + '</h3>' +
-      (parsedMsg.cleanMessage ? '<p class="jj-notice-body">' + escapeHTML(parsedMsg.cleanMessage) + '</p>' : '') +
-      actionHTML +
-      '<div class="jj-notice-foot">' +
-        '<button type="button" class="jj-notice-dismiss" id="jjNoticeDismissBtn">Dismiss</button>' +
-        '<span class="jj-notice-hide-tag">hide for 7d</span>' +
-      '</div>' +
-    '</div>';
-
-  function closeNotice(hide7d) {
-    if (hide7d) {
-      try { localStorage.setItem(hideKey, String(Date.now() + 7 * 24 * 3600 * 1000)); } catch (e) {}
-    }
-    if (wrap && wrap.parentNode) wrap.remove();
-  }
-
-  document.body.appendChild(wrap);
-  document.getElementById("jjNoticeCloseX").addEventListener("click", function () { closeNotice(false); });
-  document.getElementById("jjNoticeDismissBtn").addEventListener("click", function () { closeNotice(true); });
-  wrap.addEventListener("click", function (e) {
-    if (e.target === wrap) closeNotice(false);
-  });
-}
-window.renderStartupNoticeModal = renderStartupNoticeModal;
-
-// ---------- Notices Ticker (Remaining & [NOTICE] Messages) ----------
-function loadMessages() {
-  var tickerWrapper = document.getElementById("jjTickerTextWrapper");
-  var tickerContainer = document.getElementById("jjAlertsTicker");
-  var actionArea = document.getElementById("jjTickerActionArea");
-
-  fetchFromApi("messages")
-    .then(function (data) {
-      var activeMessages = Array.isArray(data) ? data : [];
-      if (!activeMessages.length) {
-        if (tickerContainer) tickerContainer.style.display = "none";
-        return;
-      }
-
-      var popupCandidates = activeMessages.filter(function (m) {
-        return !/^\s*\[NOTICE\]/i.test(String(m.title || "").trim());
-      });
-
-      var popupNotice = pickTargetedNotice(popupCandidates);
-      if (popupNotice && !window.__JJ_APP_BLOCKED) {
-        renderStartupNoticeModal(popupNotice);
-      }
-
-      var remainingNotices = activeMessages.filter(function (m) {
-        return !popupNotice || String(m.id) !== String(popupNotice.id);
-      });
-      var barItems = remainingNotices.length ? remainingNotices : activeMessages;
-
-      if (!tickerWrapper || !tickerContainer) return;
-      tickerContainer.style.display = "flex";
-      tickerWrapper.innerHTML = "";
-
-      barItems.forEach(function (item, index) {
-        var cleanTitle = String(item.title || "").replace(/^\s*\[(WEB|APP|ALL|NOTICE)\]\s*/i, "").trim();
-        var cleanBody = extractNoticeButton(item.message).cleanMessage;
-        var slide = document.createElement("span");
-        slide.className = "jj-ticker-slide" + (index === 0 ? " active" : "");
-        slide.setAttribute("data-link", item.link_url || "");
-        slide.innerHTML = "📢 <strong>" + escapeHTML(cleanTitle) + "</strong>: " + escapeHTML(cleanBody);
-        tickerWrapper.appendChild(slide);
-      });
-
-      function updateButtonLink(activeSlide) {
-        if (!actionArea) return;
-        var link = activeSlide ? activeSlide.getAttribute("data-link") : "";
-        if (link) {
-          actionArea.innerHTML = '<a class="jj-ticker-btn" href="' + escapeHTML(safeURL(link)) + '" target="_blank" rel="noopener noreferrer">Open ➜</a>';
-          actionArea.style.display = "block";
-        } else {
-          actionArea.innerHTML = "";
-          actionArea.style.display = "none";
-        }
-      }
-
-      updateButtonLink(tickerWrapper.querySelector(".jj-ticker-slide.active"));
-      var slides = tickerWrapper.querySelectorAll(".jj-ticker-slide");
-      if (slides.length <= 1) return;
-
-      var current = 0;
-      setInterval(function () {
-        slides[current].classList.remove("active");
-        current = (current + 1) % slides.length;
-        slides[current].classList.add("active");
-        updateButtonLink(slides[current]);
-      }, 4000);
-    })
-    .catch(function () {});
-}
-
-function closeMovieModal() {
-  if (!movieModal.hidden) {
-    movieModal.hidden = true;
-    if (history.state && history.state.jjModalOpen) {
-      try { history.back(); } catch (e) {}
-    }
-  }
-}
-
-// ---------- Hide APK Download Buttons Inside Android App ----------
-(function configureApkDownloadButtons() {
-  if (isRunningInsideApk()) {
-    var st = document.createElement("style");
-    st.textContent = '.jj-apk-btn, .nav-download-app, .footer-app-link, a[href*="jj-movies.apk"]:not(.jj-strict-update-btn) { display: none !important; }';
-    document.head.appendChild(st);
-  }
-})();
-
-// ---------- Event Listeners ----------
-if (searchInput) searchInput.addEventListener("input", handleLiveSearch);
-if (genreFilter) genreFilter.addEventListener("change", renderMovies);
-if (yearFilter) yearFilter.addEventListener("change", renderMovies);
-
-var closeBtn = document.getElementById("closeModal");
-if (closeBtn) closeBtn.addEventListener("click", closeMovieModal);
-
-if (movieModal) {
-  movieModal.addEventListener("click", function (event) {
-    if (event.target === movieModal) closeMovieModal();
-  });
-}
-
-document.addEventListener("keydown", function (event) {
-  if (event.key === "Escape") {
-    if (window.__JJ_APP_BLOCKED) return;
-    var noticeModal = document.getElementById("jjStartupNoticeModal");
-    if (noticeModal) noticeModal.remove();
-    closeInAppPlayer();
-    closeMovieModal();
-  }
-});
-
-createExtraSections();
-loadMovies();
-initNeonFestivalMode();
-
-// ---------- Offline Bar & Pull-to-Refresh ----------
-var OFFLINE_TEXT = "📡 No internet connection. Please turn on your internet and pull down to refresh.";
-
-function showOfflineBar() {
-  var bar = document.getElementById("jjOfflineBar");
-  if (!bar) {
-    bar = document.createElement("div");
-    bar.id = "jjOfflineBar";
-    bar.style.cssText = "position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom, 0px));z-index:99999;background:#ff2450;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:10px 14px;border-radius:10px;";
-    bar.textContent = OFFLINE_TEXT;
-    document.body.appendChild(bar);
-  }
-  bar.style.display = "block";
-}
-
-function hideOfflineBar() {
-  var bar = document.getElementById("jjOfflineBar");
-  if (bar) bar.style.display = "none";
-}
-
-window.addEventListener("offline", showOfflineBar);
-window.addEventListener("online", function () { hideOfflineBar(); loadMovies(); });
-if (navigator.onLine === false) showOfflineBar();
-
-(function initPullToRefresh() {
-  var startY = 0, dist = 0, active = false, THRESH = 90;
-  var ind = document.createElement("div");
-  ind.style.cssText = "position:fixed;top:calc(8px + env(safe-area-inset-top, 0px));left:50%;transform:translate(-50%,-70px);z-index:99998;background:#162238;border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:12px;font-weight:700;padding:8px 16px;border-radius:999px;transition:transform 0.15s;pointer-events:none;";
-  ind.textContent = "↓ Pull down to refresh";
-  document.body.appendChild(ind);
-
-  function blocked(t) {
-    return t && t.closest && t.closest('[id*="odal"], [id*="layer"], [class*="modal"], [class*="player"]');
-  }
-
-  document.addEventListener("touchstart", function (e) {
-    if ((window.scrollY || document.documentElement.scrollTop) > 0 || blocked(e.target)) { active = false; return; }
-    startY = e.touches[0].clientY; dist = 0; active = true;
-  }, { passive: true });
-
-  document.addEventListener("touchmove", function (e) {
-    if (!active) return;
-    dist = e.touches[0].clientY - startY;
-    if (dist > 0) {
-      ind.style.transition = "none";
-      ind.style.transform = "translate(-50%," + (Math.min(dist / 2, 70) - 70) + "px)";
-      ind.textContent = dist > THRESH ? "Release to refresh" : "↓ Pull down to refresh";
-    }
-  }, { passive: true });
-
-  document.addEventListener("touchend", function () {
-    if (!active) return;
-    active = false;
-    ind.style.transition = "transform 0.15s";
-    ind.style.transform = "translate(-50%,-70px)";
-    if (dist > THRESH) {
-      if (navigator.onLine === false) showOfflineBar();
-      else {
-        ind.textContent = "Refreshing...";
-        ind.style.transform = "translate(-50%,0)";
-        setTimeout(function () { window.location.reload(); }, 250);
-      }
-    }
-  });
-})();
-
-if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
-  window.addEventListener("load", function () {
-    navigator.serviceWorker.register("./sw.js").catch(function () {});
-  });
-}
+package com.jjmovies.app;
+
+          import android.app.AlertDialog;
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import android.content.pm.ActivityInfo;
+          import android.content.res.ColorStateList;
+          import android.content.res.Configuration;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.media.AudioManager;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.provider.Settings;
+          import android.view.GestureDetector;
+          import android.view.Gravity;
+          import android.view.KeyEvent;
+          import android.view.MotionEvent;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.view.WindowManager;
+          import android.widget.ImageButton;
+          import android.widget.LinearLayout;
+          import android.widget.RelativeLayout;
+          import android.widget.ScrollView;
+          import android.widget.SeekBar;
+          import android.widget.TextView;
+          import android.widget.Toast;
+
+          import androidx.appcompat.app.AppCompatActivity;
+
+          import org.videolan.libvlc.LibVLC;
+          import org.videolan.libvlc.Media;
+          import org.videolan.libvlc.MediaPlayer;
+          import org.videolan.libvlc.util.VLCVideoLayout;
+
+          import java.util.ArrayList;
+          import java.util.Locale;
+
+          public class VlcPlayerActivity extends AppCompatActivity {
+
+              public static final String EXTRA_VIDEO_URL = "video_url";
+              public static final String EXTRA_VIDEO_TITLE = "video_title";
+
+              private static final String PREFS_NAME = "jj_vlc_prefs";
+              private static final String KEY_SUB_SIZE = "sub_rel_fontsize";
+
+              private static final int[] SUB_SIZE_VALUES = { 22, 16, 13, 10 };
+              private static final String[] SUB_SIZE_LABELS = { "Small", "Normal", "Large", "XL" };
+
+              private LibVLC libVLC;
+              private MediaPlayer mediaPlayer;
+              private VLCVideoLayout videoLayout;
+              private RelativeLayout controlsOverlay;
+              private LinearLayout loadingBrandContainer;
+              private TextView tvLoadingSub, tvGestureHud;
+              private SeekBar seekBar;
+              private TextView tvCurrentTime, tvTotalTime, tvTitle;
+              private ImageButton btnPlayPause, btnUnlock, btnRotate;
+              private AudioManager audioManager;
+
+              private final Handler handler = new Handler(Looper.getMainLooper());
+              private String safeVideoUrl = "";
+              private String movieDisplayTitle = "JJ Movies";
+              private int currentSubFontSize = 16;
+              private boolean isUserSeeking = false;
+              private boolean controlsVisible = true;
+              private boolean isLocked = false;
+              private boolean isOrientationLocked = false;
+              private int aspectMode = 0;
+
+              private float touchStartX = 0f;
+              private float touchStartY = 0f;
+              private int gestureMode = 0;
+              private float startBrightness = 0.5f;
+              private int startVolume = 0;
+              private int maxVolume = 15;
+
+              private final MediaPlayer.ScaleType[] scaleTypes = {
+                  MediaPlayer.ScaleType.SURFACE_BEST_FIT,
+                  MediaPlayer.ScaleType.SURFACE_FILL,
+                  MediaPlayer.ScaleType.SURFACE_FIT_SCREEN,
+                  MediaPlayer.ScaleType.SURFACE_16_9
+              };
+              private final String[] scaleNames = { "Best Fit", "Fill Screen", "Zoom / Crop", "16:9" };
+
+              private final Runnable hideControlsRunnable = () -> {
+                  if (controlsOverlay != null && mediaPlayer != null && mediaPlayer.isPlaying()) {
+                      controlsOverlay.setVisibility(View.GONE);
+                      controlsVisible = false;
+                      hideSystemUi();
+                  }
+              };
+
+              private final Runnable hideUnlockRunnable = () -> {
+                  if (btnUnlock != null) {
+                      btnUnlock.setVisibility(View.GONE);
+                      hideSystemUi();
+                  }
+              };
+
+              private final Runnable hideHudRunnable = () -> {
+                  if (tvGestureHud != null) tvGestureHud.setVisibility(View.GONE);
+              };
+
+              private final Runnable hideBrandAfterSeekRunnable = () -> {
+                  if (loadingBrandContainer != null && mediaPlayer != null && mediaPlayer.isPlaying()) {
+                      loadingBrandContainer.setVisibility(View.GONE);
+                  }
+              };
+
+              private final Runnable progressUpdater = new Runnable() {
+                  @Override
+                  public void run() {
+                      if (mediaPlayer != null && !isUserSeeking) {
+                          long total = mediaPlayer.getLength();
+                          long current = mediaPlayer.getTime();
+                          if (total > 0) {
+                              seekBar.setMax((int) total);
+                              seekBar.setProgress((int) Math.max(0, current));
+                              tvCurrentTime.setText(formatTime(current));
+                              tvTotalTime.setText(formatTime(total));
+                          }
+                      }
+                      handler.postDelayed(this, 500);
+                  }
+              };
+
+              private String cleanRipperTags(String raw) {
+                  if (raw == null) return "";
+                  String s = raw.trim();
+                  s = s.replaceAll("(?i)\\b(team\\s*movies|1tamilmv|tamilmv|tamilrockers|movierulz|bolly4u|katmoviehd|vegamovies|uhdmovies|olamovies|filmyzilla|desiremovies|hdhub4u|mkvcinemas|ssrmovies|worldfree4u|telly|hon3y|psa|yify|rarbg|flux|ntb|cmrg|qxr|utr|tigole)\\b", " ");
+                  s = s.replaceAll("(?i)(www\\.[a-z0-9.-]+|@[a-z0-9_]+|t\\.me/\\S+)", " ");
+                  s = s.replaceAll("(?i)^track\\s*\\d+\\s*[-:|]?\\s*", "");
+                  s = s.replaceAll("\\[\\s*\\]", "").replaceAll("\\(\\s*\\)", "");
+                  s = s.replaceAll("\\s*-\\s*-\\s*", " - ");
+                  s = s.replaceAll("^[\\s\\-:|]+|[\\s\\-:|]+$", "");
+                  s = s.replaceAll("\\s+", " ").trim();
+                  return s;
+              }
+
+              private String formatTrackLabel(MediaPlayer.TrackDescription tr, boolean isAudio, int fallbackNum) {
+                  if (tr.id == -1) return "Disable track";
+                  String cleaned = cleanRipperTags(tr.name);
+                  cleaned = cleaned.replaceAll("(?i)^jj\\s*[-:|]?\\s*", "").trim();
+                  String safeMovie = movieDisplayTitle != null ? movieDisplayTitle.trim() : "Movie";
+                  if (!safeMovie.isEmpty() && cleaned.toLowerCase(Locale.US).startsWith(safeMovie.toLowerCase(Locale.US))) {
+                      cleaned = cleaned.substring(safeMovie.length()).replaceAll("^[\\s\\-:|]+", "").trim();
+                  }
+                  if (cleaned.isEmpty()) {
+                      return isAudio
+                              ? ("JJ - " + safeMovie + " - Audio " + fallbackNum)
+                              : ("JJ - " + safeMovie + " - Subtitle " + fallbackNum);
+                  }
+                  return "JJ - " + safeMovie + " - " + cleaned;
+              }
+
+              private void hideSystemUi() {
+                  getWindow().getDecorView().setSystemUiVisibility(
+                      View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                      | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                      | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                      | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                      | View.SYSTEM_UI_FLAG_FULLSCREEN
+                      | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                  );
+              }
+
+              private void showBrandOverlay(String subText, boolean autoHide) {
+                  if (loadingBrandContainer == null) return;
+                  if (tvLoadingSub != null && subText != null) tvLoadingSub.setText(subText);
+                  loadingBrandContainer.setVisibility(View.VISIBLE);
+                  handler.removeCallbacks(hideBrandAfterSeekRunnable);
+                  if (autoHide) handler.postDelayed(hideBrandAfterSeekRunnable, 1200);
+              }
+
+              private void hideBrandOverlay() {
+                  if (loadingBrandContainer != null) loadingBrandContainer.setVisibility(View.GONE);
+              }
+
+              private void showGestureHud(String text) {
+                  if (tvGestureHud == null) return;
+                  tvGestureHud.setText(text);
+                  tvGestureHud.setVisibility(View.VISIBLE);
+                  handler.removeCallbacks(hideHudRunnable);
+                  handler.postDelayed(hideHudRunnable, 1000);
+              }
+
+              private void showControls() {
+                  if (isLocked) return;
+                  if (controlsOverlay != null) {
+                      controlsOverlay.setVisibility(View.VISIBLE);
+                      controlsVisible = true;
+                  }
+                  scheduleHideControls();
+              }
+
+              private void toggleControls() {
+                  if (isLocked) {
+                      if (btnUnlock != null) {
+                          btnUnlock.setVisibility(View.VISIBLE);
+                          handler.removeCallbacks(hideUnlockRunnable);
+                          handler.postDelayed(hideUnlockRunnable, 3000);
+                      }
+                      return;
+                  }
+                  if (controlsVisible) {
+                      handler.removeCallbacks(hideControlsRunnable);
+                      controlsOverlay.setVisibility(View.GONE);
+                      controlsVisible = false;
+                      hideSystemUi();
+                  } else {
+                      showControls();
+                  }
+              }
+
+              private void lockScreen() {
+                  isLocked = true;
+                  handler.removeCallbacks(hideControlsRunnable);
+                  if (controlsOverlay != null) {
+                      controlsOverlay.setVisibility(View.GONE);
+                      controlsVisible = false;
+                  }
+                  if (btnUnlock != null) {
+                      btnUnlock.setVisibility(View.VISIBLE);
+                      handler.removeCallbacks(hideUnlockRunnable);
+                      handler.postDelayed(hideUnlockRunnable, 3000);
+                  }
+                  hideSystemUi();
+                  Toast.makeText(this, "Screen Locked", Toast.LENGTH_SHORT).show();
+              }
+
+              private void unlockScreen() {
+                  isLocked = false;
+                  handler.removeCallbacks(hideUnlockRunnable);
+                  if (btnUnlock != null) btnUnlock.setVisibility(View.GONE);
+                  showControls();
+                  Toast.makeText(this, "Screen Unlocked", Toast.LENGTH_SHORT).show();
+              }
+
+              private void toggleOrientationLock() {
+                  if (!isOrientationLocked) {
+                      isOrientationLocked = true;
+                      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
+                      if (btnRotate != null) btnRotate.setImageResource(R.drawable.ic_vlc_orient_lock);
+                      showGestureHud("Orientation Locked");
+                  } else {
+                      isOrientationLocked = false;
+                      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
+                      if (btnRotate != null) btnRotate.setImageResource(R.drawable.ic_vlc_rotate);
+                      showGestureHud("Auto-Rotate");
+                  }
+                  scheduleHideControls();
+              }
+
+              private void manualFlipOrientation() {
+                  int current = getResources().getConfiguration().orientation;
+                  isOrientationLocked = true;
+                  if (current == Configuration.ORIENTATION_LANDSCAPE) {
+                      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                      showGestureHud("Portrait Locked");
+                  } else {
+                      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                      showGestureHud("Landscape Locked");
+                  }
+                  if (btnRotate != null) btnRotate.setImageResource(R.drawable.ic_vlc_orient_lock);
+                  scheduleHideControls();
+              }
+
+              private void cycleAspectRatio() {
+                  if (mediaPlayer == null) return;
+                  aspectMode = (aspectMode + 1) % scaleTypes.length;
+                  mediaPlayer.setVideoScale(scaleTypes[aspectMode]);
+                  showGestureHud(scaleNames[aspectMode]);
+                  scheduleHideControls();
+              }
+
+              private void scheduleHideControls() {
+                  handler.removeCallbacks(hideControlsRunnable);
+                  handler.postDelayed(hideControlsRunnable, 4000);
+              }
+
+              private String formatTime(long ms) {
+                  if (ms <= 0) return "0:00";
+                  long totalSec = ms / 1000;
+                  long hours = totalSec / 3600;
+                  long mins = (totalSec % 3600) / 60;
+                  long secs = totalSec % 60;
+                  if (hours > 0) return String.format(Locale.US, "%d:%02d:%02d", hours, mins, secs);
+                  return String.format(Locale.US, "%d:%02d", mins, secs);
+              }
+
+              private float getCurrentBrightness() {
+                  float b = getWindow().getAttributes().screenBrightness;
+                  if (b >= 0f) return b;
+                  try {
+                      int sys = Settings.System.getInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS);
+                      return Math.max(0.05f, Math.min(1f, sys / 255f));
+                  } catch (Exception e) {
+                      return 0.5f;
+                  }
+              }
+
+              private int getCurrentSubSizeIndex() {
+                  for (int i = 0; i < SUB_SIZE_VALUES.length; i++) {
+                      if (SUB_SIZE_VALUES[i] == currentSubFontSize) return i;
+                  }
+                  return 1;
+              }
+
+              private void initVlcPlayer(long resumePositionMs, int restoreAudioId, int restoreSpuId) {
+                  if (mediaPlayer != null) {
+                      mediaPlayer.stop();
+                      mediaPlayer.detachViews();
+                      mediaPlayer.release();
+                      mediaPlayer = null;
+                  }
+                  if (libVLC != null) {
+                      libVLC.release();
+                      libVLC = null;
+                  }
+
+                  ArrayList<String> options = new ArrayList<>();
+                  options.add("--audio-time-stretch");
+                  options.add("--network-caching=3000");
+                  options.add("--file-caching=1500");
+                  options.add("--live-caching=3000");
+                  options.add("--http-reconnect");
+                  options.add("--freetype-rel-fontsize=" + currentSubFontSize);
+                  options.add("--sub-margin=45");
+
+                  libVLC = new LibVLC(this, options);
+                  mediaPlayer = new MediaPlayer(libVLC);
+                  mediaPlayer.attachViews(videoLayout, null, false, false);
+
+                  final boolean[] restored = { false };
+
+                  mediaPlayer.setEventListener(event -> runOnUiThread(() -> {
+                      if (event.type == MediaPlayer.Event.Playing) {
+                          hideBrandOverlay();
+                          btnPlayPause.setImageResource(R.drawable.ic_vlc_pause);
+                          if (!restored[0]) {
+                              restored[0] = true;
+                              if (resumePositionMs > 0) mediaPlayer.setTime(resumePositionMs);
+                              handler.postDelayed(() -> {
+                                  if (mediaPlayer != null) {
+                                      if (restoreAudioId != Integer.MIN_VALUE) mediaPlayer.setAudioTrack(restoreAudioId);
+                                      if (restoreSpuId != Integer.MIN_VALUE) mediaPlayer.setSpuTrack(restoreSpuId);
+                                  }
+                              }, 600);
+                          }
+                          scheduleHideControls();
+                      } else if (event.type == MediaPlayer.Event.Paused) {
+                          btnPlayPause.setImageResource(R.drawable.ic_vlc_play);
+                          showControls();
+                      } else if (event.type == MediaPlayer.Event.Buffering) {
+                          float pct = event.getBuffering();
+                          if (pct >= 100f) hideBrandOverlay();
+                          else showBrandOverlay("Buffering " + Math.round(pct) + "%", false);
+                      } else if (event.type == MediaPlayer.Event.EncounteredError) {
+                          hideBrandOverlay();
+                          Toast.makeText(this, "Playback error. Try another server.", Toast.LENGTH_LONG).show();
+                      }
+                  }));
+
+                  Media media = new Media(libVLC, Uri.parse(safeVideoUrl));
+                  media.setHWDecoderEnabled(true, true);
+                  media.addOption(":network-caching=3000");
+                  media.addOption(":http-reconnect");
+                  media.addOption(":freetype-rel-fontsize=" + currentSubFontSize);
+                  media.addOption(":http-user-agent=Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+                  mediaPlayer.setMedia(media);
+                  media.release();
+
+                  showBrandOverlay("Loading...", false);
+                  mediaPlayer.play();
+              }
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
+                  hideSystemUi();
+                  setContentView(R.layout.activity_vlc_player);
+
+                  String videoUrl = getIntent().getStringExtra(EXTRA_VIDEO_URL);
+                  String videoTitle = getIntent().getStringExtra(EXTRA_VIDEO_TITLE);
+                  if (videoUrl == null || videoUrl.trim().isEmpty()) {
+                      Toast.makeText(this, "Invalid video URL", Toast.LENGTH_SHORT).show();
+                      finish();
+                      return;
+                  }
+                  if (videoTitle != null && !videoTitle.trim().isEmpty()) {
+                      movieDisplayTitle = videoTitle.trim();
+                  }
+
+                  safeVideoUrl = videoUrl.trim()
+                          .replace(" ", "%20")
+                          .replace("(", "%28")
+                          .replace(")", "%29");
+
+                  SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+                  currentSubFontSize = prefs.getInt(KEY_SUB_SIZE, 16);
+
+                  audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+                  if (audioManager != null) {
+                      maxVolume = Math.max(1, audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+                  }
+
+                  RelativeLayout root = findViewById(R.id.vlc_root);
+                  videoLayout = findViewById(R.id.vlc_video_layout);
+                  controlsOverlay = findViewById(R.id.controls_overlay);
+                  loadingBrandContainer = findViewById(R.id.loading_brand_container);
+                  tvLoadingSub = findViewById(R.id.tv_loading_sub);
+                  tvGestureHud = findViewById(R.id.tv_gesture_hud);
+                  seekBar = findViewById(R.id.vlc_seekbar);
+                  tvCurrentTime = findViewById(R.id.tv_current_time);
+                  tvTotalTime = findViewById(R.id.tv_total_time);
+                  tvTitle = findViewById(R.id.tv_video_title);
+                  btnPlayPause = findViewById(R.id.btn_play_pause);
+                  btnUnlock = findViewById(R.id.btn_unlock);
+                  btnRotate = findViewById(R.id.btn_rotate);
+
+                  ImageButton btnBack = findViewById(R.id.btn_back);
+                  ImageButton btnTracks = findViewById(R.id.btn_tracks);
+                  ImageButton btnAspect = findViewById(R.id.btn_aspect);
+                  ImageButton btnLock = findViewById(R.id.btn_lock);
+
+                  if (tvTitle != null) {
+                      tvTitle.setText(movieDisplayTitle);
+                  }
+
+                  GestureDetector gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+                      @Override
+                      public boolean onSingleTapConfirmed(MotionEvent e) {
+                          toggleControls();
+                          return true;
+                      }
+                      @Override
+                      public boolean onDoubleTap(MotionEvent e) {
+                          if (isLocked) return true;
+                          int width = root.getWidth();
+                          if (e.getX() < width / 2f) {
+                              seekBy(-10000L);
+                              showBrandOverlay("⏪ -10s", true);
+                          } else {
+                              seekBy(10000L);
+                              showBrandOverlay("⏩ +10s", true);
+                          }
+                          return true;
+                      }
+                  });
+
+                  float swipeThreshold = 24f * getResources().getDisplayMetrics().density;
+
+                  View.OnTouchListener touchListener = (v, event) -> {
+                      gestureDetector.onTouchEvent(event);
+                      if (isLocked) return true;
+
+                      int action = event.getActionMasked();
+                      if (action == MotionEvent.ACTION_DOWN) {
+                          touchStartX = event.getX();
+                          touchStartY = event.getY();
+                          gestureMode = 0;
+                          startBrightness = getCurrentBrightness();
+                          if (audioManager != null) {
+                              startVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+                          }
+                      } else if (action == MotionEvent.ACTION_MOVE) {
+                          float dx = event.getX() - touchStartX;
+                          float dy = touchStartY - event.getY();
+                          if (gestureMode == 0 && Math.abs(dy) > swipeThreshold && Math.abs(dy) > Math.abs(dx)) {
+                              int w = Math.max(1, root.getWidth());
+                              gestureMode = (touchStartX < w / 2f) ? 1 : 2;
+                          }
+                          int h = Math.max(1, root.getHeight());
+                          if (gestureMode == 1) {
+                              float delta = dy / (h * 0.65f);
+                              float newB = Math.max(0.02f, Math.min(1.0f, startBrightness + delta));
+                              WindowManager.LayoutParams lp = getWindow().getAttributes();
+                              lp.screenBrightness = newB;
+                              getWindow().setAttributes(lp);
+                              showGestureHud("☀ Brightness: " + Math.round(newB * 100) + "%");
+                          } else if (gestureMode == 2 && audioManager != null) {
+                              float delta = dy / (h * 0.65f);
+                              int newVol = Math.max(0, Math.min(maxVolume, Math.round(startVolume + delta * maxVolume)));
+                              audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVol, 0);
+                              int pct = Math.round((newVol * 100f) / maxVolume);
+                              showGestureHud("🔊 Volume: " + pct + "%");
+                          }
+                      } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                          gestureMode = 0;
+                      }
+                      return true;
+                  };
+
+                  root.setOnTouchListener(touchListener);
+                  controlsOverlay.setOnTouchListener(touchListener);
+
+                  initVlcPlayer(0L, Integer.MIN_VALUE, Integer.MIN_VALUE);
+
+                  handler.post(progressUpdater);
+                  scheduleHideControls();
+
+                  if (btnBack != null) btnBack.setOnClickListener(v -> finish());
+                  if (btnTracks != null) btnTracks.setOnClickListener(v -> { showControls(); showSideBySideTracksDialog(); });
+                  if (btnRotate != null) {
+                      btnRotate.setImageResource(R.drawable.ic_vlc_rotate);
+                      btnRotate.setOnClickListener(v -> toggleOrientationLock());
+                      btnRotate.setOnLongClickListener(v -> { manualFlipOrientation(); return true; });
+                  }
+                  if (btnPlayPause != null) btnPlayPause.setOnClickListener(v -> { togglePlayPause(); scheduleHideControls(); });
+                  if (btnAspect != null) btnAspect.setOnClickListener(v -> cycleAspectRatio());
+                  if (btnLock != null) btnLock.setOnClickListener(v -> lockScreen());
+                  if (btnUnlock != null) btnUnlock.setOnClickListener(v -> unlockScreen());
+
+                  seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override
+                      public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                          if (fromUser) {
+                              String t = formatTime(progress);
+                              tvCurrentTime.setText(t);
+                              showBrandOverlay("Seeking " + t, false);
+                          }
+                      }
+                      @Override
+                      public void onStartTrackingTouch(SeekBar sb) {
+                          isUserSeeking = true;
+                          handler.removeCallbacks(hideControlsRunnable);
+                      }
+                      @Override
+                      public void onStopTrackingTouch(SeekBar sb) {
+                          isUserSeeking = false;
+                          if (mediaPlayer != null) mediaPlayer.setTime(sb.getProgress());
+                          showBrandOverlay("Seeking " + formatTime(sb.getProgress()), true);
+                          scheduleHideControls();
+                      }
+                  });
+              }
+
+              private void togglePlayPause() {
+                  if (mediaPlayer == null) return;
+                  if (mediaPlayer.isPlaying()) {
+                      mediaPlayer.pause();
+                      btnPlayPause.setImageResource(R.drawable.ic_vlc_play);
+                  } else {
+                      mediaPlayer.play();
+                      btnPlayPause.setImageResource(R.drawable.ic_vlc_pause);
+                  }
+              }
+
+              private void seekBy(long deltaMs) {
+                  if (mediaPlayer == null) return;
+                  long target = mediaPlayer.getTime() + deltaMs;
+                  mediaPlayer.setTime(Math.max(0L, target));
+              }
+
+              private void showSideBySideTracksDialog() {
+                  if (mediaPlayer == null) return;
+                  handler.removeCallbacks(hideControlsRunnable);
+
+                  MediaPlayer.TrackDescription[] audioTracks = mediaPlayer.getAudioTracks();
+                  MediaPlayer.TrackDescription[] spuTracks = mediaPlayer.getSpuTracks();
+
+                  float density = getResources().getDisplayMetrics().density;
+                  int pad = Math.round(14 * density);
+                  int itemPadV = Math.round(9 * density);
+                  int itemPadH = Math.round(10 * density);
+
+                  GradientDrawable dialogBg = new GradientDrawable();
+                  dialogBg.setColor(Color.parseColor("#E60D0F14"));
+                  dialogBg.setCornerRadius(14 * density);
+                  dialogBg.setStroke(Math.round(1 * density), Color.parseColor("#2A2F3D"));
+
+                  LinearLayout container = new LinearLayout(this);
+                  container.setOrientation(LinearLayout.HORIZONTAL);
+                  container.setBackground(dialogBg);
+                  container.setPadding(pad, pad, pad, pad);
+
+                  LinearLayout leftCol = new LinearLayout(this);
+                  leftCol.setOrientation(LinearLayout.VERTICAL);
+                  leftCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                  leftCol.setPadding(0, 0, Math.round(8 * density), 0);
+
+                  TextView audioHeader = new TextView(this);
+                  audioHeader.setText("Audio");
+                  audioHeader.setTextColor(Color.WHITE);
+                  audioHeader.setTextSize(15f);
+                  audioHeader.setTypeface(null, Typeface.BOLD);
+                  audioHeader.setPadding(itemPadH, Math.round(4 * density), itemPadH, Math.round(8 * density));
+                  leftCol.addView(audioHeader);
+
+                  ScrollView audioScroll = new ScrollView(this);
+                  LinearLayout audioList = new LinearLayout(this);
+                  audioList.setOrientation(LinearLayout.VERTICAL);
+
+                  int currentAudioId = mediaPlayer.getAudioTrack();
+                  if (audioTracks != null && audioTracks.length > 0) {
+                      int aNum = 1;
+                      for (int i = 0; i < audioTracks.length; i++) {
+                          MediaPlayer.TrackDescription tr = audioTracks[i];
+                          String label = formatTrackLabel(tr, true, tr.id == -1 ? 0 : aNum++);
+                          audioList.addView(buildTrackRow(label, tr.id == currentAudioId, itemPadH, itemPadV));
+                      }
+                  } else {
+                      TextView emptyAudio = new TextView(this);
+                      emptyAudio.setText("No audio tracks");
+                      emptyAudio.setTextColor(Color.parseColor("#8E95A5"));
+                      emptyAudio.setTextSize(13f);
+                      emptyAudio.setPadding(itemPadH, itemPadV, itemPadH, itemPadV);
+                      audioList.addView(emptyAudio);
+                  }
+                  audioScroll.addView(audioList);
+                  leftCol.addView(audioScroll);
+
+                  View divider = new View(this);
+                  divider.setLayoutParams(new LinearLayout.LayoutParams(Math.round(1 * density), ViewGroup.LayoutParams.MATCH_PARENT));
+                  divider.setBackgroundColor(Color.parseColor("#2A2F3D"));
+
+                  LinearLayout rightCol = new LinearLayout(this);
+                  rightCol.setOrientation(LinearLayout.VERTICAL);
+                  rightCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                  rightCol.setPadding(Math.round(8 * density), 0, 0, 0);
+
+                  TextView subHeader = new TextView(this);
+                  subHeader.setText("Subtitles");
+                  subHeader.setTextColor(Color.WHITE);
+                  subHeader.setTextSize(15f);
+                  subHeader.setTypeface(null, Typeface.BOLD);
+                  subHeader.setPadding(itemPadH, Math.round(4 * density), itemPadH, Math.round(8 * density));
+                  rightCol.addView(subHeader);
+
+                  ScrollView subScroll = new ScrollView(this);
+                  LinearLayout subList = new LinearLayout(this);
+                  subList.setOrientation(LinearLayout.VERTICAL);
+
+                  int currentSpuId = mediaPlayer.getSpuTrack();
+                  if (spuTracks != null && spuTracks.length > 0) {
+                      int sNum = 1;
+                      for (int i = 0; i < spuTracks.length; i++) {
+                          MediaPlayer.TrackDescription tr = spuTracks[i];
+                          String label = formatTrackLabel(tr, false, tr.id == -1 ? 0 : sNum++);
+                          subList.addView(buildTrackRow(label, tr.id == currentSpuId, itemPadH, itemPadV));
+                      }
+                  } else {
+                      TextView emptySub = new TextView(this);
+                      emptySub.setText("Disable track");
+                      emptySub.setTextColor(Color.parseColor("#8E95A5"));
+                      emptySub.setTextSize(13f);
+                      emptySub.setPadding(itemPadH, itemPadV, itemPadH, itemPadV);
+                      subList.addView(emptySub);
+                  }
+                  subScroll.addView(subList);
+                  rightCol.addView(subScroll);
+
+                  int initIdx = getCurrentSubSizeIndex();
+
+                  LinearLayout sizeHeaderRow = new LinearLayout(this);
+                  sizeHeaderRow.setOrientation(LinearLayout.HORIZONTAL);
+                  sizeHeaderRow.setPadding(itemPadH, Math.round(12 * density), itemPadH, Math.round(2 * density));
+
+                  TextView sizeTitle = new TextView(this);
+                  sizeTitle.setText("Subtitle Size");
+                  sizeTitle.setTextColor(Color.parseColor("#94A3B8"));
+                  sizeTitle.setTextSize(12f);
+                  sizeTitle.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+                  TextView sizeValueTv = new TextView(this);
+                  sizeValueTv.setText(SUB_SIZE_LABELS[initIdx]);
+                  sizeValueTv.setTextColor(Color.parseColor("#FF6B00"));
+                  sizeValueTv.setTextSize(12f);
+                  sizeValueTv.setTypeface(null, Typeface.BOLD);
+
+                  sizeHeaderRow.addView(sizeTitle);
+                  sizeHeaderRow.addView(sizeValueTv);
+                  rightCol.addView(sizeHeaderRow);
+
+                  SeekBar sizeSlider = new SeekBar(this);
+                  sizeSlider.setMax(SUB_SIZE_VALUES.length - 1);
+                  sizeSlider.setProgress(initIdx);
+                  sizeSlider.setProgressTintList(ColorStateList.valueOf(Color.parseColor("#FF6B00")));
+                  sizeSlider.setThumbTintList(ColorStateList.valueOf(Color.parseColor("#FF6B00")));
+                  sizeSlider.setProgressBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#55FFFFFF")));
+                  sizeSlider.setPadding(itemPadH, Math.round(4 * density), itemPadH, Math.round(4 * density));
+                  rightCol.addView(sizeSlider);
+
+                  container.addView(leftCol);
+                  container.addView(divider);
+                  container.addView(rightCol);
+
+                  AlertDialog dialog = new AlertDialog.Builder(this)
+                          .setView(container)
+                          .setOnDismissListener(d -> {
+                              hideSystemUi();
+                              scheduleHideControls();
+                          })
+                          .create();
+
+                  bindDismissOnSelect(audioList, audioTracks, true, dialog);
+                  bindDismissOnSelect(subList, spuTracks, false, dialog);
+
+                  sizeSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override
+                      public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                          if (progress >= 0 && progress < SUB_SIZE_LABELS.length) {
+                              sizeValueTv.setText(SUB_SIZE_LABELS[progress]);
+                          }
+                      }
+                      @Override
+                      public void onStartTrackingTouch(SeekBar sb) {}
+                      @Override
+                      public void onStopTrackingTouch(SeekBar sb) {
+                          int idx = sb.getProgress();
+                          int newSize = SUB_SIZE_VALUES[idx];
+                          if (currentSubFontSize != newSize) {
+                              currentSubFontSize = newSize;
+                              getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putInt(KEY_SUB_SIZE, newSize).apply();
+                              long pos = mediaPlayer != null ? mediaPlayer.getTime() : 0L;
+                              int aId = mediaPlayer != null ? mediaPlayer.getAudioTrack() : Integer.MIN_VALUE;
+                              int sId = mediaPlayer != null ? mediaPlayer.getSpuTrack() : Integer.MIN_VALUE;
+                              Toast.makeText(VlcPlayerActivity.this, "Subtitle Size: " + SUB_SIZE_LABELS[idx], Toast.LENGTH_SHORT).show();
+                              dialog.dismiss();
+                              initVlcPlayer(pos, aId, sId);
+                          }
+                      }
+                  });
+
+                  dialog.show();
+                  if (dialog.getWindow() != null) {
+                      dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+                  }
+              }
+
+              private void bindDismissOnSelect(
+                      LinearLayout listView,
+                      MediaPlayer.TrackDescription[] tracks,
+                      boolean isAudio,
+                      AlertDialog dialog
+              ) {
+                  if (tracks == null) return;
+                  int count = Math.min(listView.getChildCount(), tracks.length);
+                  int num = 1;
+                  for (int i = 0; i < count; i++) {
+                      final int idx = i;
+                      MediaPlayer.TrackDescription tr = tracks[idx];
+                      final String label = formatTrackLabel(tr, isAudio, tr.id == -1 ? 0 : num++);
+                      listView.getChildAt(i).setOnClickListener(v -> {
+                          if (isAudio) {
+                              mediaPlayer.setAudioTrack(tr.id);
+                              Toast.makeText(this, "Audio: " + label, Toast.LENGTH_SHORT).show();
+                          } else {
+                              mediaPlayer.setSpuTrack(tr.id);
+                              Toast.makeText(this, "Subtitle: " + label, Toast.LENGTH_SHORT).show();
+                          }
+                          dialog.dismiss();
+                      });
+                  }
+              }
+
+              private TextView buildTrackRow(String label, boolean selected, int padH, int padV) {
+                  TextView tv = new TextView(this);
+                  tv.setLayoutParams(new LinearLayout.LayoutParams(
+                          ViewGroup.LayoutParams.MATCH_PARENT,
+                          ViewGroup.LayoutParams.WRAP_CONTENT
+                  ));
+                  tv.setGravity(Gravity.CENTER_VERTICAL);
+                  tv.setText((selected ? "✓  " : "    ") + label);
+                  tv.setTextSize(13.5f);
+                  tv.setTextColor(selected ? Color.WHITE : Color.parseColor("#B5BCCB"));
+                  tv.setTypeface(null, selected ? Typeface.BOLD : Typeface.NORMAL);
+                  tv.setPadding(padH, padV, padH, padV);
+                  return tv;
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (isLocked) {
+                      toggleControls();
+                      return;
+                  }
+                  super.onBackPressed();
+              }
+
+              @Override
+              public boolean onKeyDown(int keyCode, KeyEvent event) {
+                  if (mediaPlayer != null && !isLocked) {
+                      if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
+                          togglePlayPause();
+                          showControls();
+                          return true;
+                      }
+                      if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD) {
+                          seekBy(10000L);
+                          showBrandOverlay("⏩ +10s", true);
+                          showControls();
+                          return true;
+                      }
+                      if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND) {
+                          seekBy(-10000L);
+                          showBrandOverlay("⏪ -10s", true);
+                          showControls();
+                          return true;
+                      }
+                  }
+                  return super.onKeyDown(keyCode, event);
+              }
+
+              @Override
+              protected void onStop() {
+                  super.onStop();
+                  if (mediaPlayer != null) mediaPlayer.stop();
+              }
+
+              @Override
+              protected void onDestroy() {
+                  super.onDestroy();
+                  handler.removeCallbacksAndMessages(null);
+                  if (mediaPlayer != null) {
+                      mediaPlayer.detachViews();
+                      mediaPlayer.release();
+                      mediaPlayer = null;
+                  }
+                  if (libVLC != null) {
+                      libVLC.release();
+                      libVLC = null;
+                  }
+              }
+          }
