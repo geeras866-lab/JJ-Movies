@@ -26,6 +26,9 @@
       <a href="./jj-movies.apk" id="navAppDownloadLink" class="nav-download-app jj-apk-btn" download>
         <span>App</span>
       </a>
+      <a href="./jj-movies-tv.apk" id="navTvDownloadLink" class="nav-download-app jj-apk-btn" download style="border-color:#a855f7;background:rgba(168,85,247,0.15);">
+        <span>📺 TV</span>
+      </a>
     </div>
   </header>
 
@@ -44,9 +47,10 @@
           </div>
           <h1 class="banner-title">Welcome to <span>JJ Movies</span></h1>
           <p class="banner-desc">Explore cinema files, high quality prints and grab links on Telegram bot.</p>
-          <div class="banner-action-row">
+          <div class="banner-action-row" style="flex-wrap:wrap;">
             <a href="#collection" class="btn-banner-primary">⚡ Explore collection</a>
             <a href="./jj-movies.apk" id="bannerAppDownloadLink" class="btn-banner-secondary jj-apk-btn" download>⬇ Android App</a>
+            <a href="./jj-movies-tv.apk" id="bannerTvDownloadLink" class="btn-banner-secondary jj-apk-btn" download style="border-color:#a855f7;background:rgba(168,85,247,0.2);">📺 TV App</a>
           </div>
         </div>
       </div>
@@ -120,9 +124,14 @@
       <span class="logo-text">MOVIES</span>
     </a>
     <p>Your Movie Library · © 2026 JJ Movies</p>
-    <a href="./jj-movies.apk" id="footerAppDownloadLink" class="footer-app-link jj-apk-btn" download>
-      Download Android App
-    </a>
+    <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
+      <a href="./jj-movies.apk" id="footerAppDownloadLink" class="footer-app-link jj-apk-btn" download>
+        ⬇ Download Android App
+      </a>
+      <a href="./jj-movies-tv.apk" id="footerTvDownloadLink" class="footer-app-link jj-apk-btn" download style="border-color:#a855f7;background:rgba(168,85,247,0.15);">
+        📺 Download TV App
+      </a>
+    </div>
   </footer>
 
   <!-- OTT Dark Blur Modal -->
@@ -133,7 +142,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=10"></script>
   <script src="tv.js"></script>
   <script>
     function filterByCustomCategory(category, btnElement) {
