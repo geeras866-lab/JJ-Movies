@@ -376,14 +376,14 @@ jobs:
           cat << 'EOF' > android/app/src/main/res/drawable/bg_vlc_top_grad.xml
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android">
-              <gradient android:angle="270" android:startColor="#CC000000" android:endColor="#00000000" />
+              <gradient android:angle="270" android:startColor="#88000000" android:endColor="#00000000" />
           </shape>
           EOF
 
           cat << 'EOF' > android/app/src/main/res/drawable/bg_vlc_bottom_grad.xml
           <?xml version="1.0" encoding="utf-8"?>
           <shape xmlns:android="http://schemas.android.com/apk/res/android">
-              <gradient android:angle="90" android:startColor="#DD000000" android:endColor="#00000000" />
+              <gradient android:angle="90" android:startColor="#99000000" android:endColor="#00000000" />
           </shape>
           EOF
 
@@ -442,7 +442,7 @@ jobs:
                       android:textSize="11sp" />
               </LinearLayout>
 
-              <!-- Center Gesture HUD (Brightness / Volume / Seek) -->
+              <!-- Center Gesture HUD (Brightness / Volume / Aspect) -->
               <TextView
                   android:id="@+id/tv_gesture_hud"
                   android:layout_width="wrap_content"
@@ -639,8 +639,10 @@ jobs:
           import android.content.Context;
           import android.content.SharedPreferences;
           import android.content.pm.ActivityInfo;
+          import android.content.res.ColorStateList;
           import android.graphics.Color;
           import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
           import android.media.AudioManager;
           import android.net.Uri;
           import android.os.Bundle;
@@ -724,7 +726,6 @@ jobs:
                   if (controlsOverlay != null && mediaPlayer != null && mediaPlayer.isPlaying()) {
                       controlsOverlay.setVisibility(View.GONE);
                       controlsVisible = false;
-                      adjustSubtitleClearanceForControls(false);
                       hideSystemUi();
                   }
               };
@@ -800,31 +801,12 @@ jobs:
                   handler.postDelayed(hideHudRunnable, 1000);
               }
 
-              private void adjustSubtitleClearanceForControls(boolean showClearance) {
-                  if (videoLayout == null) return;
-                  float density = getResources().getDisplayMetrics().density;
-                  int bottomLiftPx = showClearance ? Math.round(78 * density) : Math.round(16 * density);
-                  ViewGroup.LayoutParams lp = videoLayout.getLayoutParams();
-                  if (lp instanceof ViewGroup.MarginLayoutParams) {
-                      ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) lp;
-                      mlp.bottomMargin = showClearance ? Math.round(52 * density) : 0;
-                      videoLayout.setLayoutParams(mlp);
-                  }
-                  videoLayout.setPadding(
-                      videoLayout.getPaddingLeft(),
-                      videoLayout.getPaddingTop(),
-                      videoLayout.getPaddingRight(),
-                      bottomLiftPx
-                  );
-              }
-
               private void showControls() {
                   if (isLocked) return;
                   if (controlsOverlay != null) {
                       controlsOverlay.setVisibility(View.VISIBLE);
                       controlsVisible = true;
                   }
-                  adjustSubtitleClearanceForControls(true);
                   scheduleHideControls();
               }
 
@@ -841,7 +823,6 @@ jobs:
                       handler.removeCallbacks(hideControlsRunnable);
                       controlsOverlay.setVisibility(View.GONE);
                       controlsVisible = false;
-                      adjustSubtitleClearanceForControls(false);
                       hideSystemUi();
                   } else {
                       showControls();
@@ -855,7 +836,6 @@ jobs:
                       controlsOverlay.setVisibility(View.GONE);
                       controlsVisible = false;
                   }
-                  adjustSubtitleClearanceForControls(false);
                   if (btnUnlock != null) {
                       btnUnlock.setVisibility(View.VISIBLE);
                       handler.removeCallbacks(hideUnlockRunnable);
@@ -926,6 +906,13 @@ jobs:
                   }
               }
 
+              private int getCurrentSubSizeIndex() {
+                  for (int i = 0; i < SUB_SIZE_VALUES.length; i++) {
+                      if (SUB_SIZE_VALUES[i] == currentSubFontSize) return i;
+                  }
+                  return 1; // Normal
+              }
+
               private void initVlcPlayer(long resumePositionMs, int restoreAudioId, int restoreSpuId) {
                   if (mediaPlayer != null) {
                       mediaPlayer.stop();
@@ -945,6 +932,7 @@ jobs:
                   options.add("--live-caching=3000");
                   options.add("--http-reconnect");
                   options.add("--freetype-rel-fontsize=" + currentSubFontSize);
+                  options.add("--sub-margin=45");
 
                   libVLC = new LibVLC(this, options);
                   mediaPlayer = new MediaPlayer(libVLC);
@@ -1088,7 +1076,7 @@ jobs:
                           }
                       } else if (action == MotionEvent.ACTION_MOVE) {
                           float dx = event.getX() - touchStartX;
-                          float dy = touchStartY - event.getY(); // up = positive
+                          float dy = touchStartY - event.getY();
                           if (gestureMode == 0 && Math.abs(dy) > swipeThreshold && Math.abs(dy) > Math.abs(dx)) {
                               int w = Math.max(1, root.getWidth());
                               gestureMode = (touchStartX < w / 2f) ? 1 : 2;
@@ -1117,7 +1105,6 @@ jobs:
                   root.setOnTouchListener(touchListener);
                   controlsOverlay.setOnTouchListener(touchListener);
 
-                  adjustSubtitleClearanceForControls(true);
                   initVlcPlayer(0L, Integer.MIN_VALUE, Integer.MIN_VALUE);
 
                   handler.post(progressUpdater);
@@ -1180,13 +1167,18 @@ jobs:
                   MediaPlayer.TrackDescription[] spuTracks = mediaPlayer.getSpuTracks();
 
                   float density = getResources().getDisplayMetrics().density;
-                  int pad = Math.round(12 * density);
+                  int pad = Math.round(14 * density);
                   int itemPadV = Math.round(9 * density);
                   int itemPadH = Math.round(10 * density);
 
+                  GradientDrawable dialogBg = new GradientDrawable();
+                  dialogBg.setColor(Color.parseColor("#E60D0F14"));
+                  dialogBg.setCornerRadius(14 * density);
+                  dialogBg.setStroke(Math.round(1 * density), Color.parseColor("#2A2F3D"));
+
                   LinearLayout container = new LinearLayout(this);
                   container.setOrientation(LinearLayout.HORIZONTAL);
-                  container.setBackgroundColor(Color.parseColor("#0D0F14"));
+                  container.setBackground(dialogBg);
                   container.setPadding(pad, pad, pad, pad);
 
                   // Left Column: Audio Tracks
@@ -1232,7 +1224,7 @@ jobs:
                   divider.setLayoutParams(new LinearLayout.LayoutParams(Math.round(1 * density), ViewGroup.LayoutParams.MATCH_PARENT));
                   divider.setBackgroundColor(Color.parseColor("#2A2F3D"));
 
-                  // Right Column: Subtitles + Subtitle Size Selector
+                  // Right Column: Subtitles + Mini Slider
                   LinearLayout rightCol = new LinearLayout(this);
                   rightCol.setOrientation(LinearLayout.VERTICAL);
                   rightCol.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -1270,19 +1262,37 @@ jobs:
                   subScroll.addView(subList);
                   rightCol.addView(subScroll);
 
-                  // Subtitle Size Section
-                  TextView sizeHeader = new TextView(this);
-                  sizeHeader.setText("Subtitle Size");
-                  sizeHeader.setTextColor(Color.parseColor("#94A3B8"));
-                  sizeHeader.setTextSize(12f);
-                  sizeHeader.setTypeface(null, Typeface.BOLD);
-                  sizeHeader.setPadding(itemPadH, Math.round(12 * density), itemPadH, Math.round(6 * density));
-                  rightCol.addView(sizeHeader);
+                  // Mini Slider for Subtitle Size
+                  int initIdx = getCurrentSubSizeIndex();
 
-                  LinearLayout sizeRow = new LinearLayout(this);
-                  sizeRow.setOrientation(LinearLayout.HORIZONTAL);
-                  sizeRow.setPadding(itemPadH, 0, itemPadH, Math.round(4 * density));
-                  rightCol.addView(sizeRow);
+                  LinearLayout sizeHeaderRow = new LinearLayout(this);
+                  sizeHeaderRow.setOrientation(LinearLayout.HORIZONTAL);
+                  sizeHeaderRow.setPadding(itemPadH, Math.round(12 * density), itemPadH, Math.round(2 * density));
+
+                  TextView sizeTitle = new TextView(this);
+                  sizeTitle.setText("Subtitle Size");
+                  sizeTitle.setTextColor(Color.parseColor("#94A3B8"));
+                  sizeTitle.setTextSize(12f);
+                  sizeTitle.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+                  TextView sizeValueTv = new TextView(this);
+                  sizeValueTv.setText(SUB_SIZE_LABELS[initIdx]);
+                  sizeValueTv.setTextColor(Color.parseColor("#FF6B00"));
+                  sizeValueTv.setTextSize(12f);
+                  sizeValueTv.setTypeface(null, Typeface.BOLD);
+
+                  sizeHeaderRow.addView(sizeTitle);
+                  sizeHeaderRow.addView(sizeValueTv);
+                  rightCol.addView(sizeHeaderRow);
+
+                  SeekBar sizeSlider = new SeekBar(this);
+                  sizeSlider.setMax(SUB_SIZE_VALUES.length - 1);
+                  sizeSlider.setProgress(initIdx);
+                  sizeSlider.setProgressTintList(ColorStateList.valueOf(Color.parseColor("#FF6B00")));
+                  sizeSlider.setThumbTintList(ColorStateList.valueOf(Color.parseColor("#FF6B00")));
+                  sizeSlider.setProgressBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#55FFFFFF")));
+                  sizeSlider.setPadding(itemPadH, Math.round(4 * density), itemPadH, Math.round(4 * density));
+                  rightCol.addView(sizeSlider);
 
                   container.addView(leftCol);
                   container.addView(divider);
@@ -1299,39 +1309,31 @@ jobs:
                   bindDismissOnSelect(audioList, audioTracks, true, dialog);
                   bindDismissOnSelect(subList, spuTracks, false, dialog);
 
-                  for (int i = 0; i < SUB_SIZE_VALUES.length; i++) {
-                      final int sizeVal = SUB_SIZE_VALUES[i];
-                      final String sizeLabel = SUB_SIZE_LABELS[i];
-                      TextView chip = new TextView(this);
-                      chip.setText(sizeLabel);
-                      chip.setTextSize(11.5f);
-                      chip.setGravity(Gravity.CENTER);
-                      boolean active = (currentSubFontSize == sizeVal);
-                      chip.setTextColor(active ? Color.WHITE : Color.parseColor("#CBD5E1"));
-                      chip.setTypeface(null, active ? Typeface.BOLD : Typeface.NORMAL);
-                      chip.setBackgroundColor(active ? Color.parseColor("#FF2450") : Color.parseColor("#1E293B"));
-                      int cPadH = Math.round(8 * density);
-                      int cPadV = Math.round(6 * density);
-                      chip.setPadding(cPadH, cPadV, cPadH, cPadV);
-                      LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-                      clp.setMargins(Math.round(2 * density), 0, Math.round(2 * density), 0);
-                      chip.setLayoutParams(clp);
-                      chip.setOnClickListener(v -> {
-                          if (currentSubFontSize != sizeVal) {
-                              currentSubFontSize = sizeVal;
-                              getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putInt(KEY_SUB_SIZE, sizeVal).apply();
+                  sizeSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override
+                      public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                          if (progress >= 0 && progress < SUB_SIZE_LABELS.length) {
+                              sizeValueTv.setText(SUB_SIZE_LABELS[progress]);
+                          }
+                      }
+                      @Override
+                      public void onStartTrackingTouch(SeekBar sb) {}
+                      @Override
+                      public void onStopTrackingTouch(SeekBar sb) {
+                          int idx = sb.getProgress();
+                          int newSize = SUB_SIZE_VALUES[idx];
+                          if (currentSubFontSize != newSize) {
+                              currentSubFontSize = newSize;
+                              getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putInt(KEY_SUB_SIZE, newSize).apply();
                               long pos = mediaPlayer != null ? mediaPlayer.getTime() : 0L;
                               int aId = mediaPlayer != null ? mediaPlayer.getAudioTrack() : Integer.MIN_VALUE;
                               int sId = mediaPlayer != null ? mediaPlayer.getSpuTrack() : Integer.MIN_VALUE;
-                              Toast.makeText(this, "Subtitle Size: " + sizeLabel, Toast.LENGTH_SHORT).show();
+                              Toast.makeText(VlcPlayerActivity.this, "Subtitle Size: " + SUB_SIZE_LABELS[idx], Toast.LENGTH_SHORT).show();
                               dialog.dismiss();
                               initVlcPlayer(pos, aId, sId);
-                          } else {
-                              dialog.dismiss();
                           }
-                      });
-                      sizeRow.addView(chip);
-                  }
+                      }
+                  });
 
                   dialog.show();
                   if (dialog.getWindow() != null) {
