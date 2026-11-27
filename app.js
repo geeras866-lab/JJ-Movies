@@ -101,6 +101,83 @@ function applyAppDownloadUrlFromSettings(data) {
   });
 }
 
+// ---------- Strict App Maintenance & Version Control (APK Only) ----------
+window.__JJ_APP_BLOCKED = false;
+
+function getInstalledApkVersionCode() {
+  try {
+    if (window.AndroidVlc && typeof window.AndroidVlc.getAppVersionCode === "function") {
+      var code = parseInt(window.AndroidVlc.getAppVersionCode(), 10);
+      if (!isNaN(code) && code > 0) return code;
+    }
+  } catch (e) {}
+  // Old APKs lo getAppVersionCode() ledu kabatti automatic ga Version 1 ga count avtayi
+  return 1;
+}
+
+function showStrictAppBlockOverlay(cfg) {
+  window.__JJ_APP_BLOCKED = true;
+  var existing = document.getElementById("jjStrictBlockOverlay");
+  if (existing) existing.remove();
+
+  var noticeModal = document.getElementById("jjStartupNoticeModal");
+  if (noticeModal) noticeModal.remove();
+
+  var wrap = document.createElement("div");
+  wrap.id = "jjStrictBlockOverlay";
+  wrap.style.cssText =
+    "position:fixed;inset:0;z-index:2147483647;background:#080d18;display:flex;align-items:center;justify-content:center;padding:24px;";
+
+  var btnHtml = cfg.actionUrl
+    ? '<a class="jj-strict-update-btn" href="' + escapeHTML(cfg.actionUrl) + '" target="_blank" rel="noopener noreferrer" style="display:inline-block;width:100%;padding:14px 18px;margin-top:18px;background:linear-gradient(135deg,#ff2450,#ff6b00);color:#fff;text-decoration:none;border-radius:12px;font-weight:800;font-size:15px;">⬇ ' + escapeHTML(cfg.actionLabel || "Update New App") + '</a>'
+    : "";
+
+  wrap.innerHTML =
+    '<div style="width:100%;max-width:380px;background:#111827;border:1.5px solid rgba(255,36,80,.45);border-radius:20px;padding:26px 22px;text-align:center;color:#f8fafc;box-shadow:0 24px 60px rgba(0,0,0,.95);">' +
+      '<div style="font-size:44px;margin-bottom:10px;">' + escapeHTML(cfg.icon || "🛠️") + '</div>' +
+      '<div style="display:inline-block;background:#ff2450;color:#fff;font-size:10px;font-weight:800;letter-spacing:1.2px;padding:3px 10px;border-radius:999px;margin-bottom:12px;">JJ MOVIES</div>' +
+      '<h2 style="margin:0 0 10px;font-size:21px;font-weight:900;color:#fff;">' + escapeHTML(cfg.title) + '</h2>' +
+      '<p style="margin:0;font-size:14px;line-height:1.6;color:#cbd5e1;white-space:pre-line;">' + escapeHTML(cfg.message) + '</p>' +
+      btnHtml +
+    '</div>';
+
+  document.body.style.overflow = "hidden";
+  document.body.appendChild(wrap);
+}
+
+function applyAppControlFromSettings(data) {
+  if (!isRunningInsideApk() || !Array.isArray(data)) return;
+
+  var ctrlRow = data.find(function (r) { return r && r.key === "app_control_config"; });
+  if (!ctrlRow || !ctrlRow.value) return;
+  var cfg = ctrlRow.value;
+
+  if (cfg.maintenance === true) {
+    showStrictAppBlockOverlay({
+      icon: "🛠️",
+      title: "App Under Maintenance",
+      message: cfg.maintenance_message || "This app is currently under maintenance. Please check back soon.",
+      actionUrl: "",
+      actionLabel: ""
+    });
+    return;
+  }
+
+  var minVer = parseInt(cfg.min_version_code, 10) || 1;
+  var currentVer = getInstalledApkVersionCode();
+  if (currentVer < minVer) {
+    var fallbackAppRow = data.find(function (r) { return r && r.key === "app_download_config"; });
+    var downloadLink = safeAppDownloadURL(cfg.update_url || (fallbackAppRow && fallbackAppRow.value && fallbackAppRow.value.url) || "./jj-movies.apk");
+    showStrictAppBlockOverlay({
+      icon: "🚀",
+      title: cfg.update_title || "Update New App",
+      message: cfg.update_message || "You are using an older version of JJ Movies. Please update to the latest version to continue.",
+      actionUrl: downloadLink,
+      actionLabel: "Update New App"
+    });
+  }
+}
+
 function buildTelegramBotStartUrl(versionOrId) {
   var payload = String(versionOrId == null ? "" : versionOrId).trim();
   if (!payload) return "https://t.me/" + TELEGRAM_BOT_USERNAME;
@@ -293,6 +370,7 @@ async function resolveTokenStreamUrl(rawUrl, linkType, meta) {
 }
 
 async function playMovieByFileName(fileName, title) {
+  if (window.__JJ_APP_BLOCKED) return;
   var cleanFile = String(fileName || "").trim().replace(/^\/+/, "");
   if (!cleanFile) return;
 
@@ -326,6 +404,7 @@ async function playMovieByFileName(fileName, title) {
 window.playMovieByFileName = playMovieByFileName;
 
 function launchNativeVlc(playableUrl, title) {
+  if (window.__JJ_APP_BLOCKED) return false;
   var activeTitle = title ||
     currentActiveMovieTitle ||
     (document.getElementById("modalMovieTitle") && document.getElementById("modalMovieTitle").textContent) ||
@@ -441,6 +520,7 @@ function ensureInAppPlayerModal() {
 }
 
 window.addEventListener("popstate", function () {
+  if (window.__JJ_APP_BLOCKED) return;
   var noticeModal = document.getElementById("jjStartupNoticeModal");
   if (noticeModal) {
     noticeModal.remove();
@@ -462,12 +542,14 @@ window.addEventListener("popstate", function () {
 });
 
 function openMoviePlayerById(movieId) {
+  if (window.__JJ_APP_BLOCKED) return;
   var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
   if (!movie) return;
   openServerSelection(movie.title, movie.stream1, movie.stream2, movie.linkType, { id: movie.id });
 }
 
 async function openServerSelection(title, s1, s2, linkType, meta) {
+  if (window.__JJ_APP_BLOCKED) return;
   var cleanTitle = title || "Playing Movie";
   currentActiveMovieTitle = cleanTitle;
 
@@ -525,6 +607,7 @@ async function openServerSelection(title, s1, s2, linkType, meta) {
 }
 
 async function playMovieStream(rawUrl, title, linkType, meta) {
+  if (window.__JJ_APP_BLOCKED) return;
   var stage = document.getElementById("jjPlayerStage");
   if (!stage) return;
   var raw = String(rawUrl || "").trim();
@@ -714,6 +797,7 @@ async function initNeonFestivalMode() {
   try {
     settingsData = await fetchFromApi("settings");
     applyAppDownloadUrlFromSettings(settingsData);
+    applyAppControlFromSettings(settingsData);
   } catch (err) {}
 
   try {
@@ -1190,6 +1274,7 @@ function renderEpisodes(movie, eps, box) {
 
 // ---------- Movie Details Modal (Website + App Both Show Player & Bot Prints) ----------
 async function showMovieDetails(movieId) {
+  if (window.__JJ_APP_BLOCKED) return;
   var movie = movies.find(function (item) { return String(item.id) === String(movieId); });
   if (!movie) return;
 
@@ -1336,6 +1421,7 @@ function pickTargetedNotice(messagesList) {
 }
 
 function renderStartupNoticeModal(msgItem) {
+  if (window.__JJ_APP_BLOCKED) return;
   if (!msgItem || !msgItem.title) return;
   var inApp = Boolean(msgItem.isAppNotice != null ? msgItem.isAppNotice : isRunningInsideApk());
   var hideKey = "jj_notice_hide_until_" + (inApp ? "app_" : "web_") + String(msgItem.id || "") + "_" + String(msgItem.title || "").slice(0, 20) + "_" + String(msgItem.link_url || "").slice(-10);
@@ -1443,7 +1529,7 @@ function loadMessages() {
       });
 
       var popupNotice = pickTargetedNotice(popupCandidates);
-      if (popupNotice) {
+      if (popupNotice && !window.__JJ_APP_BLOCKED) {
         renderStartupNoticeModal(popupNotice);
       }
 
@@ -1506,7 +1592,7 @@ function closeMovieModal() {
 (function configureApkDownloadButtons() {
   if (isRunningInsideApk()) {
     var st = document.createElement("style");
-    st.textContent = '.jj-apk-btn, .nav-download-app, .footer-app-link, a[href*="jj-movies.apk"] { display: none !important; }';
+    st.textContent = '.jj-apk-btn, .nav-download-app, .footer-app-link, a[href*="jj-movies.apk"]:not(.jj-strict-update-btn) { display: none !important; }';
     document.head.appendChild(st);
   }
 })();
@@ -1527,6 +1613,7 @@ if (movieModal) {
 
 document.addEventListener("keydown", function (event) {
   if (event.key === "Escape") {
+    if (window.__JJ_APP_BLOCKED) return;
     var noticeModal = document.getElementById("jjStartupNoticeModal");
     if (noticeModal) noticeModal.remove();
     closeInAppPlayer();
