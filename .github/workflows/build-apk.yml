@@ -717,6 +717,7 @@ jobs:
 
               private final Handler handler = new Handler(Looper.getMainLooper());
               private String safeVideoUrl = "";
+              private String movieDisplayTitle = "JJ Movies";
               private int currentSubFontSize = 16;
               private boolean isUserSeeking = false;
               private boolean controlsVisible = true;
@@ -780,6 +781,36 @@ jobs:
                       handler.postDelayed(this, 500);
                   }
               };
+
+              private String cleanRipperTags(String raw) {
+                  if (raw == null) return "";
+                  String s = raw.trim();
+                  s = s.replaceAll("(?i)team\\s*movies", " ");
+                  s = s.replaceAll("(?i)1\\s*tamil\\s*mv|tamil\\s*mv|tamil\\s*rockers|movie\\s*rulz|bolly\\s*4u|katmoviehd|vegamovies|uhdmovies|olamovies|filmyzilla|desiremovies|hdhub4u|mkvcinemas|ssrmovies|worldfree4u|telly|hon3y|psa|yify|rarbg|flux|ntb|cmrg|qxr|utr|tigole", " ");
+                  s = s.replaceAll("(?i)(www\\.[a-z0-9.-]+|@[a-z0-9_]+|t\\.me/\\S+)", " ");
+                  s = s.replaceAll("(?i)^track\\s*\\d+\\s*[-:|]?\\s*", "");
+                  s = s.replaceAll("\\[\\s*\\]", "").replaceAll("\\(\\s*\\)", "");
+                  s = s.replaceAll("\\s*-\\s*-\\s*", " - ");
+                  s = s.replaceAll("^[\\s\\-:|]+|[\\s\\-:|]+$", "");
+                  s = s.replaceAll("\\s+", " ").trim();
+                  return s;
+              }
+
+              private String formatTrackLabel(MediaPlayer.TrackDescription tr, boolean isAudio, int fallbackNum) {
+                  if (tr.id == -1) return "Disable track";
+                  String cleaned = cleanRipperTags(tr.name);
+                  cleaned = cleaned.replaceAll("(?i)^jj\\s*[-:|]?\\s*", "").trim();
+                  String safeMovie = movieDisplayTitle != null ? movieDisplayTitle.trim() : "Movie";
+                  if (!safeMovie.isEmpty() && cleaned.toLowerCase(Locale.US).startsWith(safeMovie.toLowerCase(Locale.US))) {
+                      cleaned = cleaned.substring(safeMovie.length()).replaceAll("^[\\s\\-:|]+", "").trim();
+                  }
+                  if (cleaned.isEmpty()) {
+                      return isAudio
+                              ? ("JJ - " + safeMovie + " - Audio " + fallbackNum)
+                              : ("JJ - " + safeMovie + " - Subtitle " + fallbackNum);
+                  }
+                  return "JJ - " + safeMovie + " - " + cleaned;
+              }
 
               private void hideSystemUi() {
                   getWindow().getDecorView().setSystemUiVisibility(
@@ -1017,6 +1048,9 @@ jobs:
                       finish();
                       return;
                   }
+                  if (videoTitle != null && !videoTitle.trim().isEmpty()) {
+                      movieDisplayTitle = videoTitle.trim();
+                  }
 
                   safeVideoUrl = videoUrl.trim()
                           .replace(" ", "%20")
@@ -1050,8 +1084,8 @@ jobs:
                   ImageButton btnAspect = findViewById(R.id.btn_aspect);
                   ImageButton btnLock = findViewById(R.id.btn_lock);
 
-                  if (tvTitle != null && videoTitle != null && !videoTitle.trim().isEmpty()) {
-                      tvTitle.setText(videoTitle.trim());
+                  if (tvTitle != null) {
+                      tvTitle.setText(movieDisplayTitle);
                   }
 
                   GestureDetector gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
@@ -1220,11 +1254,10 @@ jobs:
 
                   int currentAudioId = mediaPlayer.getAudioTrack();
                   if (audioTracks != null && audioTracks.length > 0) {
+                      int aNum = 1;
                       for (int i = 0; i < audioTracks.length; i++) {
                           MediaPlayer.TrackDescription tr = audioTracks[i];
-                          String label = (tr.name != null && !tr.name.trim().isEmpty())
-                                  ? tr.name.trim()
-                                  : (tr.id == -1 ? "Disable track" : ("Audio Track " + i));
+                          String label = formatTrackLabel(tr, true, tr.id == -1 ? 0 : aNum++);
                           audioList.addView(buildTrackRow(label, tr.id == currentAudioId, itemPadH, itemPadV));
                       }
                   } else {
@@ -1261,11 +1294,10 @@ jobs:
 
                   int currentSpuId = mediaPlayer.getSpuTrack();
                   if (spuTracks != null && spuTracks.length > 0) {
+                      int sNum = 1;
                       for (int i = 0; i < spuTracks.length; i++) {
                           MediaPlayer.TrackDescription tr = spuTracks[i];
-                          String label = (tr.name != null && !tr.name.trim().isEmpty())
-                                  ? tr.name.trim()
-                                  : (tr.id == -1 ? "Disable track" : ("Subtitle " + i));
+                          String label = formatTrackLabel(tr, false, tr.id == -1 ? 0 : sNum++);
                           subList.addView(buildTrackRow(label, tr.id == currentSpuId, itemPadH, itemPadV));
                       }
                   } else {
@@ -1365,12 +1397,11 @@ jobs:
               ) {
                   if (tracks == null) return;
                   int count = Math.min(listView.getChildCount(), tracks.length);
+                  int num = 1;
                   for (int i = 0; i < count; i++) {
                       final int idx = i;
                       MediaPlayer.TrackDescription tr = tracks[idx];
-                      String label = (tr.name != null && !tr.name.trim().isEmpty())
-                              ? tr.name.trim()
-                              : (tr.id == -1 ? "Disable track" : ((isAudio ? "Audio Track " : "Subtitle ") + idx));
+                      final String label = formatTrackLabel(tr, isAudio, tr.id == -1 ? 0 : num++);
                       listView.getChildAt(i).setOnClickListener(v -> {
                           if (isAudio) {
                               mediaPlayer.setAudioTrack(tr.id);
