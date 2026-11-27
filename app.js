@@ -131,7 +131,6 @@ function getInstalledApkVersionCode() {
       if (!isNaN(code) && code > 0) return code;
     }
   } catch (e) {}
-  // Old APKs lo getAppVersionCode() ledu kabatti automatic ga Version 1 ga count avtayi
   return 1;
 }
 
